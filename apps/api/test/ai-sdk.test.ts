@@ -200,6 +200,11 @@ describe("what each setup sends over the wire", () => {
     usageMetadata: { promptTokenCount: 700, candidatesTokenCount: 300, thoughtsTokenCount: 50, cachedContentTokenCount: 20 },
   };
 
+  it("a named project wins over a key, so a restricted key cannot override the service identity", () => {
+    const options = resolveAiOptions({ AI_PROVIDER: "google", GOOGLE_CLOUD_PROJECT: "p", GOOGLE_API_KEY: "AQ.restricted" })!;
+    expect(options.secrets).toEqual([]);
+  });
+
   it("Vertex express mode: key in a header, nothing secret in the URL or body", async () => {
     const { fn, calls } = recordingFetch(geminiReply);
     const ai = createAiFromEnv({ GOOGLE_API_KEY: "AQ.test-key" }, { fetch: fn })!;
