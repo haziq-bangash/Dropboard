@@ -6,12 +6,15 @@ import { useState } from "react";
 import { DropZone } from "@/components/app/DropZone";
 import { useProjects } from "@/components/app/projects-store";
 import { loadFile } from "@/lib/ingest";
+import { authClient } from "@/lib/auth-client";
+import { saveProjectData } from "@/lib/local-data";
 import { setLoaded } from "@/lib/loaded-data";
 import { projectsApi } from "@/lib/projects";
 
 export default function NewProject() {
   const router = useRouter();
   const { refresh } = useProjects();
+  const { data: session } = authClient.useSession();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,6 +25,7 @@ export default function NewProject() {
       const { title, profile } = await loadFile(file);
       const created = await projectsApi.create(suggestDashboard(title, profile), { fileName: file.name, rowCount: profile.rowCount });
       setLoaded({ projectId: created.id, fileName: file.name, profile });
+      if (session) await saveProjectData(session.user.id, created.id);
       await refresh();
       router.push(`/app/p/${created.id}`);
     } catch (e) {
