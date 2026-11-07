@@ -174,7 +174,6 @@ export function HeroFlow() {
         <div className="absolute left-1/2 top-[142px] z-20 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg ring-4 ring-background">
           <BarChart3 className="size-8" />
         </div>
-        <p className="absolute bottom-1 right-[14%] text-xs text-muted-foreground">Sample insights, for illustration</p>
       </div>
     </div>
   );
