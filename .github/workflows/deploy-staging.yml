@@ -93,6 +93,10 @@ jobs:
               if gcloud secrets describe google-client-id >/dev/null 2>&1 && gcloud secrets describe google-client-secret >/dev/null 2>&1; then
                 LIST="$LIST,GOOGLE_CLIENT_ID=google-client-id:latest,GOOGLE_CLIENT_SECRET=google-client-secret:latest"
               fi
+              if gcloud secrets describe resend-api-key >/dev/null 2>&1 && [ -n "${{ vars.MAIL_FROM }}" ]; then
+                LIST="$LIST,RESEND_API_KEY=resend-api-key:latest"
+                ENV_VARS="$ENV_VARS,MAIL_FROM=${{ vars.MAIL_FROM }}"
+              fi
               SECRETS="--update-secrets=$LIST"
             fi
             MEMORY=512Mi

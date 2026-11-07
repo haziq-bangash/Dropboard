@@ -50,6 +50,11 @@ if [ -n "${GOOGLE_CLIENT_ID:-}" ] && [ -n "${GOOGLE_CLIENT_SECRET:-}" ]; then
   put_secret google-client-secret "$GOOGLE_CLIENT_SECRET"
   names="$names google-client-id google-client-secret"
 fi
+# Optional: email for confirmation and password reset (Resend). MAIL_FROM is a plain setting, not a secret.
+if [ -n "${RESEND_API_KEY:-}" ]; then
+  put_secret resend-api-key "$RESEND_API_KEY"
+  names="$names resend-api-key"
+fi
 
 # Narrow, per-secret access: the runtime account reads values; the deployer may only look the secrets up.
 for name in $names; do

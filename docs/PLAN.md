@@ -13,6 +13,7 @@ Spreadsheet/CSV/JSON in, shareable dashboard out. Browser does the heavy work; C
 0. **Foundations (done, v0.1.0):** monorepo, API, spec, Dockerfile (done). CI, deploy to staging, budget alerts. Exit: push to main deploys /health to staging.
 1. **Instant dashboard (browser-only) (done, v0.1.0):** parse csv/xlsx/json/ndjson in a worker, DuckDB-WASM profile, deterministic chart suggester, renderer, landing page. Exit: 50 MB CSV to dashboard in under 5s, no server call.
 2. **Persist and share (done, v0.2.0):** Better Auth, Postgres, save/load specs, snapshot publishing, optional password, SSR public viewer. Exit: a stranger opens a shared link.
+   - **Accounts (added after v0.3.4):** Google sign-in (when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set), email confirmation and password reset (when a mail provider is set: `MAIL_PROVIDER`, Resend by default, see `apps/api/src/mail`). With no mail provider, confirmation is not required, so nobody is locked out. Still open: social-login account linking rules and an "account" settings page.
 3. **AI layer (built, v0.3.0; needs an Anthropic key to run):** /api/generate from schema and stats only, cache by schema hash, quotas, chat edits via spec patches, NL Q&A (model writes SQL, browser runs it). Exit: cost per dashboard under target.
 4. **Monetization:** Stripe, entitlements, metering, hosted data, PDF/PPTX export.
 5. **Growth:** source templates and SEO pages, connectors with scheduled refresh, alerts, embeds, gallery, API/MCP, teams.
