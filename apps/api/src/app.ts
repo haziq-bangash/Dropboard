@@ -9,7 +9,7 @@ export const app = new Hono();
 app.use("*", secureHeaders());
 app.use("/api/*", cors({ origin: process.env.WEB_ORIGIN ?? "*" }));
 
-app.get("/healthz", (c) => c.text("ok"));
+app.get("/health", (c) => c.text("ok"));
 
 // Placeholder: persist a dashboard spec (Firestore/GCS comes next).
 app.post("/api/dashboards", zValidator("json", DashboardSpec), (c) => {

@@ -9,8 +9,8 @@ const post = (body: unknown) =>
   });
 
 describe("api", () => {
-  it("serves /healthz", async () => {
-    const res = await app.request("/healthz");
+  it("serves /health", async () => {
+    const res = await app.request("/health");
     expect(res.status).toBe(200);
     expect(await res.text()).toBe("ok");
   });
