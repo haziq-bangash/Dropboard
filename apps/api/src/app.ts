@@ -7,6 +7,7 @@ import { allowedOrigins, googleEnabled, type Auth } from "./auth";
 import { registerAiRoutes } from "./ai/routes";
 import type { AiService } from "./ai/service";
 import type { LimitsFor } from "./plans";
+import { registerAccountRoutes } from "./account";
 import { registerProjectRoutes } from "./projects";
 import type { AppEnv } from "./types";
 import type { PrismaClient } from "./generated/prisma/client";
@@ -51,6 +52,7 @@ export function createApp({ prisma, auth, ai, aiDailyLimit, mailer, limitsFor, s
   registerAiRoutes(app, { prisma, ai, dailyLimit: aiDailyLimit, requireUser });
 
   registerProjectRoutes(app, { prisma, requireUser, limitsFor, shareLimits });
+  registerAccountRoutes(app, { prisma, requireUser, limitsFor, aiDailyLimit });
 
   return app;
 }

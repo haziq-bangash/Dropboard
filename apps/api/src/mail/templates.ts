@@ -27,3 +27,9 @@ export const resetPassword = (to: string, url: string): Mail => ({
   subject: "Reset your Dropboard password",
   ...layout("Reset your password", "Use the button below to choose a new password. The link works for one hour.", "Choose a new password", url, "If you did not ask for this, you can ignore this message. Your password stays the same."),
 });
+
+export const confirmEmailChange = (to: string, newEmail: string, url: string): Mail => ({
+  to,
+  subject: "Confirm the change of your Dropboard email",
+  ...layout("Confirm your new email", `You asked to change the email on your Dropboard account to ${newEmail}. Confirm here, then we will send a link to the new address.`, "Confirm the change", url, "If you did not ask for this, you can ignore this message and your email stays the same."),
+});

@@ -2,7 +2,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import type { PrismaClient } from "./generated/prisma/client";
 import type { Mailer } from "./mail/mailer";
-import { resetPassword, verifyEmail } from "./mail/templates";
+import { confirmEmailChange, resetPassword, verifyEmail } from "./mail/templates";
 
 export function allowedOrigins(): string[] {
   return (process.env.WEB_ORIGIN ?? "")
@@ -49,6 +49,25 @@ export function createAuth(prisma: PrismaClient, mailer?: Mailer) {
         },
       },
     }),
+    user: {
+      // Deleting an account removes everything under it: projects and links go with the user, the rest is cleared here
+      deleteUser: {
+        enabled: true,
+        beforeDelete: async (user) => {
+          await prisma.aiGeneration.deleteMany({ where: { userId: user.id } });
+          await prisma.verification.deleteMany({ where: { identifier: user.email } });
+        },
+      },
+      // Changing an email needs mail to confirm it, so it is offered only when email is configured
+      changeEmail: mailer
+        ? {
+            enabled: true,
+            sendChangeEmailConfirmation: async ({ user, newEmail, url }) => {
+              void mailer.send(confirmEmailChange(user.email, newEmail, url)).catch((e) => console.error("email change failed:", e.message));
+            },
+          }
+        : { enabled: false },
+    },
     // Google sign-in appears only when both values are set
     socialProviders: googleEnabled()
       ? { google: { clientId: process.env.GOOGLE_CLIENT_ID!, clientSecret: process.env.GOOGLE_CLIENT_SECRET! } }
