@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import { timingSafeEqual } from "node:crypto";
 
 export type Verdict = { ok: true } | { ok: false; retryAfterSeconds: number };
 
@@ -54,12 +55,27 @@ export function createLimiter(max: number, windowMs: number, now: () => number =
   };
 }
 
+const sameSecret = (given: string, expected: string) => {
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+};
+
 /**
- * Who is asking, as well as we can tell. Behind Google's front end the last entry of X-Forwarded-For is the address that
- * connected to it. Requests relayed by our own web app all share that app's address, so for them this acts as a limit on
- * the whole app; the failed-password limit is keyed by link instead and does not depend on it.
+ * Who is asking, as well as we can tell.
+ *
+ * Our web app relays every visitor, so on its own the API would see one address for everyone. When PROXY_SECRET is set,
+ * the web app sends the visitor's address in X-Dropboard-Client-Ip together with that secret, and it is trusted only
+ * with the right secret. Otherwise (or for anyone calling the API directly) the last entry of X-Forwarded-For is used:
+ * behind Google's front end that is the address that connected to it, which cannot be faked from outside.
  */
 export function clientKey(c: Context): string {
+  const secret = process.env.PROXY_SECRET;
+  if (secret) {
+    const given = c.req.header("x-dropboard-proxy-secret");
+    const ip = c.req.header("x-dropboard-client-ip")?.trim();
+    if (given && ip && sameSecret(given, secret)) return ip.slice(0, 64);
+  }
   const forwarded = c.req.header("x-forwarded-for")?.split(",").map((s) => s.trim()).filter(Boolean);
   return forwarded?.at(-1) ?? "unknown";
 }

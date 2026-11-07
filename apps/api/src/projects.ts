@@ -22,11 +22,14 @@ const json = (v: unknown) => v as Prisma.InputJsonValue;
 /** Projects (saved dashboards), publishing, and the public share viewer endpoint. */
 export function registerProjectRoutes(
   app: Hono<AppEnv>,
-  { prisma, requireUser, limitsFor = defaultLimitsFor, shareLimits = { requestsPerMinute: 120, wrongPasswordsPerMinute: 10 } }: Deps,
+  { prisma, requireUser, limitsFor = defaultLimitsFor, shareLimits }: Deps,
 ) {
   // The viewer is public, so it is the one place anyone on the internet can hit without signing in
-  const viewerRequests = createLimiter(shareLimits.requestsPerMinute, 60_000);
-  const wrongPasswords = createLimiter(shareLimits.wrongPasswordsPerMinute, 60_000);
+  // Per visitor when the web app passes real addresses (PROXY_SECRET). Without it every visitor looks like the web app, so
+  // the allowance is wider and only guards against floods.
+  const requestsPerMinute = shareLimits?.requestsPerMinute ?? (process.env.PROXY_SECRET ? 120 : 600);
+  const viewerRequests = createLimiter(requestsPerMinute, 60_000);
+  const wrongPasswords = createLimiter(shareLimits?.wrongPasswordsPerMinute ?? 10, 60_000);
   const limitReached = (what: string, max: number) =>
     ({ error: `Your plan allows ${max} ${what}. Delete one or upgrade to add more.`, code: "limit_reached", limit: max }) as const;
 
