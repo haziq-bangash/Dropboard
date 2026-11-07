@@ -63,41 +63,41 @@ describe("auth and dashboards (real Postgres)", () => {
   });
 
   it("rejects unauthenticated requests", async () => {
-    expect((await call("/api/dashboards", null)).status).toBe(401);
-    expect((await call("/api/dashboards", null, { method: "POST", body: JSON.stringify(spec) })).status).toBe(401);
+    expect((await call("/api/projects", null)).status).toBe(401);
+    expect((await call("/api/projects", null, { method: "POST", body: JSON.stringify({ spec }) })).status).toBe(401);
   });
 
   it("rejects an invalid spec", async () => {
     const cookie = await signUp("invalid");
-    expect((await call("/api/dashboards", cookie, { method: "POST", body: "{}" })).status).toBe(400);
+    expect((await call("/api/projects", cookie, { method: "POST", body: "{}" })).status).toBe(400);
   });
 
   it("creates, lists, reads and deletes a dashboard", async () => {
     const cookie = await signUp("owner");
-    const created = await call("/api/dashboards", cookie, { method: "POST", body: JSON.stringify(spec) });
+    const created = await call("/api/projects", cookie, { method: "POST", body: JSON.stringify({ spec }) });
     expect(created.status).toBe(201);
     const { id } = (await created.json()) as { id: string };
 
-    const list = (await (await call("/api/dashboards", cookie)).json()) as { id: string }[];
+    const list = ((await (await call("/api/projects", cookie)).json()) as { items: { id: string }[] }).items;
     expect(list.map((d) => d.id)).toContain(id);
 
-    const got = await call(`/api/dashboards/${id}`, cookie);
+    const got = await call(`/api/projects/${id}`, cookie);
     expect(got.status).toBe(200);
     expect(((await got.json()) as { spec: unknown }).spec).toEqual(spec);
 
-    expect((await call(`/api/dashboards/${id}`, cookie, { method: "DELETE" })).status).toBe(204);
-    expect((await call(`/api/dashboards/${id}`, cookie)).status).toBe(404);
+    expect((await call(`/api/projects/${id}`, cookie, { method: "DELETE" })).status).toBe(204);
+    expect((await call(`/api/projects/${id}`, cookie)).status).toBe(404);
   });
 
   it("does not let one user read or delete another user's dashboard", async () => {
     const alice = await signUp("alice");
     const bob = await signUp("bob");
-    const created = await call("/api/dashboards", alice, { method: "POST", body: JSON.stringify(spec) });
+    const created = await call("/api/projects", alice, { method: "POST", body: JSON.stringify({ spec }) });
     const { id } = (await created.json()) as { id: string };
 
-    expect((await call(`/api/dashboards/${id}`, bob)).status).toBe(404);
-    expect((await call(`/api/dashboards/${id}`, bob, { method: "DELETE" })).status).toBe(404);
-    expect((await call(`/api/dashboards/${id}`, alice)).status).toBe(200);
+    expect((await call(`/api/projects/${id}`, bob)).status).toBe(404);
+    expect((await call(`/api/projects/${id}`, bob, { method: "DELETE" })).status).toBe(404);
+    expect((await call(`/api/projects/${id}`, alice)).status).toBe(200);
   });
 
   describe("publishing snapshots", () => {
@@ -108,11 +108,11 @@ describe("auth and dashboards (real Postgres)", () => {
     const results = { c1: [{ x: "a", y: 1 }] };
 
     async function makeDashboard(cookie: string) {
-      const res = await call("/api/dashboards", cookie, { method: "POST", body: JSON.stringify(chartSpec) });
+      const res = await call("/api/projects", cookie, { method: "POST", body: JSON.stringify({ spec: chartSpec }) });
       return ((await res.json()) as { id: string }).id;
     }
     const publish = (id: string, cookie: string | null, body: unknown) =>
-      call(`/api/dashboards/${id}/share`, cookie, { method: "POST", body: JSON.stringify(body) });
+      call(`/api/projects/${id}/share`, cookie, { method: "POST", body: JSON.stringify(body) });
 
     it("publishes a public snapshot readable without a session", async () => {
       const cookie = await signUp("pub");
