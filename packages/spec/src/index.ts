@@ -22,3 +22,4 @@ export const DashboardSpec = z.object({
 
 export type DashboardSpec = z.infer<typeof DashboardSpec>;
 export type ChartSpec = z.infer<typeof ChartSpec>;
+export type ColumnType = z.infer<typeof ColumnType>;
