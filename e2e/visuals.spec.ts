@@ -109,3 +109,24 @@ test("the accent words use the editorial serif", async ({ page }) => {
   const loginFamily = await page.locator("h1 em").evaluate((el) => getComputedStyle(el).fontFamily);
   expect(loginFamily).toContain("Instrument");
 });
+
+test("the three feature rows are numbered and each sits on its own art panel", async ({ page }) => {
+  await page.goto("/");
+  const how = page.locator("#how");
+  await expect(how.getByTestId("feature-art")).toHaveCount(3);
+  for (const n of ["01", "02", "03"]) await expect(how.getByText(n, { exact: true })).toBeVisible();
+  await expect(how.getByRole("heading", { name: "Instant dashboards, built in your browser" })).toBeVisible();
+  await expect(how.getByRole("heading", { name: "Share a link, not your spreadsheet" })).toBeVisible();
+});
+
+test("no text on the landing or sign-in pages is rendered in capitals", async ({ page }) => {
+  for (const path of ["/", "/login"]) {
+    await page.goto(path);
+    const offenders = await page.evaluate(() =>
+      Array.from(document.querySelectorAll("body *"))
+        .filter((el) => getComputedStyle(el).textTransform === "uppercase" && (el.textContent ?? "").trim().length > 0)
+        .map((el) => `${el.tagName.toLowerCase()}: ${(el.textContent ?? "").trim().slice(0, 40)}`),
+    );
+    expect(offenders, path).toEqual([]);
+  }
+});
