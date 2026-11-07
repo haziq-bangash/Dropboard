@@ -26,6 +26,7 @@ function fakeAi(opts: { generate?: () => AiDashboardOutput; ask?: () => AiAskOut
   const calls = { generate: 0, ask: 0 };
   const usage = { inputTokens: 100, outputTokens: 50, cacheReadTokens: 0 };
   const service: AiService = {
+    provider: "fake",
     model: "fake-model",
     async generate(_: GenerateInput) {
       calls.generate++;
@@ -185,7 +186,7 @@ describe("POST /api/ai/generate", () => {
     await post(app, "/api/ai/generate", cookie, tableInput());
     const user = await prisma.user.findFirstOrThrow({ where: { name: "usage", email: { in: emails } } });
     const row = await prisma.aiGeneration.findFirstOrThrow({ where: { userId: user.id } });
-    expect(row).toMatchObject({ kind: "generate", cached: false, model: "fake-model", inputTokens: 100, outputTokens: 50 });
+    expect(row).toMatchObject({ kind: "generate", cached: false, model: "fake/fake-model", inputTokens: 100, outputTokens: 50 });
   });
 });
 
