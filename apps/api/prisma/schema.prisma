@@ -106,3 +106,30 @@ model Share {
   @@index([dashboardId])
   @@map("share")
 }
+
+// ---- AI ----
+
+// Cache of generated dashboards, keyed by a hash of model + prompt version + schema + instruction.
+model AiCache {
+  key       String   @id
+  spec      Json
+  createdAt DateTime @default(now())
+
+  @@map("ai_cache")
+}
+
+// One row per AI call. Quota counts uncached rows; Phase 4 billing reads the token columns.
+model AiGeneration {
+  id               String   @id @default(cuid())
+  userId           String
+  kind             String
+  cached           Boolean
+  model            String
+  inputTokens      Int      @default(0)
+  outputTokens     Int      @default(0)
+  cacheReadTokens  Int      @default(0)
+  createdAt        DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("ai_generation")
+}
