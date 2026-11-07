@@ -1,0 +1,30 @@
+{
+  "name": "@dropboard/web",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "predev": "node scripts/copy-duckdb.mjs",
+    "prebuild": "node scripts/copy-duckdb.mjs"
+  },
+  "dependencies": {
+    "@dropboard/engine": "workspace:^",
+    "@dropboard/spec": "workspace:^",
+    "@duckdb/duckdb-wasm": "1.32.0",
+    "echarts": "^6.1.0",
+    "next": "^16.4.5",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "read-excel-file": "^9.3.14"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^5.6.0"
+  },
+  "type": "module"
+}
