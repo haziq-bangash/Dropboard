@@ -80,7 +80,7 @@ export function ToolGrid() {
         {TOOLS.map(({ icon: Icon, title, text }) => (
           <Card key={title} size="sm">
             <CardHeader>
-              <div className="mb-2 flex size-9 items-center justify-center rounded-lg bg-muted">
+              <div className="mb-2 flex size-9 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
                 <Icon className="size-4" />
               </div>
               <CardTitle>{title}</CardTitle>
@@ -110,7 +110,7 @@ function FeatureRow({ id, icon: Icon, title, text, points, cta, visual, flip, ba
     <div id={id} className={`${wrap} grid items-center gap-10 py-14 md:grid-cols-2 md:gap-16`}>
       <div className={flip ? "md:order-2" : undefined}>
         <div className="mb-4 flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-muted">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
             <Icon className="size-5" />
           </div>
           {badge && <Badge>{badge}</Badge>}
@@ -194,7 +194,7 @@ export function AiPrompts() {
   return (
     <section className="mt-10 bg-foreground py-20 text-background">
       <div className={`${wrap} text-center`}>
-        <Badge className="mb-4 bg-background text-foreground">New</Badge>
+        <Badge variant="secondary" className="mb-4">New</Badge>
         <h2 className="mx-auto max-w-2xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
           Design with AI. Ask anything about your spreadsheet.
         </h2>
@@ -235,7 +235,7 @@ export function Perks() {
         {PERKS.map(({ icon: Icon, title, text }) => (
           <Card key={title}>
             <CardHeader>
-              <div className="mb-2 flex size-10 items-center justify-center rounded-xl bg-muted">
+              <div className="mb-2 flex size-10 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
                 <Icon className="size-5" />
               </div>
               <CardTitle>{title}</CardTitle>
@@ -251,7 +251,7 @@ export function Perks() {
 export function ClosingCta() {
   return (
     <section className={`${wrap} pb-24`}>
-      <div className="rounded-3xl border bg-muted/40 px-6 py-16 text-center">
+      <div className="rounded-3xl border bg-secondary/40 px-6 py-16 text-center">
         <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Ready to begin?</h2>
         <p className="mx-auto mt-3 max-w-md text-balance text-muted-foreground">
           Drop your first spreadsheet and see your dashboard in seconds. No signup needed.
