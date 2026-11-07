@@ -57,7 +57,7 @@ export async function loadFile(file: File): Promise<Loaded> {
   return { title, profile: await profileTable() };
 }
 
-async function profileTable(): Promise<TableProfile> {
+export async function profileTable(): Promise<TableProfile> {
   const cols = await runQuery("SELECT column_name, column_type FROM (DESCRIBE data)");
   const [{ n }] = (await runQuery("SELECT count(*) AS n FROM data")) as { n: number }[];
   if (!cols.length) throw new Error("No columns found in the file.");
