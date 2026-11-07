@@ -14,7 +14,31 @@ permissions:
   id-token: write
 
 jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - name: Skip when no database is configured
+        if: env.DATABASE_URL == ''
+        run: echo "DATABASE_URL secret not set, skipping migrations"
+      - uses: actions/checkout@v4
+        if: env.DATABASE_URL != ''
+      - uses: pnpm/action-setup@v4
+        if: env.DATABASE_URL != ''
+      - uses: actions/setup-node@v4
+        if: env.DATABASE_URL != ''
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: env.DATABASE_URL != ''
+      - run: pnpm --filter @dropboard/api exec prisma migrate deploy
+        if: env.DATABASE_URL != ''
+
   deploy:
+    needs: migrate
     runs-on: ubuntu-latest
     environment: staging
     strategy:
@@ -41,17 +65,20 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.app }}
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy dropboard-${{ matrix.app }} \
-            --image "$IMAGE" \
-            --region "${{ vars.GCP_REGION }}" \
-            --allow-unauthenticated \
-            --min-instances 0 \
-            --max-instances 3 \
-            --concurrency 80 \
-            --cpu 1 --memory ${{ matrix.app == 'web' && '512Mi' || '256Mi' }} \
-            --cpu-throttling \
-            --cpu-boost \
-            --set-env-vars "WEB_ORIGIN=${{ vars.WEB_ORIGIN }}"
+          if [ "${{ matrix.app }}" = api ]; then
+            ENV_VARS="WEB_ORIGIN=${{ vars.WEB_URL }},BETTER_AUTH_URL=${{ vars.WEB_URL }}"
+            # Secrets are optional until Secret Manager is set up (see infra/setup-secrets.sh)
+            SECRETS=""
+            if gcloud secrets describe better-auth-secret >/dev/null 2>&1 && gcloud secrets describe database-url >/dev/null 2>&1; then
+              SECRETS="--update-secrets=BETTER_AUTH_SECRET=better-auth-secret:latest,DATABASE_URL=database-url:latest"
+            fi
+            MEMORY=256Mi
+          else
+            ENV_VARS="API_URL=${{ vars.API_URL }}"
+            SECRETS=""
+            MEMORY=512Mi
+          fi
+          gcloud run deploy dropboard-${{ matrix.app }}             --image "$IMAGE"             --region "${{ vars.GCP_REGION }}"             --allow-unauthenticated             --min-instances 0             --max-instances 3             --concurrency 80             --cpu 1 --memory "$MEMORY"             --cpu-throttling             --cpu-boost             --set-env-vars "$ENV_VARS"             $SECRETS
       - name: Verify
         run: |
           url=$(gcloud run services describe dropboard-${{ matrix.app }} --region "${{ vars.GCP_REGION }}" --format='value(status.url)')
