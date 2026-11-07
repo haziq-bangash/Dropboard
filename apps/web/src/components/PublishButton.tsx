@@ -64,8 +64,8 @@ export function PublishButton({ spec }: { spec: DashboardSpec }) {
     try {
       const pub = publishableSpec(spec);
       const results = await collectResults(pub);
-      const { id } = await post<{ id: string }>("/api/dashboards", pub);
-      const { slug } = await post<{ slug: string }>(`/api/dashboards/${id}/share`, {
+      const { id } = await post<{ id: string }>("/api/projects", { spec: pub });
+      const { slug } = await post<{ slug: string }>(`/api/projects/${id}/share`, {
         results,
         password: protect ? password : undefined,
       });
