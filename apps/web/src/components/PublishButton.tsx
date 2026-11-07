@@ -34,7 +34,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export function PublishButton({ spec }: { spec: DashboardSpec }) {
+export function PublishButton({ spec, projectId, onPublished }: { spec: DashboardSpec; projectId?: string; onPublished?: () => void }) {
   const { data: session } = authClient.useSession();
   const [open, setOpen] = useState(false);
   const [protect, setProtect] = useState(false);
@@ -64,12 +64,14 @@ export function PublishButton({ spec }: { spec: DashboardSpec }) {
     try {
       const pub = publishableSpec(spec);
       const results = await collectResults(pub);
-      const { id } = await post<{ id: string }>("/api/projects", { spec: pub });
+      // a saved project already exists; the quick try-it flow saves one on the way
+      const id = projectId ?? (await post<{ id: string }>("/api/projects", { spec: pub })).id;
       const { slug } = await post<{ slug: string }>(`/api/projects/${id}/share`, {
         results,
         password: protect ? password : undefined,
       });
       setLink(`${location.origin}/s/${slug}`);
+      onPublished?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not publish.");
     } finally {

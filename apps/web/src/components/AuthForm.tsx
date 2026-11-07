@@ -38,7 +38,7 @@ export function AuthForm() {
 
   async function resendConfirmation(email: string) {
     setBusy(true);
-    await authClient.sendVerificationEmail({ email, callbackURL: "/" });
+    await authClient.sendVerificationEmail({ email, callbackURL: "/app" });
     setBusy(false);
     setSent({ kind: "confirm", email });
     setMode("sent");
@@ -116,7 +116,7 @@ export function AuthForm() {
           const { data, error } =
             mode === "in"
               ? await authClient.signIn.email({ email, password })
-              : await authClient.signUp.email({ email, password, name: email.split("@")[0], callbackURL: "/" });
+              : await authClient.signUp.email({ email, password, name: email.split("@")[0], callbackURL: "/app" });
           setBusy(false);
           if (error) {
             if (error.status === 403) setUnconfirmed(email);
@@ -124,7 +124,7 @@ export function AuthForm() {
           } else if (mode === "up" && providers.email && !data?.token) {
             setSent({ kind: "confirm", email });
             setMode("sent");
-          } else router.push("/");
+          } else router.push("/app");
         }}
       >
         <div className="grid gap-2">
@@ -213,7 +213,7 @@ export function AuthForm() {
             variant="outline"
             size="lg"
             className="mt-6 h-11 w-full rounded-xl"
-            onClick={() => authClient.signIn.social({ provider: "google", callbackURL: "/" })}
+            onClick={() => authClient.signIn.social({ provider: "google", callbackURL: "/app" })}
           >
             <GoogleMark />
             Continue with Google

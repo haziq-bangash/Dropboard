@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Instrument_Serif } from "next/font/google";
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/marketing/Footer";
 import { cn } from "@/lib/utils";
 import "./globals.css";
 
@@ -19,9 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={cn("font-sans", geist.variable, serif.variable)}>
       <body suppressHydrationWarning className="flex min-h-screen flex-col bg-background text-foreground antialiased">
-        <Header />
-        <main className="flex-1">{children}</main>
-        <Footer />
+        {children}
       </body>
     </html>
   );

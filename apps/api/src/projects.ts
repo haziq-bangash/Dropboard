@@ -157,7 +157,9 @@ export function registerProjectRoutes(app: Hono<AppEnv>, { prisma, requireUser, 
       }
 
       const { results, password } = c.req.valid("json");
-      const spec = DashboardSpec.parse(project.spec);
+      // The raw-row preview table never leaves the browser, whatever the client sends
+      const full = DashboardSpec.parse(project.spec);
+      const spec = { ...full, charts: full.charts.filter((ch) => ch.type !== "table") };
       const known = new Set(spec.charts.map((ch) => ch.id));
       if (Object.keys(results).some((id) => !known.has(id))) {
         return c.json({ error: "results contain unknown chart ids" }, 400);

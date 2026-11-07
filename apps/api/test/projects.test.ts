@@ -116,6 +116,22 @@ describe("projects (real Postgres)", () => {
     expect((await publish()).status).toBe(201);
   });
 
+  it("never publishes the raw-row preview table, whatever the client sends", async () => {
+    const cookie = await signUp("table");
+    const withTable = {
+      ...spec(),
+      charts: [chart, { id: "t1", type: "table", title: "Data", query: "SELECT * FROM data", layout: { x: 0, y: 0, w: 1, h: 1 } }],
+    };
+    const { id } = (await (await create(cookie, { spec: withTable })).json()) as { id: string };
+    const res = await call(`/api/projects/${id}/share`, cookie, { method: "POST", body: JSON.stringify({ results: { c1: [{ x: 1 }] } }) });
+    const { slug } = (await res.json()) as { slug: string };
+    const shared = (await (await app.request(`/api/shares/${slug}`)).json()) as { spec: { charts: { id: string }[] } };
+    expect(shared.spec.charts.map((c) => c.id)).toEqual(["c1"]);
+    await call(`/api/shares/${slug}`, cookie, { method: "DELETE" }); // free the slot so the rule itself is tested
+    const sneaky = await call(`/api/projects/${id}/share`, cookie, { method: "POST", body: JSON.stringify({ results: { t1: [{ x: 1 }] } }) });
+    expect(sneaky.status).toBe(400);
+  });
+
   it("keeps every project route private to its owner", async () => {
     const alice = await signUp("alice");
     const bob = await signUp("bob");
