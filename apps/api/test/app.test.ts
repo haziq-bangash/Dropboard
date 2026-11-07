@@ -99,4 +99,83 @@ describe("auth and dashboards (real Postgres)", () => {
     expect((await call(`/api/dashboards/${id}`, bob, { method: "DELETE" })).status).toBe(404);
     expect((await call(`/api/dashboards/${id}`, alice)).status).toBe(200);
   });
+
+  describe("publishing snapshots", () => {
+    const chartSpec = {
+      ...spec,
+      charts: [{ id: "c1", type: "bar", title: "b", query: "SELECT 1 AS x", layout: { x: 0, y: 0, w: 1, h: 1 } }],
+    };
+    const results = { c1: [{ x: "a", y: 1 }] };
+
+    async function makeDashboard(cookie: string) {
+      const res = await call("/api/dashboards", cookie, { method: "POST", body: JSON.stringify(chartSpec) });
+      return ((await res.json()) as { id: string }).id;
+    }
+    const publish = (id: string, cookie: string | null, body: unknown) =>
+      call(`/api/dashboards/${id}/share`, cookie, { method: "POST", body: JSON.stringify(body) });
+
+    it("publishes a public snapshot readable without a session", async () => {
+      const cookie = await signUp("pub");
+      const id = await makeDashboard(cookie);
+      const res = await publish(id, cookie, { results });
+      expect(res.status).toBe(201);
+      const { slug } = (await res.json()) as { slug: string };
+
+      const view = await call(`/api/shares/${slug}`, null);
+      expect(view.status).toBe(200);
+      expect(view.headers.get("cache-control")).toContain("no-store");
+      const body = (await view.json()) as { spec: { title: string }; results: unknown };
+      expect(body.spec.title).toBe("t");
+      expect(body.results).toEqual(results);
+    });
+
+    it("protects a share with a password", async () => {
+      const cookie = await signUp("pw");
+      const id = await makeDashboard(cookie);
+      const { slug } = (await (await publish(id, cookie, { results, password: "open-sesame" })).json()) as { slug: string };
+
+      const none = await call(`/api/shares/${slug}`, null);
+      expect(none.status).toBe(401);
+      expect(((await none.json()) as { passwordRequired: boolean }).passwordRequired).toBe(true);
+      expect((await call(`/api/shares/${slug}`, null, { headers: { "x-share-password": "nope" } })).status).toBe(403);
+      expect((await call(`/api/shares/${slug}`, null, { headers: { "x-share-password": "open-sesame" } })).status).toBe(200);
+    });
+
+    it("never stores the password in plain text", async () => {
+      const cookie = await signUp("hash");
+      const id = await makeDashboard(cookie);
+      const { slug } = (await (await publish(id, cookie, { results, password: "plain-text-check" })).json()) as { slug: string };
+      const row = await prisma.share.findUniqueOrThrow({ where: { slug } });
+      expect(row.passwordHash).toBeTruthy();
+      expect(row.passwordHash).not.toContain("plain-text-check");
+    });
+
+    it("lets the owner revoke, and only the owner", async () => {
+      const owner = await signUp("rev-owner");
+      const other = await signUp("rev-other");
+      const id = await makeDashboard(owner);
+      const { slug } = (await (await publish(id, owner, { results })).json()) as { slug: string };
+
+      expect((await call(`/api/shares/${slug}`, other, { method: "DELETE" })).status).toBe(404);
+      expect((await call(`/api/shares/${slug}`, null)).status).toBe(200);
+      expect((await call(`/api/shares/${slug}`, owner, { method: "DELETE" })).status).toBe(204);
+      expect((await call(`/api/shares/${slug}`, null)).status).toBe(404);
+    });
+
+    it("rejects publishing from non-owners, anonymous users, unknown charts and oversized snapshots", async () => {
+      const owner = await signUp("rej-owner");
+      const other = await signUp("rej-other");
+      const id = await makeDashboard(owner);
+
+      expect((await publish(id, null, { results })).status).toBe(401);
+      expect((await publish(id, other, { results })).status).toBe(404);
+      expect((await publish(id, owner, { results: { nope: [] } })).status).toBe(400);
+      const big = { c1: Array(1000).fill({ x: "x".repeat(3000) }) };
+      expect((await publish(id, owner, { results: big })).status).toBe(413);
+    });
+
+    it("returns 404 for unknown slugs", async () => {
+      expect((await call("/api/shares/does-not-exist", null)).status).toBe(404);
+    });
+  });
 });
