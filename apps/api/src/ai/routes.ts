@@ -56,7 +56,7 @@ export function registerAiRoutes(app: Hono<AppEnv>, { prisma, ai, dailyLimit = D
     }
 
     const left = await remaining(userId);
-    if (left <= 0) return c.json({ error: "daily AI limit reached", remaining: 0 }, 429);
+    if (left <= 0) return c.json({ error: "daily limit reached", remaining: 0 }, 429);
 
     try {
       const { output, usage } = await ai.generate(input);
@@ -77,7 +77,7 @@ export function registerAiRoutes(app: Hono<AppEnv>, { prisma, ai, dailyLimit = D
     if (!ai) return c.json({ error: "ai not configured" }, 503);
     const userId = c.get("userId");
     const left = await remaining(userId);
-    if (left <= 0) return c.json({ error: "daily AI limit reached", remaining: 0 }, 429);
+    if (left <= 0) return c.json({ error: "daily limit reached", remaining: 0 }, 429);
 
     try {
       const { output, usage } = await ai.ask(c.req.valid("json"));
@@ -93,7 +93,7 @@ export function registerAiRoutes(app: Hono<AppEnv>, { prisma, ai, dailyLimit = D
 
 // Failed or declined calls are not charged against the quota.
 function failure(c: { json: (body: unknown, status: 422 | 502) => Response }, e: unknown): Response {
-  if (e instanceof AiRefusal) return c.json({ error: "The AI declined this request." }, 422);
+  if (e instanceof AiRefusal) return c.json({ error: "The assistant declined this request." }, 422);
   console.error("ai call failed:", e instanceof Error ? e.message : e);
-  return c.json({ error: "The AI could not produce a usable result. Try rephrasing." }, 502);
+  return c.json({ error: "The assistant could not produce a usable result. Try rephrasing." }, 502);
 }
