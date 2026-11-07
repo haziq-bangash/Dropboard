@@ -1,7 +1,7 @@
 import { DuckDBDataProtocol } from "@duckdb/duckdb-wasm";
 import { getDb } from "./duckdb";
 import { profileTable } from "./ingest";
-import type { LoadedData } from "./loaded-data";
+import { newLoadId, type LoadedData } from "./loaded-data";
 
 /**
  * A copy of each project's parsed table, kept in the browser's private storage (OPFS) as Parquet, so reopening a
@@ -98,7 +98,7 @@ export async function loadProjectData(
     } finally {
       await conn.close();
     }
-    return { projectId, fileName, profile: await profileTable() };
+    return { projectId, fileName, profile: await profileTable(), loadId: newLoadId() };
   } catch {
     return null;
   }

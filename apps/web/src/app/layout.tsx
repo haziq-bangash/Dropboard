@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Instrument_Serif } from "next/font/google";
+import { QueryProvider } from "@/lib/query-provider";
 import { cn } from "@/lib/utils";
 import "./globals.css";
 
@@ -17,7 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={cn("font-sans", geist.variable, serif.variable)}>
       <body suppressHydrationWarning className="flex min-h-screen flex-col bg-background text-foreground antialiased">
-        {children}
+        <QueryProvider>{children}</QueryProvider>
       </body>
     </html>
   );
