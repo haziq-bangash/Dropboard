@@ -1,5 +1,4 @@
 import {
-  BarChart3,
   DollarSign,
   MapPin,
   Package,
@@ -11,6 +10,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
+import { LogoMark } from "@/components/Logo";
 
 // Decorative hero: raw rows (gray placeholders) stream into the logo and come out as insight cards.
 // Pure CSS. Each row draws the same moving track twice, once as placeholders and once as finished cards,
@@ -171,9 +171,7 @@ export function HeroFlow() {
           </defs>
           <path d="M207 0 L213 0 L213 280 C213 320 255 360 420 380 L0 380 C165 360 207 320 207 280 Z" fill="url(#hero-beam)" />
         </svg>
-        <div className="absolute left-1/2 top-[142px] z-20 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg ring-4 ring-background">
-          <BarChart3 className="size-8" />
-        </div>
+        <LogoMark className="absolute left-1/2 top-[142px] z-20 size-16 -translate-x-1/2 -translate-y-1/2 rounded-2xl shadow-lg ring-4 ring-background" />
       </div>
     </div>
   );

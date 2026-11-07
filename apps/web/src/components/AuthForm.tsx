@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, BarChart3, Lock, Mail } from "lucide-react";
+import { ArrowRight, Lock, Mail } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
+import { Logo } from "./Logo";
 import { ASSISTANT } from "@/lib/brand";
 
 export function AuthForm() {
@@ -18,11 +19,8 @@ export function AuthForm() {
 
   return (
     <div className="mx-auto w-full max-w-sm">
-      <div className="mb-8 flex items-center justify-center gap-2 font-semibold tracking-tight">
-        <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <BarChart3 className="size-4" />
-        </span>
-        Dropboard
+      <div className="mb-8 flex justify-center">
+        <Logo />
       </div>
 
       <h1 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">

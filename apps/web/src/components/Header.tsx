@@ -1,9 +1,9 @@
 "use client";
 
-import { BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
+import { Logo } from "./Logo";
 import { ASSISTANT } from "@/lib/brand";
 
 const LINKS: [string, string][] = [
@@ -18,9 +18,8 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
       <nav className="mx-auto flex h-14 w-full max-w-6xl items-center gap-6 px-5">
-        <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-          <BarChart3 className="size-5" />
-          Dropboard
+        <Link href="/" aria-label="Dropboard home">
+          <Logo />
         </Link>
         <div className="hidden flex-1 items-center justify-center gap-6 md:flex">
           {LINKS.map(([label, href]) => (
