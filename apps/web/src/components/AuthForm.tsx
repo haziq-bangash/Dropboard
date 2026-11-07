@@ -28,11 +28,11 @@ export function AuthForm() {
       <h1 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">
         {mode === "in" ? (
           <>
-            Welcome <em className="font-serif font-medium italic text-brand-text">back</em>
+            Welcome <em className="font-serif text-[1.14em] italic text-brand-text">back</em>
           </>
         ) : (
           <>
-            Create your <em className="font-serif font-medium italic text-brand-text">account</em>
+            Create your <em className="font-serif text-[1.14em] italic text-brand-text">account</em>
           </>
         )}
       </h1>

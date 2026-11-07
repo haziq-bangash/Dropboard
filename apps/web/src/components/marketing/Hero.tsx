@@ -16,7 +16,7 @@ export function Hero() {
       </Link>
 
       <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
-        Turn any spreadsheet into a <em className="font-serif font-medium italic text-brand-text">dashboard</em>
+        Turn any spreadsheet into a <em className="font-serif text-[1.14em] italic text-brand-text">dashboard</em>
       </h1>
       <p className="mt-5 max-w-2xl text-lg text-balance text-muted-foreground">
         Drop an Excel, CSV or JSON file and get KPIs and charts in seconds. No signup to start, and your rows never leave your browser.
