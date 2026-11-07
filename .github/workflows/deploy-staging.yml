@@ -55,5 +55,5 @@ jobs:
       - name: Verify
         run: |
           url=$(gcloud run services describe dropboard-${{ matrix.app }} --region "${{ vars.GCP_REGION }}" --format='value(status.url)')
-          path=/healthz; [ "${{ matrix.app }}" = web ] && path=/
+          path=/health; [ "${{ matrix.app }}" = web ] && path=/
           curl -fsS --retry 5 --retry-delay 3 "$url$path" >/dev/null
