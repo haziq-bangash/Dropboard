@@ -69,3 +69,16 @@ describe("guardSql", () => {
     "",
   ])("rejects %j", (sql) => expect(guardSql(sql).ok).toBe(false));
 });
+
+import { publishableSpec } from "../src";
+
+describe("publishableSpec", () => {
+  it("drops raw-row table charts but keeps the rest", () => {
+    const spec = suggestDashboard("Sales", sales);
+    expect(spec.charts.some((c) => c.type === "table")).toBe(true);
+    const published = publishableSpec(spec);
+    expect(published.charts.some((c) => c.type === "table")).toBe(false);
+    expect(published.charts.length).toBe(spec.charts.length - 1);
+    expect(published.title).toBe(spec.title);
+  });
+});
