@@ -2,7 +2,7 @@
 
 import type { TableProfile } from "@dropboard/engine";
 import type { DashboardSpec } from "@dropboard/spec";
-import { MessageSquare, Sparkles } from "lucide-react";
+import { Bot, LayoutDashboard, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -52,7 +52,7 @@ export function AiPanel({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="size-4" /> AI assistant
+          <Bot className="size-4" /> AI assistant
           <Badge variant="secondary">New</Badge>
         </CardTitle>
         <CardDescription>
@@ -97,7 +97,7 @@ export function AiPanel({
                   )
                 }
               >
-                <Sparkles />
+                <LayoutDashboard />
                 {busy === "generate" ? "Designing…" : "Design with AI"}
               </Button>
             </div>

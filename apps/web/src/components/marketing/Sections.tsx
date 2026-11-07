@@ -1,13 +1,15 @@
 import {
   ArrowRight,
+  Bot,
   FileSpreadsheet,
+  Gift,
   Gauge,
+  LayoutDashboard,
   Link2,
   LineChart,
   MessageSquare,
   Share2,
   ShieldCheck,
-  Sparkles,
   Table2,
   Zap,
 } from "lucide-react";
@@ -31,7 +33,7 @@ function SectionHeading({ title, children }: { title: string; children?: React.R
 
 const TOOLS = [
   { icon: Zap, title: "Instant dashboards", text: "KPIs and charts picked for your columns." },
-  { icon: Sparkles, title: "AI design", text: "Describe the dashboard you want." },
+  { icon: LayoutDashboard, title: "AI design", text: "Describe the dashboard you want." },
   { icon: MessageSquare, title: "Ask your data", text: "Questions in plain English." },
   { icon: Share2, title: "Share links", text: "Password-protected and read-only." },
   { icon: ShieldCheck, title: "Private by design", text: "Your rows stay in your browser." },
@@ -123,7 +125,7 @@ export function FeatureRows() {
         id="ai"
         flip
         badge="New"
-        icon={Sparkles}
+        icon={Bot}
         title="Ask your data in plain English"
         text="Describe the dashboard you want or ask a question. The AI writes the query, and your browser runs it."
         points={[
@@ -176,7 +178,7 @@ const PERKS = [
   { icon: FileSpreadsheet, title: "Any spreadsheet", text: "Excel, CSV, JSON and NDJSON exports from any tool you use." },
   { icon: Table2, title: "Built for stores and ops", text: "Made for ecommerce and operations exports. Shopify, Stripe and GA4 templates are coming soon." },
   { icon: Share2, title: "Safe sharing", text: "Read-only links with optional passwords, never indexed by search engines." },
-  { icon: Sparkles, title: "Free to start", text: "Build a dashboard without an account. Sign in only to publish and use AI." },
+  { icon: Gift, title: "Free to start", text: "Build a dashboard without an account. Sign in only to publish and use AI." },
 ] as const;
 
 export function Perks() {
