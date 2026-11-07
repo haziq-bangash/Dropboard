@@ -43,6 +43,19 @@ Findings are computed in the browser from the data, so they are free to run and 
 - **Present mode:** full-screen, slide-style walk through the story.
 - **Infographic and share cards:** one-page image or carousel from the story, exported as PNG (generated in the browser).
 - **Exit:** a messy 5,000-row file produces a ranked findings list and a readable story in under 10 seconds, and every number in it can be traced to a query.
+- **Algorithms (from research, Nov 2026).** Spend the effort on free browser-side findings and on guards around Pilot, not on model routing: Pilot already costs about $0.001 per dashboard.
+  - **Evaluation first, before the engine.** Three harnesses decide whether an algorithm ships: (1) a null test that shuffles every column of the fixtures and expects near-zero findings at 5% FDR; (2) datasets with planted insights, scored for precision and recall; (3) a set of questions scored on execution accuracy for Pilot's SQL.
+  - **Candidate scoring.** Score each candidate by impact (cheap) and significance (expensive). Compute impact for all candidates, prune, then test significance only on the best few (QuickInsights).
+  - **Statistical validity.** Findings are generated as one batch, so apply a Benjamini-Hochberg correction across all candidates, and require an effect-size floor as well, because with thousands of rows almost everything is "significant". Use alpha-investing only if findings become interactive. Studies of visual analysis report 60 to 75 percent false insights without such control.
+  - **Trends and change points.** In the TCPDBench benchmark no method beat the "no change points" baseline with default settings, so be conservative: PELT with a conservative penalty, a minimum segment length and an effect-size floor, and say nothing when unsure.
+  - **Outliers and seasonality.** Robust methods (median absolute deviation or IQR for outliers, STL for seasonality). These are standard but not verified by the research, so the harness above decides.
+  - **Pilot SQL.** Keep the SQL guard, add a template layer for recurring question shapes (grammar-constrained decoding in the literature, reported up to 36% higher execution accuracy), and allow one repair retry that feeds the database error back. Escalate to a stronger model only when a verifier (guard or execution failure) fails, never on a learned router.
+  - **Chart choice.** Keep the deterministic suggester. Rank charts with Draco-style constraint weights fitted offline from Pilot's pairwise judgments, then ship the ranker. Offer two or three alternatives, since one question often has several valid charts.
+  - **Line charts.** Bucket by minimum and maximum in SQL (MinMax) to cap points near twice the chart width. It is the most stable under panning. M4 is not preferred.
+  - **Profiling.** Rules plus DuckDB's sniffer for types. DuckDB's approximate aggregates (approx_count_distinct, approx_quantile, approx_top_k) for large files, with error measured on our fixtures because the docs give no bounds. Ask Pilot about ambiguous columns by name only.
+  - **Cost.** Keep the exact cache. No semantic cache, because a wrong cached answer to a data question is costly. Do not rely on provider prompt caching: our prompts are likely under the minimum size and the discount has been reported unreliable, so budget uncached prices.
+  - **Scope.** Keep Pilot narrow with a human in the loop: the best models score about 30 percent on open-ended data-science agent benchmarks.
+  - **Exit additions:** zero findings above the 5% FDR on shuffled data, planted insights recovered with precision and recall reported, and Pilot execution accuracy reported on the question set.
 
 ### Phase 6: Sources (v0.6.0)
 - **Paste and drag:** paste copied cells or a table from a page.
