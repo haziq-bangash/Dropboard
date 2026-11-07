@@ -1,14 +1,8 @@
 import {
   ArrowRight,
   Bot,
-  FileSpreadsheet,
-  Gift,
   Link2,
   LineChart,
-  Share2,
-  ShieldCheck,
-  Table2,
-  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -171,7 +165,7 @@ export function AiPrompts() {
           New
         </Badge>
         <h2 className="mx-auto max-w-2xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-          Meet <em className="font-serif font-medium italic text-secondary">{ASSISTANT}</em>. Ask anything about your spreadsheet.
+          Meet <em className="font-serif text-[1.14em] italic text-secondary">{ASSISTANT}</em>. Ask anything about your spreadsheet.
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-balance opacity-70">
           Start from a question instead of a blank dashboard. Here is the kind of thing you can ask.
@@ -185,31 +179,110 @@ export function AiPrompts() {
   );
 }
 
-const PERKS = [
-  { icon: ShieldCheck, title: "Private by design", text: "Files are processed in your browser. Your rows are never uploaded." },
-  { icon: Zap, title: "Fast", text: "Dashboards appear in seconds, even for files with over a million rows." },
-  { icon: FileSpreadsheet, title: "Any spreadsheet", text: "Excel, CSV, JSON and NDJSON exports from any tool you use." },
-  { icon: Table2, title: "Built for stores and ops", text: "Made for ecommerce and operations exports. Shopify, Stripe and GA4 templates are coming soon." },
-  { icon: Share2, title: "Safe sharing", text: "Read-only links with optional passwords, never indexed by search engines." },
-  { icon: Gift, title: "Free to start", text: `Build a dashboard without an account. Sign in only to publish and use ${ASSISTANT}.` },
-] as const;
+const bentoBase =
+  "group relative isolate flex flex-col justify-end overflow-hidden rounded-3xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl min-h-[220px]";
+
+function Stat({ children }: { children: React.ReactNode }) {
+  return <p className="font-serif leading-[0.9] tracking-normal">{children}</p>;
+}
+
+function Chip({ children, tilt, className }: { children: React.ReactNode; tilt: string; className?: string }) {
+  return (
+    <span
+      className={`inline-block rounded-full px-3 py-1 text-sm font-medium shadow-sm transition-transform duration-300 group-hover:rotate-0 ${tilt} ${className ?? ""}`}
+    >
+      {children}
+    </span>
+  );
+}
 
 export function Perks() {
   return (
     <section id="privacy" className={`${wrap} py-24`}>
       <SectionHeading title="Why Dropboard">Built so you can go from file to answer without handing over your data.</SectionHeading>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {PERKS.map(({ icon: Icon, title, text }) => (
-          <Card key={title}>
-            <CardHeader>
-              <div className="mb-2 flex size-10 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
-                <Icon className="size-5" />
-              </div>
-              <CardTitle>{title}</CardTitle>
-              <CardDescription>{text}</CardDescription>
-            </CardHeader>
-          </Card>
-        ))}
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:auto-rows-[220px] lg:grid-cols-4">
+        {/* Private by design */}
+        <div className={`${bentoBase} bg-primary text-primary-foreground sm:col-span-2 lg:row-span-2`} data-testid="perk">
+          <div aria-hidden="true" className="absolute inset-0 -z-10 bg-cover bg-center opacity-20" style={{ backgroundImage: "url(/art/topo-lines-light.svg)" }} />
+          <Grain className="-z-10 opacity-40" />
+          <p className="text-[11px] font-semibold tracking-[0.2em] uppercase opacity-70">Private by design</p>
+          <Stat>
+            <span className="block text-[8.5rem] sm:text-[11rem]">0</span>
+          </Stat>
+          <p className="-mt-2 text-2xl font-semibold tracking-tight">rows uploaded</p>
+          <p className="mt-2 max-w-sm text-sm opacity-80">Files are processed in your browser. Your rows are never uploaded.</p>
+        </div>
+
+        {/* Fast */}
+        <div className={`${bentoBase} bg-secondary text-secondary-foreground`} data-testid="perk">
+          <Grain className="-z-10 opacity-40" />
+          <p className="text-[11px] font-semibold tracking-[0.2em] uppercase opacity-70">Fast</p>
+          <Stat>
+            <span className="block text-7xl">~3s</span>
+          </Stat>
+          <p className="mt-2 text-sm">1.4M rows in our tests. Dashboards appear in seconds.</p>
+        </div>
+
+        {/* Any spreadsheet */}
+        <div className={`${bentoBase} bg-[#D3DBDD] text-foreground`} data-testid="perk">
+          <Grain className="-z-10 opacity-40" />
+          <div className="absolute right-4 top-4 flex max-w-[75%] flex-wrap justify-end gap-2">
+            <Chip tilt="-rotate-6" className="bg-card">.xlsx</Chip>
+            <Chip tilt="rotate-3" className="bg-primary text-primary-foreground">.csv</Chip>
+            <Chip tilt="rotate-6" className="bg-card">.json</Chip>
+            <Chip tilt="-rotate-3" className="bg-card">.ndjson</Chip>
+          </div>
+          <p className="text-lg font-semibold">Any spreadsheet</p>
+          <p className="mt-1 text-sm text-foreground/75">Exports from any tool you use.</p>
+        </div>
+
+        {/* Built for stores and ops */}
+        <div className={`${bentoBase} bg-gradient-to-br from-[#FFD59A] to-[#FF9A45] text-foreground sm:col-span-2`} data-testid="perk">
+          <Grain className="-z-10 opacity-45" />
+          <div className="absolute right-5 top-5 flex gap-2">
+            {["Shopify", "Stripe", "GA4"].map((t, i) => (
+              <Chip key={t} tilt={["-rotate-3", "rotate-2", "-rotate-1"][i]} className="border border-dashed border-foreground/60 bg-background/70">
+                {t} <span className="text-[10px] font-semibold tracking-wider uppercase opacity-70">soon</span>
+              </Chip>
+            ))}
+          </div>
+          <p className="text-lg font-semibold">Built for stores and ops</p>
+          <p className="mt-1 max-w-md text-sm text-foreground/80">
+            Made for ecommerce and operations exports. Shopify, Stripe and GA4 templates are coming soon.
+          </p>
+        </div>
+
+        {/* Safe sharing */}
+        <div className={`${bentoBase} bg-foreground text-background sm:col-span-2`} data-testid="perk">
+          <div aria-hidden="true" className="absolute inset-0 -z-10 bg-cover bg-center opacity-[0.16]" style={{ backgroundImage: "url(/art/topo-lines-light.svg)" }} />
+          <Grain className="-z-10 opacity-40" />
+          <div className="absolute right-5 top-5 flex flex-wrap justify-end gap-2">
+            <Chip tilt="-rotate-3" className="bg-secondary text-secondary-foreground">Password</Chip>
+            <Chip tilt="rotate-2" className="bg-background text-foreground">Read-only</Chip>
+            <Chip tilt="-rotate-2" className="bg-brand text-foreground">Revocable</Chip>
+          </div>
+          <Stat>
+            <span className="block text-5xl sm:text-6xl">
+              Never <em className="text-secondary italic">indexed</em>
+            </span>
+          </Stat>
+          <p className="mt-3 text-lg font-semibold">Safe sharing</p>
+          <p className="mt-1 max-w-md text-sm opacity-75">Read-only links with optional passwords, hidden from search engines.</p>
+        </div>
+
+        {/* Free to start */}
+        <div className={`${bentoBase} border-2 border-dashed border-brand bg-card text-foreground sm:col-span-2`} data-testid="perk">
+          <p className="text-[11px] font-semibold tracking-[0.2em] text-brand-text uppercase">Free to start</p>
+          <Stat>
+            <span className="block text-7xl sm:text-8xl">
+              <em className="text-brand-text italic">Free</em>
+            </span>
+          </Stat>
+          <p className="mt-2 max-w-md text-sm text-muted-foreground">
+            {`Build a dashboard without an account. Sign in only to publish and use ${ASSISTANT}.`}
+          </p>
+        </div>
       </div>
     </section>
   );
