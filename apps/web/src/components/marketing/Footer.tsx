@@ -1,6 +1,6 @@
-import { BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { Grain } from "@/components/art/Grain";
+import { Logo } from "@/components/Logo";
 import { ASSISTANT } from "@/lib/brand";
 
 const COLUMNS: { title: string; links: [string, string][] }[] = [
@@ -40,9 +40,8 @@ export function Footer() {
       <div className="mx-auto w-full max-w-6xl px-5 pt-16">
         <div className="grid gap-10 md:grid-cols-[1.6fr_repeat(3,1fr)]">
           <div>
-            <Link href="/" className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-              <BarChart3 className="size-6" />
-              Dropboard
+            <Link href="/" aria-label="Dropboard home" className="text-xl">
+              <Logo />
             </Link>
             <p className="mt-3 max-w-xs text-sm text-muted-foreground">
               Turn any spreadsheet into a dashboard, without handing over your data.
