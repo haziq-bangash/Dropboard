@@ -4,7 +4,9 @@ import type { DashboardSpec } from "@dropboard/spec";
 import { suggestDashboard } from "@dropboard/engine";
 import { useCallback, useState } from "react";
 import { loadFile } from "@/lib/ingest";
+import { liveSource } from "@/lib/results";
 import { Dashboard } from "./Dashboard";
+import { PublishButton } from "./PublishButton";
 
 type State =
   | { status: "idle" }
@@ -48,7 +50,8 @@ export function Uploader() {
       {state.status === "ready" && (
         <>
           <p className="muted">Built in {state.ms} ms, entirely in your browser.</p>
-          <Dashboard spec={state.spec} />
+          <PublishButton spec={state.spec} />
+          <Dashboard spec={state.spec} source={liveSource} />
         </>
       )}
     </div>
