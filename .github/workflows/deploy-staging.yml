@@ -151,13 +151,24 @@ jobs:
                 LIST="$LIST,RESEND_API_KEY=resend-api-key:latest"
                 ENV_VARS="$ENV_VARS,MAIL_FROM=${{ vars.MAIL_FROM }}"
               fi
+              if gcloud secrets describe proxy-secret >/dev/null 2>&1; then
+                LIST="$LIST,PROXY_SECRET=proxy-secret:latest"
+              fi
               SECRETS="--update-secrets=$LIST"
             fi
             MEMORY=512Mi
           else
+            # The web app shares the API's runtime account, so it can read the proxy secret too: it passes each visitor's
+            # address to the API (see apps/web/src/lib/forward.ts)
             SA_FLAG=""
+            if [ -n "${{ vars.RUNTIME_SERVICE_ACCOUNT }}" ]; then
+              SA_FLAG="--service-account=${{ vars.RUNTIME_SERVICE_ACCOUNT }}"
+            fi
             ENV_VARS="API_URL=${{ vars.API_URL }}"
             SECRETS=""
+            if gcloud secrets describe proxy-secret >/dev/null 2>&1; then
+              SECRETS="--update-secrets=PROXY_SECRET=proxy-secret:latest"
+            fi
             MEMORY=512Mi
           fi
 
