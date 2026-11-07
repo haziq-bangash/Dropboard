@@ -15,3 +15,18 @@ describe("DashboardSpec", () => {
     expect(DashboardSpec.safeParse({ ...valid, charts: Array(51).fill(chart) }).success).toBe(false);
   });
 });
+
+import { PublishInput, SHARE_MAX_ROWS_PER_CHART } from "../src";
+
+describe("PublishInput", () => {
+  it("accepts results and an optional password", () => {
+    expect(PublishInput.safeParse({ results: { c1: [{ x: "a", y: 1 }] }, password: "hunter22" }).success).toBe(true);
+    expect(PublishInput.safeParse({ results: {} }).success).toBe(true);
+  });
+  it("rejects too many rows, nested values and short passwords", () => {
+    const rows = Array(SHARE_MAX_ROWS_PER_CHART + 1).fill({ x: 1 });
+    expect(PublishInput.safeParse({ results: { c1: rows } }).success).toBe(false);
+    expect(PublishInput.safeParse({ results: { c1: [{ x: { nested: 1 } }] } }).success).toBe(false);
+    expect(PublishInput.safeParse({ results: {}, password: "abc" }).success).toBe(false);
+  });
+});

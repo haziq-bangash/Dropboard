@@ -23,3 +23,19 @@ export const DashboardSpec = z.object({
 export type DashboardSpec = z.infer<typeof DashboardSpec>;
 export type ChartSpec = z.infer<typeof ChartSpec>;
 export type ColumnType = z.infer<typeof ColumnType>;
+
+// ---- Publishing (snapshot shares) ----
+
+const Cell = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+export const SHARE_MAX_ROWS_PER_CHART = 1000;
+
+/** Precomputed chart results keyed by chart id. Never raw table data. */
+export const ShareResults = z.record(z.string(), z.array(z.record(z.string(), Cell)).max(SHARE_MAX_ROWS_PER_CHART));
+
+export const PublishInput = z.object({
+  results: ShareResults,
+  password: z.string().min(4).max(128).optional(),
+});
+
+export type ShareResults = z.infer<typeof ShareResults>;
+export type PublishInput = z.infer<typeof PublishInput>;
