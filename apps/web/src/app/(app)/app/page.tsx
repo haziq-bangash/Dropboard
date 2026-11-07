@@ -3,7 +3,9 @@
 import { FolderOpen, Plus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { GettingStarted } from "@/components/app/GettingStarted";
 import { ProjectCard } from "@/components/app/ProjectCard";
+import { StarterGrid } from "@/components/app/StarterGrid";
 import { useProjects } from "@/components/app/projects-store";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -19,19 +21,32 @@ export default function Projects() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">
-            Your <em className="font-serif text-[1.14em] italic text-brand-text">projects</em>
+            Your{" "}
+            <em className="font-serif text-[1.14em] italic text-brand-text">
+              projects
+            </em>
           </h1>
-          <p className="mt-2 text-muted-foreground">Each project is a dashboard built from one file. Your rows stay in your browser.</p>
+          <p className="mt-2 text-muted-foreground">
+            Each project is a dashboard built from one file. Your rows stay in
+            your browser.
+          </p>
         </div>
-        <Button render={<Link href="/app/new" />} nativeButton={false} disabled={full}>
+        <Button
+          render={<Link href="/app/new" />}
+          nativeButton={false}
+          disabled={full}
+        >
           <Plus /> New project
         </Button>
       </div>
 
+      <GettingStarted />
+
       {full && (
         <Alert className="mt-6">
           <AlertDescription>
-            You are using all {limits!.projects.max} projects on the free plan. Delete one to start another.
+            You are using all {limits!.projects.max} projects on the free plan.
+            Delete one to start another.
           </AlertDescription>
         </Alert>
       )}
@@ -49,17 +64,23 @@ export default function Projects() {
             ))}
           </div>
         ) : items.length === 0 ? (
-          <div className="flex flex-col items-center gap-4 rounded-2xl border-2 border-dashed px-6 py-16 text-center">
-            <div className="grid size-12 place-items-center rounded-full bg-secondary/60">
-              <FolderOpen className="size-6 text-brand-text" />
+          <div className="flex flex-col gap-12">
+            <div className="flex flex-col items-center gap-4 rounded-2xl border-2 border-dashed px-6 py-16 text-center">
+              <div className="grid size-12 place-items-center rounded-full bg-secondary/60">
+                <FolderOpen className="size-6 text-brand-text" />
+              </div>
+              <div>
+                <p className="text-lg font-medium">No projects yet</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Drop a spreadsheet and your first dashboard is ready in
+                  seconds.
+                </p>
+              </div>
+              <Button render={<Link href="/app/new" />} nativeButton={false}>
+                <Plus /> Start a project
+              </Button>
             </div>
-            <div>
-              <p className="text-lg font-medium">No projects yet</p>
-              <p className="mt-1 text-sm text-muted-foreground">Drop a spreadsheet and your first dashboard is ready in seconds.</p>
-            </div>
-            <Button render={<Link href="/app/new" />} nativeButton={false}>
-              <Plus /> Start a project
-            </Button>
+            <StarterGrid />
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

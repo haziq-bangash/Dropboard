@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BookOpen,
   ChevronsUpDown,
   FolderKanban,
   Globe,
@@ -32,6 +33,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { authClient } from "@/lib/auth-client";
+import { showGuideAgain } from "@/lib/guide";
 import { clearLocalData } from "@/lib/local-data";
 import { setLoaded } from "@/lib/loaded-data";
 import { Logo } from "../Logo";
@@ -55,7 +57,7 @@ const NAV = [
 export function AppSidebar({
   user,
 }: {
-  user: { name: string; email: string };
+  user: { id: string; name: string; email: string };
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -130,6 +132,15 @@ export function AppSidebar({
                   </DropdownMenuLabel>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    showGuideAgain(user.id);
+                    router.push("/app");
+                  }}
+                >
+                  <BookOpen />
+                  Show the guide again
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={async () => {
                     setLoaded(null);
