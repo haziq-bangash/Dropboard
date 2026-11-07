@@ -19,7 +19,7 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:$SA_EMAIL" --role=roles/aiplatform.user --condition=None >/dev/null
 
 # Secrets: only the ones that exist, only for this account
-for secret in database-url better-auth-secret anthropic-api-key google-api-key; do
+for secret in database-url better-auth-secret anthropic-api-key google-api-key google-client-id google-client-secret; do
   if gcloud secrets describe "$secret" --project="$PROJECT_ID" >/dev/null 2>&1; then
     gcloud secrets add-iam-policy-binding "$secret" --project="$PROJECT_ID" \
       --member="serviceAccount:$SA_EMAIL" --role=roles/secretmanager.secretAccessor >/dev/null
