@@ -90,6 +90,9 @@ jobs:
               if gcloud secrets describe google-api-key >/dev/null 2>&1; then
                 LIST="$LIST,GOOGLE_API_KEY=google-api-key:latest"
               fi
+              if gcloud secrets describe google-client-id >/dev/null 2>&1 && gcloud secrets describe google-client-secret >/dev/null 2>&1; then
+                LIST="$LIST,GOOGLE_CLIENT_ID=google-client-id:latest,GOOGLE_CLIENT_SECRET=google-client-secret:latest"
+              fi
               SECRETS="--update-secrets=$LIST"
             fi
             MEMORY=512Mi
