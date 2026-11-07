@@ -10,7 +10,7 @@ RUN pnpm --filter @dropboard/api build
 
 FROM gcr.io/distroless/nodejs22-debian12:nonroot
 WORKDIR /app
-COPY --from=build /repo/apps/api/dist/index.js ./index.js
+COPY --from=build /repo/apps/api/dist ./
 ENV NODE_ENV=production
 EXPOSE 8080
 CMD ["index.js"]
