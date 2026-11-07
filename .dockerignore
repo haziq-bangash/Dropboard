@@ -1,3 +1,14 @@
 **/node_modules
 **/dist
+**/.next
+**/.next-dev
+**/.turbo
+**/.env
+**/.env.*
+**/test-results
+**/playwright-report
 .git
+.github
+docs
+e2e
+*.md
