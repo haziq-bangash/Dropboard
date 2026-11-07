@@ -187,10 +187,10 @@ describe("sign-in providers", () => {
     try {
       delete process.env.GOOGLE_CLIENT_ID;
       delete process.env.GOOGLE_CLIENT_SECRET;
-      expect(await (await app.request("/api/providers")).json()).toEqual({ google: false });
+      expect(await (await app.request("/api/providers")).json()).toEqual({ google: false, email: false });
       process.env.GOOGLE_CLIENT_ID = "id";
       process.env.GOOGLE_CLIENT_SECRET = "secret";
-      expect(await (await app.request("/api/providers")).json()).toEqual({ google: true });
+      expect(await (await app.request("/api/providers")).json()).toEqual({ google: true, email: false });
     } finally {
       if (saved.id === undefined) delete process.env.GOOGLE_CLIENT_ID;
       else process.env.GOOGLE_CLIENT_ID = saved.id;

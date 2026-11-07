@@ -6,6 +6,7 @@ import { cors } from "hono/cors";
 import { createMiddleware } from "hono/factory";
 import { secureHeaders } from "hono/secure-headers";
 import { randomBytes } from "node:crypto";
+import type { Mailer } from "./mail/mailer";
 import { allowedOrigins, googleEnabled, type Auth } from "./auth";
 import { registerAiRoutes } from "./ai/routes";
 import type { AiService } from "./ai/service";
@@ -19,9 +20,11 @@ export interface Deps {
   /** Omit to disable AI routes (they return 503). */
   ai?: AiService;
   aiDailyLimit?: number;
+  /** Present when email is configured: the web app then offers password reset and email confirmation. */
+  mailer?: Mailer;
 }
 
-export function createApp({ prisma, auth, ai, aiDailyLimit }: Deps) {
+export function createApp({ prisma, auth, ai, aiDailyLimit, mailer }: Deps) {
   const app = new Hono<AppEnv>();
 
   app.use("*", secureHeaders());
@@ -33,7 +36,7 @@ export function createApp({ prisma, auth, ai, aiDailyLimit }: Deps) {
   app.get("/health", (c) => c.text("ok"));
 
   // which optional sign-in methods the web app should offer
-  app.get("/api/providers", (c) => c.json({ google: googleEnabled() }));
+  app.get("/api/providers", (c) => c.json({ google: googleEnabled(), email: Boolean(mailer) }));
 
   // Better Auth: sign-up, sign-in, sessions, etc.
   app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
