@@ -12,14 +12,33 @@ test("the hero flow moves", async ({ page }) => {
   expect(t2).not.toBe(t1);
 });
 
-test("the hero flow turns placeholders into insight cards across the beam", async ({ page }) => {
+test("the hero flow turns placeholders into insight cards as they cross the beam", async ({ page }) => {
   await page.goto("/");
-  // each row is drawn twice: one clipped to the left half (placeholders), one to the right half (finished cards)
-  const rows = page.locator('[class*="clip-path"]');
-  await expect(rows).toHaveCount(6);
+  // each row draws the same track twice: placeholders and finished cards, cross-faded around the center
+  await expect(page.locator('[data-layer="placeholder"]')).toHaveCount(3);
+  await expect(page.locator('[data-layer="insight"]')).toHaveCount(3);
   // finished cards carry real labels; placeholders carry none
-  await expect(page.locator('[class*="clip-path:inset(0_0_0_50%)"]').first()).toContainText(/\w/);
-  await expect(page.locator('[class*="clip-path:inset(0_50%_0_0)"]').first()).not.toContainText(/\w/);
+  await expect(page.locator('[data-layer="insight"]').first()).toContainText(/\w/);
+  await expect(page.locator('[data-layer="placeholder"]').first()).not.toContainText(/\w/);
+});
+
+test("the hero flow loops without a jump", async ({ page }) => {
+  await page.goto("/");
+  // The track holds the card sequence twice and is shifted by half its width. That is only seamless if half of the
+  // track is exactly one copy: 6 cards x (288px card + 16px gap) = 1824px, so the track is 3648px wide.
+  const widths = await page.locator("[data-track]").evaluateAll((els) => els.map((el) => (el as HTMLElement).offsetWidth));
+  expect(widths).toHaveLength(6);
+  for (const w of widths) expect(w).toBe(12 * (288 + 16));
+  // and the placeholder and finished layers of a row move in lockstep
+  const sameMotion = await page.evaluate(() => {
+    const tracks = Array.from(document.querySelectorAll("[data-track]")) as HTMLElement[];
+    return [0, 1, 2].every((row) => {
+      const a = getComputedStyle(tracks[row * 2]);
+      const b = getComputedStyle(tracks[row * 2 + 1]);
+      return a.animationDuration === b.animationDuration && a.animationDelay === b.animationDelay;
+    });
+  });
+  expect(sameMotion).toBe(true);
 });
 
 test("the prompt carousel cycles through the example questions", async ({ page }) => {
