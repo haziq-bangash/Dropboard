@@ -13,6 +13,8 @@
     "@ai-sdk/anthropic": "4.0.98",
     "@ai-sdk/google": "4.0.113",
     "@ai-sdk/google-vertex": "5.0.133",
+    "@ai-sdk/openai": "4.0.111",
+    "@ai-sdk/xai": "5.0.40",
     "@dropboard/engine": "workspace:^",
     "@dropboard/spec": "workspace:*",
     "@hono/node-server": "^1.13.0",
