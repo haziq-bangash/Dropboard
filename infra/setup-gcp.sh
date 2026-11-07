@@ -7,7 +7,8 @@ set -euo pipefail
 : "${PROJECT_ID:?}" "${BILLING_ACCOUNT:?}" "${GITHUB_REPO:?}"
 REGION="${REGION:-europe-west1}"
 BUDGET_USD="${BUDGET_USD:-20}"
-SA="github-deployer"
+SA="${SA_NAME:-dropboard-deployer}"
+POOL="${POOL:-dropboard-github}"
 SA_EMAIL="$SA@$PROJECT_ID.iam.gserviceaccount.com"
 
 gcloud projects describe "$PROJECT_ID" >/dev/null 2>&1 || gcloud projects create "$PROJECT_ID"
@@ -28,7 +29,7 @@ gcloud artifacts repositories set-cleanup-policies dropboard --location="$REGION
 
 # Deployer service account (least privilege)
 gcloud iam service-accounts describe "$SA_EMAIL" >/dev/null 2>&1 || \
-  gcloud iam service-accounts create "$SA" --display-name="GitHub deployer"
+  gcloud iam service-accounts create "$SA" --display-name="Dropboard GitHub deployer"
 for role in roles/run.admin roles/artifactregistry.writer roles/iam.serviceAccountUser; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:$SA_EMAIL" --role="$role" --condition=None >/dev/null
@@ -36,18 +37,18 @@ done
 
 # Workload Identity Federation: keyless auth, restricted to this repo
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
-gcloud iam workload-identity-pools describe github --location=global >/dev/null 2>&1 || \
-  gcloud iam workload-identity-pools create github --location=global --display-name="GitHub"
+gcloud iam workload-identity-pools describe "$POOL" --location=global >/dev/null 2>&1 || \
+  gcloud iam workload-identity-pools create "$POOL" --location=global --display-name="GitHub"
 gcloud iam workload-identity-pools providers describe github-oidc \
-  --location=global --workload-identity-pool=github >/dev/null 2>&1 || \
+  --location=global --workload-identity-pool="$POOL" >/dev/null 2>&1 || \
   gcloud iam workload-identity-pools providers create-oidc github-oidc \
-    --location=global --workload-identity-pool=github \
+    --location=global --workload-identity-pool="$POOL" \
     --issuer-uri="https://token.actions.githubusercontent.com" \
     --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
     --attribute-condition="assertion.repository=='$GITHUB_REPO'"
 gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \
   --role=roles/iam.workloadIdentityUser \
-  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/attribute.repository/$GITHUB_REPO" >/dev/null
+  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL/attribute.repository/$GITHUB_REPO" >/dev/null
 
 # Budget alerts at 50/90/100% of BUDGET_USD
 gcloud billing budgets create --billing-account="$BILLING_ACCOUNT" \
@@ -62,4 +63,4 @@ echo "Set these GitHub environment variables/secrets for this environment:"
 echo "  GCP_PROJECT_ID = $PROJECT_ID"
 echo "  GCP_REGION     = $REGION"
 echo "  GCP_SERVICE_ACCOUNT = $SA_EMAIL"
-echo "  GCP_WORKLOAD_IDENTITY_PROVIDER = projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/github-oidc"
+echo "  GCP_WORKLOAD_IDENTITY_PROVIDER = projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL/providers/github-oidc"
