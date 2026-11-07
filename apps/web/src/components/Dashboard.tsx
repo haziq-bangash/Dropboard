@@ -1,12 +1,9 @@
 "use client";
 
 import type { ChartSpec, DashboardSpec } from "@dropboard/spec";
-import { guardSql } from "@dropboard/engine";
 import * as echarts from "echarts";
 import { useEffect, useRef, useState } from "react";
-import { runQuery } from "@/lib/duckdb";
-
-type Rows = Record<string, unknown>[];
+import type { RowSource, Rows } from "@/lib/results";
 
 const COLORS = ["#2563eb", "#16a34a", "#d97706", "#9333ea", "#dc2626", "#0891b2"];
 
@@ -77,24 +74,21 @@ function Table({ rows }: { rows: Rows }) {
   );
 }
 
-function Card({ spec }: { spec: ChartSpec }) {
+function Card({ spec, source }: { spec: ChartSpec; source: RowSource }) {
   const [rows, setRows] = useState<Rows | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    const guarded = guardSql(spec.query);
-    if (!guarded.ok) {
-      setError(guarded.reason);
-      return;
-    }
-    runQuery(guarded.sql)
+    setRows(null);
+    setError(null);
+    source(spec)
       .then((r) => !cancelled && setRows(r))
       .catch((e: Error) => !cancelled && setError(e.message));
     return () => {
       cancelled = true;
     };
-  }, [spec.query]);
+  }, [spec, source]);
 
   if (spec.type === "kpi") {
     return (
@@ -112,14 +106,14 @@ function Card({ spec }: { spec: ChartSpec }) {
   );
 }
 
-export function Dashboard({ spec }: { spec: DashboardSpec }) {
+export function Dashboard({ spec, source }: { spec: DashboardSpec; source: RowSource }) {
   const kpis = spec.charts.filter((c) => c.type === "kpi");
   const rest = spec.charts.filter((c) => c.type !== "kpi");
   return (
     <section>
       <h2>{spec.title}</h2>
-      <div className="grid kpis">{kpis.map((c) => <Card key={c.id} spec={c} />)}</div>
-      <div className="grid">{rest.map((c) => <Card key={c.id} spec={c} />)}</div>
+      <div className="grid kpis">{kpis.map((c) => <Card key={c.id} spec={c} source={source} />)}</div>
+      <div className="grid">{rest.map((c) => <Card key={c.id} spec={c} source={source} />)}</div>
     </section>
   );
 }
