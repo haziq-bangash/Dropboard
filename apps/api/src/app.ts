@@ -7,17 +7,21 @@ import { createMiddleware } from "hono/factory";
 import { secureHeaders } from "hono/secure-headers";
 import { randomBytes } from "node:crypto";
 import { allowedOrigins, type Auth } from "./auth";
+import { registerAiRoutes } from "./ai/routes";
+import type { AiService } from "./ai/service";
 import { hashPassword, verifyPassword } from "./password";
+import type { AppEnv } from "./types";
 import type { Prisma, PrismaClient } from "./generated/prisma/client";
 
 export interface Deps {
   prisma: PrismaClient;
   auth: Auth;
+  /** Omit to disable AI routes (they return 503). */
+  ai?: AiService;
+  aiDailyLimit?: number;
 }
 
-type AppEnv = { Variables: { userId: string } };
-
-export function createApp({ prisma, auth }: Deps) {
+export function createApp({ prisma, auth, ai, aiDailyLimit }: Deps) {
   const app = new Hono<AppEnv>();
 
   app.use("*", secureHeaders());
@@ -37,6 +41,8 @@ export function createApp({ prisma, auth }: Deps) {
     c.set("userId", session.user.id);
     await next();
   });
+
+  registerAiRoutes(app, { prisma, ai, dailyLimit: aiDailyLimit, requireUser });
 
   app.post("/api/dashboards", requireUser, zValidator("json", DashboardSpec), async (c) => {
     const spec = c.req.valid("json");
