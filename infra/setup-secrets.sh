@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # One-time (and re-runnable) Secret Manager setup for one environment.
 # Usage: PROJECT_ID=travelcompanion-341011 DATABASE_URL='postgres://user:pass@host/db?sslmode=require' ./infra/setup-secrets.sh
+# Optional: ANTHROPIC_API_KEY=sk-ant-... also stores the key that enables the AI routes.
 # Re-running adds a new secret version; set ROTATE_AUTH_SECRET=1 to also rotate BETTER_AUTH_SECRET
 # (this signs every user out). By default an existing auth secret is kept.
 set -euo pipefail
@@ -28,8 +29,14 @@ if ! gcloud secrets describe better-auth-secret --project="$PROJECT_ID" >/dev/nu
   put_secret better-auth-secret "$(openssl rand -base64 48 | tr -d '\n')"
 fi
 
+names="database-url better-auth-secret"
+if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+  put_secret anthropic-api-key "$ANTHROPIC_API_KEY"
+  names="$names anthropic-api-key"
+fi
+
 # Narrow, per-secret access: the runtime account reads values; the deployer may only look the secrets up.
-for name in database-url better-auth-secret; do
+for name in $names; do
   gcloud secrets add-iam-policy-binding "$name" --project="$PROJECT_ID" \
     --member="serviceAccount:$RUNTIME_SA" --role=roles/secretmanager.secretAccessor >/dev/null
   gcloud secrets add-iam-policy-binding "$name" --project="$PROJECT_ID" \
@@ -37,7 +44,7 @@ for name in database-url better-auth-secret; do
 done
 
 echo
-echo "Secrets ready: database-url, better-auth-secret"
+echo "Secrets ready: $names"
 echo "Next: add the same database URL as a GitHub secret named DATABASE_URL on the 'staging' environment"
 echo "(the deploy workflow uses it to run prisma migrate deploy):"
 echo "  gh secret set DATABASE_URL --env staging --repo haziq-bangash/Dropboard"
