@@ -6,18 +6,27 @@ import { randomBytes } from "node:crypto";
 import type { Prisma, PrismaClient } from "./generated/prisma/client";
 import { hashPassword, verifyPassword } from "./password";
 import { limitsFor as defaultLimitsFor, type LimitsFor } from "./plans";
+import { clientKey, createLimiter, tooManyRequests } from "./rate-limit";
 import type { AppEnv } from "./types";
 
 interface Deps {
   prisma: PrismaClient;
   requireUser: MiddlewareHandler<AppEnv>;
   limitsFor?: LimitsFor;
+  /** Public share viewer limits. Tests make these small. */
+  shareLimits?: { requestsPerMinute: number; wrongPasswordsPerMinute: number };
 }
 
 const json = (v: unknown) => v as Prisma.InputJsonValue;
 
 /** Projects (saved dashboards), publishing, and the public share viewer endpoint. */
-export function registerProjectRoutes(app: Hono<AppEnv>, { prisma, requireUser, limitsFor = defaultLimitsFor }: Deps) {
+export function registerProjectRoutes(
+  app: Hono<AppEnv>,
+  { prisma, requireUser, limitsFor = defaultLimitsFor, shareLimits = { requestsPerMinute: 120, wrongPasswordsPerMinute: 10 } }: Deps,
+) {
+  // The viewer is public, so it is the one place anyone on the internet can hit without signing in
+  const viewerRequests = createLimiter(shareLimits.requestsPerMinute, 60_000);
+  const wrongPasswords = createLimiter(shareLimits.wrongPasswordsPerMinute, 60_000);
   const limitReached = (what: string, max: number) =>
     ({ error: `Your plan allows ${max} ${what}. Delete one or upgrade to add more.`, code: "limit_reached", limit: max }) as const;
 
@@ -181,13 +190,20 @@ export function registerProjectRoutes(app: Hono<AppEnv>, { prisma, requireUser, 
 
   // Public. Password-protected shares need the `x-share-password` header.
   app.get("/api/shares/:slug", async (c) => {
+    const gate = viewerRequests.take(clientKey(c));
+    if (!gate.ok) return tooManyRequests(c, gate.retryAfterSeconds);
+
     const share = await prisma.share.findUnique({ where: { slug: c.req.param("slug") } });
     if (!share || share.revokedAt) return c.json({ error: "not found" }, 404);
 
     if (share.passwordHash) {
       const supplied = c.req.header("x-share-password");
       if (!supplied) return c.json({ error: "password required", passwordRequired: true }, 401);
+      // guesses are limited per link, whoever is asking, so the limit holds even when many people share an address
+      const locked = wrongPasswords.peek(share.slug);
+      if (!locked.ok) return tooManyRequests(c, locked.retryAfterSeconds);
       if (!(await verifyPassword(supplied, share.passwordHash))) {
+        wrongPasswords.record(share.slug);
         return c.json({ error: "wrong password", passwordRequired: true }, 403);
       }
     }

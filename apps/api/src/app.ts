@@ -21,9 +21,10 @@ export interface Deps {
   mailer?: Mailer;
   /** Plan limits per user; defaults to the free plan. */
   limitsFor?: LimitsFor;
+  shareLimits?: { requestsPerMinute: number; wrongPasswordsPerMinute: number };
 }
 
-export function createApp({ prisma, auth, ai, aiDailyLimit, mailer, limitsFor }: Deps) {
+export function createApp({ prisma, auth, ai, aiDailyLimit, mailer, limitsFor, shareLimits }: Deps) {
   const app = new Hono<AppEnv>();
 
   app.use("*", secureHeaders());
@@ -49,7 +50,7 @@ export function createApp({ prisma, auth, ai, aiDailyLimit, mailer, limitsFor }:
 
   registerAiRoutes(app, { prisma, ai, dailyLimit: aiDailyLimit, requireUser });
 
-  registerProjectRoutes(app, { prisma, requireUser, limitsFor });
+  registerProjectRoutes(app, { prisma, requireUser, limitsFor, shareLimits });
 
   return app;
 }
