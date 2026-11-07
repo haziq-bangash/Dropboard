@@ -1,10 +1,9 @@
-import type { AskInput, GenerateInput } from "@dropboard/spec";
-import { describe, expect, it, vi } from "vitest";
+import type { GenerateInput } from "@dropboard/spec";
+import { describe, expect, it } from "vitest";
 import { generateCacheKey } from "../src/ai/cache";
 import { askMessage, describeTable, generateMessage } from "../src/ai/prompt";
 import { buildSpec } from "../src/ai/sanitize";
-import { AiBadOutput, AiRefusal } from "../src/ai/schema";
-import { createAnthropicAi, DEFAULT_MODEL } from "../src/ai/service";
+import { AiBadOutput } from "../src/ai/schema";
 
 const table = {
   rowCount: 1000,
@@ -95,48 +94,5 @@ describe("buildSpec", () => {
   });
   it("throws when nothing valid remains", () => {
     expect(() => buildSpec(table, { title: "x", charts: [chart("kpi", "DELETE FROM data")] })).toThrow(AiBadOutput);
-  });
-});
-
-describe("createAnthropicAi", () => {
-  const usage = { input_tokens: 120, output_tokens: 80, cache_read_input_tokens: 100 };
-  const fakeClient = (res: unknown) => {
-    const parse = vi.fn().mockResolvedValue(res);
-    return { client: { messages: { parse } } as never, parse };
-  };
-
-  it("sends a schema-only, structured, cache-friendly request", async () => {
-    const { client, parse } = fakeClient({
-      stop_reason: "end_turn",
-      parsed_output: { title: "T", charts: [] },
-      usage,
-    });
-    const ai = createAnthropicAi(client);
-    const result = await ai.generate(input);
-
-    expect(ai.model).toBe(DEFAULT_MODEL);
-    const req = parse.mock.calls[0][0];
-    expect(req.model).toBe(DEFAULT_MODEL);
-    expect(req).not.toHaveProperty("temperature");
-    expect(req.output_config.effort).toBe("low");
-    expect(req.output_config.format).toBeDefined();
-    expect(req.system[0].cache_control).toEqual({ type: "ephemeral" });
-    expect(req.messages[0].content).toContain('"region"');
-    expect(result.usage).toEqual({ inputTokens: 120, outputTokens: 80, cacheReadTokens: 100 });
-  });
-  it("uses a configurable model", async () => {
-    const { client, parse } = fakeClient({ stop_reason: "end_turn", parsed_output: { sql: "SELECT 1", explanation: "x" }, usage });
-    const ai = createAnthropicAi(client, "claude-sonnet-5-5");
-    const ask: AskInput = { table, question: "how many rows?" };
-    await ai.ask(ask);
-    expect(parse.mock.calls[0][0].model).toBe("claude-sonnet-5-5");
-  });
-  it("throws AiRefusal on a refusal and AiBadOutput on unparseable output", async () => {
-    await expect(createAnthropicAi(fakeClient({ stop_reason: "refusal", parsed_output: null, usage }).client).generate(input)).rejects.toThrow(AiRefusal);
-    await expect(createAnthropicAi(fakeClient({ stop_reason: "end_turn", parsed_output: null, usage }).client).generate(input)).rejects.toThrow(AiBadOutput);
-  });
-  it("defaults missing cache-read tokens to zero", async () => {
-    const { client } = fakeClient({ stop_reason: "end_turn", parsed_output: { title: "T", charts: [] }, usage: { input_tokens: 1, output_tokens: 2 } });
-    expect((await createAnthropicAi(client).generate(input)).usage.cacheReadTokens).toBe(0);
   });
 });

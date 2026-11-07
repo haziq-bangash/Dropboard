@@ -10,17 +10,20 @@
     "typecheck": "prisma generate && tsc --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.6.0",
+    "@ai-sdk/anthropic": "4.0.98",
+    "@ai-sdk/google": "4.0.113",
+    "@ai-sdk/google-vertex": "5.0.133",
     "@dropboard/engine": "workspace:^",
     "@dropboard/spec": "workspace:*",
     "@hono/node-server": "^1.13.0",
-    "@hono/zod-validator": "^0.4.0",
+    "@hono/zod-validator": "^0.9.1",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
+    "ai": "7.0.164",
     "better-auth": "^1.7.18",
     "hono": "^4.6.0",
     "pg": "^8.23.1",
-    "zod": "^3.23.8"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

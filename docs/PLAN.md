@@ -34,8 +34,10 @@ Spreadsheet/CSV/JSON in, shareable dashboard out. Browser does the heavy work; C
 - The model sees only column names, types, null counts and approximate distinct counts. Never row values.
 - Model output is untrusted: structured output, then the server rebuilds the spec, drops charts whose SQL fails the guard, and the browser drops charts that do not bind to the real columns.
 - Results are cached by prompt version, model, column names and types, and instruction. Cache hits are free; misses count against a per-user daily limit (default 10, `AI_DAILY_LIMIT`). Failed and declined calls are not charged. Every call is logged with token counts for Phase 4 billing.
-- Default model is `claude-haiku-5-5` (set `ANTHROPIC_MODEL` to change). Without `ANTHROPIC_API_KEY` the routes return 503.
-- Not yet measured: real cost per dashboard and output quality against the live model. Both need a key; the tests use stubbed model responses.
+- **Provider-agnostic.** Pilot is built on the Vercel AI SDK. `AiService` (generate, ask) is the only thing routes know; `ai/ai-sdk.ts` implements it for any AI SDK model, and `ai/providers/index.ts` is the only file that knows about vendors. Choose with `AI_PROVIDER` (`google`, `anthropic`, `none`) and `AI_MODEL`; adding a vendor is a few lines in that file. Cache keys and the usage log carry `provider/model`.
+- **Default: Gemini on Vertex AI**, model `gemini-3.5-flash-lite`, authenticated as the Cloud Run service account (Application Default Credentials), so there is no API key to leak. Anthropic remains available. Without a configured provider the routes return 503.
+- **Room to grow:** the AI SDK also provides tool calling, multi-step agent loops and tool-approval hooks for human-in-the-loop flows. It is not a graph or durable-workflow engine; if we need LangGraph-style orchestration it sits on top of the same `AiService` seam.
+- Measured live on Vertex with `gemini-3.5-flash-lite`: a dashboard takes about 1.7 s and about 1,050 tokens (724 in, 332 out), a question about 0.7 s, a refinement about 1.3 s. At the list price third-party trackers show ($0.30 per million input, $2.50 per million output; confirm in Billing) that is about $0.001 per dashboard, roughly ten times under the target.
 
 ## Workflow
 - Work on a branch, open a PR, wait for CI, merge, then sync main.

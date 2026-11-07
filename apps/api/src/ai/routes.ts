@@ -8,7 +8,7 @@ import type { AppEnv } from "../types";
 import { generateCacheKey } from "./cache";
 import { buildSpec } from "./sanitize";
 import { AiBadOutput, AiRefusal, type AiUsage } from "./schema";
-import type { AiService } from "./service";
+import { modelId, type AiService } from "./service";
 
 export const DEFAULT_DAILY_LIMIT = 10;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -34,7 +34,7 @@ export function registerAiRoutes(app: Hono<AppEnv>, { prisma, ai, dailyLimit = D
         userId,
         kind,
         cached,
-        model: ai?.model ?? "unknown",
+        model: ai ? modelId(ai) : "unknown",
         inputTokens: usage?.inputTokens ?? 0,
         outputTokens: usage?.outputTokens ?? 0,
         cacheReadTokens: usage?.cacheReadTokens ?? 0,
@@ -48,7 +48,7 @@ export function registerAiRoutes(app: Hono<AppEnv>, { prisma, ai, dailyLimit = D
     const userId = c.get("userId");
     const input = c.req.valid("json");
 
-    const key = generateCacheKey(ai.model, input);
+    const key = generateCacheKey(modelId(ai), input);
     const hit = await prisma.aiCache.findUnique({ where: { key } });
     if (hit) {
       await log(userId, "generate", true);

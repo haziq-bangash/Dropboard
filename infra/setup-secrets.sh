@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # One-time (and re-runnable) Secret Manager setup for one environment.
 # Usage: PROJECT_ID=travelcompanion-341011 DATABASE_URL='postgres://user:pass@host/db?sslmode=require' ./infra/setup-secrets.sh
-# Optional: ANTHROPIC_API_KEY=sk-ant-... also stores the key that enables the AI routes.
+# Optional: ANTHROPIC_API_KEY=... and/or GOOGLE_API_KEY=... also store provider keys. With AI_PROVIDER=google no key is
+# needed at all when the service runs as the account from infra/setup-runtime-sa.sh.
 # Re-running adds a new secret version; set ROTATE_AUTH_SECRET=1 to also rotate BETTER_AUTH_SECRET
 # (this signs every user out). By default an existing auth secret is kept.
 set -euo pipefail
@@ -10,7 +11,11 @@ set -euo pipefail
 SA_NAME="${SA_NAME:-dropboard-deployer}"
 DEPLOYER="$SA_NAME@$PROJECT_ID.iam.gserviceaccount.com"
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+# Prefer the dedicated runtime account (see infra/setup-runtime-sa.sh); fall back to the project's default one
 RUNTIME_SA="$PROJECT_NUMBER-compute@developer.gserviceaccount.com"
+if gcloud iam service-accounts describe "dropboard-runtime@$PROJECT_ID.iam.gserviceaccount.com" --project="$PROJECT_ID" >/dev/null 2>&1; then
+  RUNTIME_SA="dropboard-runtime@$PROJECT_ID.iam.gserviceaccount.com"
+fi
 
 gcloud services enable secretmanager.googleapis.com --project="$PROJECT_ID"
 
@@ -33,6 +38,11 @@ names="database-url better-auth-secret"
 if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
   put_secret anthropic-api-key "$ANTHROPIC_API_KEY"
   names="$names anthropic-api-key"
+fi
+# Optional: a Google API key, only if you do not use the service identity for Vertex AI
+if [ -n "${GOOGLE_API_KEY:-}" ]; then
+  put_secret google-api-key "$GOOGLE_API_KEY"
+  names="$names google-api-key"
 fi
 
 # Narrow, per-secret access: the runtime account reads values; the deployer may only look the secrets up.
