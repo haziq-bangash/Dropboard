@@ -18,11 +18,20 @@ import {
 import type { RowSource, Rows } from "@/lib/results";
 
 // Brand chart palette (see --chart-* in globals.css): midnight green, orange, dark amber, gunmetal, teal tint, sand
-const COLORS = ["#075056", "#FF5B04", "#B8860B", "#233038", "#3E8E94", "#F4D47C"];
+const COLORS = [
+  "#075056",
+  "#FF5B04",
+  "#B8860B",
+  "#233038",
+  "#3E8E94",
+  "#F4D47C",
+];
 const MUTED = "#6F7F86";
 
 const fmt = (v: unknown) =>
-  typeof v === "number" ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(v ?? "");
+  typeof v === "number"
+    ? v.toLocaleString(undefined, { maximumFractionDigits: 2 })
+    : String(v ?? "");
 
 function toOption(spec: ChartSpec, rows: Rows): echarts.EChartsCoreOption {
   const x = spec.x ?? "x";
@@ -41,9 +50,26 @@ function toOption(spec: ChartSpec, rows: Rows): echarts.EChartsCoreOption {
     case "bar":
       return {
         ...base,
-        xAxis: { ...axis, type: "category", data: rows.map((r) => fmt(r[x])) },
+        xAxis: {
+          ...axis,
+          type: "category",
+          data: rows.map((r) => fmt(r[x])),
+          axisLabel: {
+            ...axis.axisLabel,
+            interval: 0,
+            hideOverlap: true,
+            width: 84,
+            overflow: "truncate",
+          },
+        },
         yAxis: { ...axis, type: "value" },
-        series: [{ type: "bar", data: rows.map((r) => r[y]), itemStyle: { borderRadius: [4, 4, 0, 0] } }],
+        series: [
+          {
+            type: "bar",
+            data: rows.map((r) => r[y]),
+            itemStyle: { borderRadius: [4, 4, 0, 0] },
+          },
+        ],
       };
     case "line":
     case "area":
@@ -66,12 +92,24 @@ function toOption(spec: ChartSpec, rows: Rows): echarts.EChartsCoreOption {
         ...base,
         xAxis: { ...axis, type: "value" },
         yAxis: { ...axis, type: "value" },
-        series: [{ type: "scatter", symbolSize: 6, data: rows.map((r) => [r[x], r[y]]) }],
+        series: [
+          {
+            type: "scatter",
+            symbolSize: 6,
+            data: rows.map((r) => [r[x], r[y]]),
+          },
+        ],
       };
     case "pie":
       return {
         ...base,
-        series: [{ type: "pie", radius: ["45%", "70%"], data: rows.map((r) => ({ name: fmt(r[x]), value: r[y] })) }],
+        series: [
+          {
+            type: "pie",
+            radius: ["45%", "70%"],
+            data: rows.map((r) => ({ name: fmt(r[x]), value: r[y] })),
+          },
+        ],
       };
     default:
       return base;
@@ -123,7 +161,15 @@ export function Table({ rows }: { rows: Rows }) {
   );
 }
 
-function ChartCard({ spec, source, dataKey }: { spec: ChartSpec; source: RowSource; dataKey: string }) {
+function ChartCard({
+  spec,
+  source,
+  dataKey,
+}: {
+  spec: ChartSpec;
+  source: RowSource;
+  dataKey: string;
+}) {
   // Keyed by which rows are loaded, so the same SQL on a different file is never answered from the old rows
   const query = useQuery({
     queryKey: ["chart-rows", dataKey, spec.id, spec.query],
@@ -134,15 +180,28 @@ function ChartCard({ spec, source, dataKey }: { spec: ChartSpec; source: RowSour
     refetchOnWindowFocus: false,
   });
   const rows: Rows | null = query.data ?? null;
-  const error = query.error ? (query.error instanceof Error ? query.error.message : "Could not load this chart.") : null;
+  const error = query.error
+    ? query.error instanceof Error
+      ? query.error.message
+      : "Could not load this chart."
+    : null;
 
   if (spec.type === "kpi") {
     return (
       <Card size="sm" data-testid="kpi">
         <CardHeader>
           <p className="text-sm text-muted-foreground">{spec.title}</p>
-          <div className="text-3xl font-semibold tracking-tight" data-testid="kpi-value">
-            {error ? "–" : rows ? fmt(rows[0]?.value) : <Skeleton className="h-9 w-24" />}
+          <div
+            className="text-3xl font-semibold tracking-tight"
+            data-testid="kpi-value"
+          >
+            {error ? (
+              "–"
+            ) : rows ? (
+              fmt(rows[0]?.value)
+            ) : (
+              <Skeleton className="h-9 w-24" />
+            )}
           </div>
         </CardHeader>
       </Card>
@@ -150,7 +209,10 @@ function ChartCard({ spec, source, dataKey }: { spec: ChartSpec; source: RowSour
   }
 
   return (
-    <Card className={spec.type === "table" ? "md:col-span-2" : undefined} data-testid="chart-card">
+    <Card
+      className={spec.type === "table" ? "md:col-span-2" : undefined}
+      data-testid="chart-card"
+    >
       <CardHeader>
         <CardTitle>{spec.title}</CardTitle>
       </CardHeader>
@@ -187,7 +249,9 @@ export function Dashboard({
   const rest = spec.charts.filter((c) => c.type !== "kpi");
   return (
     <section className="flex flex-col gap-4">
-      {showTitle && <h2 className="text-2xl font-semibold tracking-tight">{spec.title}</h2>}
+      {showTitle && (
+        <h2 className="text-2xl font-semibold tracking-tight">{spec.title}</h2>
+      )}
       {kpis.length > 0 && (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {kpis.map((c) => (
