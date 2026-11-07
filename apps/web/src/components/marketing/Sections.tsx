@@ -17,6 +17,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ASSISTANT } from "@/lib/brand";
 import { MockChat, MockDashboard, MockShare } from "./Mocks";
 import { PromptCarousel } from "./PromptCarousel";
 
@@ -33,7 +34,7 @@ function SectionHeading({ title, children }: { title: string; children?: React.R
 
 const TOOLS = [
   { icon: Zap, title: "Instant dashboards", text: "KPIs and charts picked for your columns." },
-  { icon: LayoutDashboard, title: "AI design", text: "Describe the dashboard you want." },
+  { icon: LayoutDashboard, title: `Meet ${ASSISTANT}`, text: "Describe the dashboard you want." },
   { icon: MessageSquare, title: "Ask your data", text: "Questions in plain English." },
   { icon: Share2, title: "Share links", text: "Password-protected and read-only." },
   { icon: ShieldCheck, title: "Private by design", text: "Your rows stay in your browser." },
@@ -122,16 +123,16 @@ export function FeatureRows() {
         visual={<MockDashboard />}
       />
       <FeatureRow
-        id="ai"
+        id="pilot"
         flip
         badge="New"
         icon={Bot}
-        title="Ask your data in plain English"
-        text="Describe the dashboard you want or ask a question. The AI writes the query, and your browser runs it."
+        title={`Ask ${ASSISTANT} anything about your data`}
+        text={`Describe the dashboard you want or ask a question. ${ASSISTANT} writes the query, and your browser runs it.`}
         points={[
           ["Design with a sentence", "“Focus on revenue by region” rebuilds the dashboard around it."],
           ["Answers you can check", "Every answer shows the SQL behind it, so nothing is a black box."],
-          ["Your rows stay private", "The AI sees only column names, types and counts. Never your data."],
+          ["Your rows stay private", `${ASSISTANT} is powered by a language model that sees only column names, types and counts. Never your data.`],
         ]}
         visual={<MockChat />}
       />
@@ -158,7 +159,7 @@ export function AiPrompts() {
           New
         </Badge>
         <h2 className="mx-auto max-w-2xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-          Design with AI. Ask anything about your spreadsheet.
+          Meet {ASSISTANT}. Ask anything about your spreadsheet.
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-balance opacity-70">
           Start from a question instead of a blank dashboard. Here is the kind of thing you can ask.
@@ -178,7 +179,7 @@ const PERKS = [
   { icon: FileSpreadsheet, title: "Any spreadsheet", text: "Excel, CSV, JSON and NDJSON exports from any tool you use." },
   { icon: Table2, title: "Built for stores and ops", text: "Made for ecommerce and operations exports. Shopify, Stripe and GA4 templates are coming soon." },
   { icon: Share2, title: "Safe sharing", text: "Read-only links with optional passwords, never indexed by search engines." },
-  { icon: Gift, title: "Free to start", text: "Build a dashboard without an account. Sign in only to publish and use AI." },
+  { icon: Gift, title: "Free to start", text: `Build a dashboard without an account. Sign in only to publish and use ${ASSISTANT}.` },
 ] as const;
 
 export function Perks() {

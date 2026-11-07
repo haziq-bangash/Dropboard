@@ -1,5 +1,6 @@
 import { Copy, Lock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { ASSISTANT } from "@/lib/brand";
 import { Switch } from "@/components/ui/switch";
 
 // Static product mockups for the marketing page. Sample numbers only, not real data.
@@ -58,7 +59,7 @@ export function MockChat() {
             ))}
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">The AI saw only column names. The answer was computed in the browser.</p>
+        <p className="text-xs text-muted-foreground">{ASSISTANT} saw only column names. The answer was computed in the browser.</p>
       </CardContent>
     </Card>
   );

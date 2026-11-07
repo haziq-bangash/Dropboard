@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
+import { ASSISTANT } from "@/lib/brand";
 
 export function AuthForm() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export function AuthForm() {
       <CardHeader>
         <CardTitle>{mode === "in" ? "Sign in to Dropboard" : "Create your account"}</CardTitle>
         <CardDescription>
-          {mode === "in" ? "Welcome back. Enter your details to continue." : "Publish links and use AI on your dashboards."}
+          {mode === "in" ? "Welcome back. Enter your details to continue." : `Publish links and use ${ASSISTANT} on your dashboards.`}
         </CardDescription>
       </CardHeader>
       <CardContent>

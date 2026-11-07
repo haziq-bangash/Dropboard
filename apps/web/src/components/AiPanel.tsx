@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { askQuestion, generateDashboard, toAiTable } from "@/lib/ai";
+import { ASSISTANT } from "@/lib/brand";
 import { authClient } from "@/lib/auth-client";
 import type { Rows } from "@/lib/results";
 import { Table } from "./Dashboard";
@@ -52,12 +53,12 @@ export function AiPanel({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Bot className="size-4" /> AI assistant
+          <Bot className="size-4" /> {ASSISTANT}
           <Badge variant="secondary">New</Badge>
         </CardTitle>
         <CardDescription>
-          Design or refine this dashboard, or ask a question in plain English. The AI sees only your column names, types and counts, never
-          your rows, and answers are computed in your browser.
+          Design or refine this dashboard, or ask a question in plain English. {ASSISTANT} is powered by a language model that sees only your column names, types and counts, never
+          your rows. Answers are computed in your browser.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
@@ -66,7 +67,7 @@ export function AiPanel({
             <Link href="/login" target="_blank" className="font-medium text-foreground underline underline-offset-4">
               Sign in
             </Link>{" "}
-            to use the AI assistant.
+            to use {ASSISTANT}.
           </p>
         ) : (
           <>
@@ -98,7 +99,7 @@ export function AiPanel({
                 }
               >
                 <LayoutDashboard />
-                {busy === "generate" ? "Designing…" : "Design with AI"}
+                {busy === "generate" ? "Designing…" : `Design with ${ASSISTANT}`}
               </Button>
             </div>
 
@@ -131,7 +132,7 @@ export function AiPanel({
 
             {remaining !== null && (
               <p className="text-sm text-muted-foreground">
-                {remaining} AI request{remaining === 1 ? "" : "s"} left today.
+                {remaining} request{remaining === 1 ? "" : "s"} left today.
               </p>
             )}
             {note && <p className="text-sm text-muted-foreground">{note}</p>}

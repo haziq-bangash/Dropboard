@@ -6,7 +6,7 @@ test("landing page shows the marketing sections and the drop zone", async ({ pag
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Turn any spreadsheet into a dashboard");
   await expect(page.getByText("Processed in your browser. Your rows are never uploaded.", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Everything you need to understand a spreadsheet" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Ask your data in plain English" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ask Pilot anything about your data" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Ready to begin?" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
 });

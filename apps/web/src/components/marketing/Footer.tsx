@@ -1,5 +1,6 @@
 import { BarChart3 } from "lucide-react";
 import Link from "next/link";
+import { ASSISTANT } from "@/lib/brand";
 
 const COLUMNS: { title: string; links: [string, string][] }[] = [
   {
@@ -7,7 +8,7 @@ const COLUMNS: { title: string; links: [string, string][] }[] = [
     links: [
       ["Features", "/#features"],
       ["How it works", "/#how"],
-      ["AI assistant", "/#ai"],
+      [ASSISTANT, "/#pilot"],
     ],
   },
   {
