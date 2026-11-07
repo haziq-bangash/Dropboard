@@ -6,7 +6,7 @@ import { cors } from "hono/cors";
 import { createMiddleware } from "hono/factory";
 import { secureHeaders } from "hono/secure-headers";
 import { randomBytes } from "node:crypto";
-import { allowedOrigins, type Auth } from "./auth";
+import { allowedOrigins, googleEnabled, type Auth } from "./auth";
 import { registerAiRoutes } from "./ai/routes";
 import type { AiService } from "./ai/service";
 import { hashPassword, verifyPassword } from "./password";
@@ -31,6 +31,9 @@ export function createApp({ prisma, auth, ai, aiDailyLimit }: Deps) {
   }
 
   app.get("/health", (c) => c.text("ok"));
+
+  // which optional sign-in methods the web app should offer
+  app.get("/api/providers", (c) => c.json({ google: googleEnabled() }));
 
   // Better Auth: sign-up, sign-in, sessions, etc.
   app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
