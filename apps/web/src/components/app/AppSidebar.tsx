@@ -1,11 +1,18 @@
 "use client";
 
-import { ChevronsUpDown, FolderKanban, Globe, LogOut, Plus } from "lucide-react";
+import {
+  ChevronsUpDown,
+  FolderKanban,
+  Globe,
+  LogOut,
+  Plus,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -25,22 +32,42 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { authClient } from "@/lib/auth-client";
+import { clearLocalData } from "@/lib/local-data";
+import { setLoaded } from "@/lib/loaded-data";
 import { Logo } from "../Logo";
 import { UsageMeter } from "./UsageMeter";
 
 const NAV = [
-  { href: "/app", label: "Projects", icon: FolderKanban, match: (p: string) => p === "/app" || p.startsWith("/app/p/") },
-  { href: "/app/new", label: "New project", icon: Plus, match: (p: string) => p === "/app/new" },
+  {
+    href: "/app",
+    label: "Projects",
+    icon: FolderKanban,
+    match: (p: string) => p === "/app" || p.startsWith("/app/p/"),
+  },
+  {
+    href: "/app/new",
+    label: "New project",
+    icon: Plus,
+    match: (p: string) => p === "/app/new",
+  },
 ];
 
-export function AppSidebar({ user }: { user: { name: string; email: string } }) {
+export function AppSidebar({
+  user,
+}: {
+  user: { name: string; email: string };
+}) {
   const pathname = usePathname();
   const router = useRouter();
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <Link href="/app" aria-label="Dropboard projects" className="flex h-10 items-center px-2">
+        <Link
+          href="/app"
+          aria-label="Dropboard projects"
+          className="flex h-10 items-center px-2"
+        >
           <Logo />
         </Link>
       </SidebarHeader>
@@ -52,14 +79,21 @@ export function AppSidebar({ user }: { user: { name: string; email: string } }) 
             <SidebarMenu>
               {NAV.map((item) => (
                 <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton isActive={item.match(pathname)} tooltip={item.label} render={<Link href={item.href} />}>
+                  <SidebarMenuButton
+                    isActive={item.match(pathname)}
+                    tooltip={item.label}
+                    render={<Link href={item.href} />}
+                  >
                     <item.icon />
                     <span>{item.label}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
               <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Back to the site" render={<Link href="/" />}>
+                <SidebarMenuButton
+                  tooltip="Back to the site"
+                  render={<Link href="/" />}
+                >
                   <Globe />
                   <span>Back to the site</span>
                 </SidebarMenuButton>
@@ -79,15 +113,27 @@ export function AppSidebar({ user }: { user: { name: string; email: string } }) 
                   {(user.name || user.email).charAt(0).toLowerCase()}
                 </span>
                 <span className="grid flex-1 text-left leading-tight">
-                  <span className="truncate text-sm font-medium">{user.email}</span>
+                  <span className="truncate text-sm font-medium">
+                    {user.email}
+                  </span>
                 </span>
                 <ChevronsUpDown className="ml-auto size-4" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" align="start" className="min-w-56">
-                <DropdownMenuLabel className="truncate font-normal text-muted-foreground">{user.email}</DropdownMenuLabel>
+              <DropdownMenuContent
+                side="top"
+                align="start"
+                className="min-w-56"
+              >
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="truncate font-normal text-muted-foreground">
+                    {user.email}
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={async () => {
+                    setLoaded(null);
+                    await clearLocalData();
                     await authClient.signOut();
                     router.push("/");
                   }}

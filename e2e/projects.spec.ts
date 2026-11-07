@@ -61,22 +61,38 @@ test("a dropped file becomes a saved project that is listed, renamed, duplicated
   await expect(page.getByTestId("project-card")).toHaveCount(1);
 });
 
-test("reopening a project asks for the file, then shows the dashboard and keeps edits", async ({ page }) => {
+test("reopening a project shows the dashboard without asking for the file again", async ({ page }) => {
   await signUp(page);
   await newProject(page);
   const url = page.url();
 
-  // a full page load drops the in-browser rows, so the file is asked for again
+  // a full page load drops the in-browser rows, so they come back from the copy kept on this device
+  await page.reload();
+  await expect(page.getByTestId("kpi-value").first()).toHaveText("500", { timeout: 30_000 });
+  await expect(page.getByTestId("device-data")).toContainText("Kept on this device only");
+  expect(page.url()).toBe(url);
+});
+
+test("removing the copy from this device brings back the attach step", async ({ page }) => {
+  await signUp(page);
+  await newProject(page);
+  await expect(page.getByTestId("device-data")).toContainText("Kept on this device only");
+
+  await page.getByRole("button", { name: "Remove from this device" }).click();
+  await expect(page.getByText("Attach your file to open this dashboard")).toBeVisible();
+
   await page.reload();
   await expect(page.getByText("Attach your file to open this dashboard")).toBeVisible();
   await page.setInputFiles('input[type="file"]', CSV);
   await expect(page.getByTestId("kpi-value").first()).toHaveText("500", { timeout: 30_000 });
-  expect(page.url()).toBe(url);
+  await expect(page.getByTestId("device-data")).toContainText("Kept on this device only");
 });
 
 test("a file with different columns is refused", async ({ page }) => {
   await signUp(page);
   await newProject(page);
+  await page.getByRole("button", { name: "Remove from this device" }).click();
+  await expect(page.getByText("Attach your file to open this dashboard")).toBeVisible();
   await page.reload();
   await page.setInputFiles('input[type="file"]', {
     name: "other.csv",
@@ -84,6 +100,36 @@ test("a file with different columns is refused", async ({ page }) => {
     buffer: Buffer.from("alpha,beta\n1,2\n3,4\n"),
   });
   await expect(page.locator('[data-slot="alert"]')).toContainText("missing columns");
+  await expect(page.getByText("Attach your file to open this dashboard")).toBeVisible();
+});
+
+test("replacing the file on an open project checks its columns too", async ({ page }) => {
+  await signUp(page);
+  await newProject(page);
+  await page.locator('[data-testid="device-data"] input[type="file"]').setInputFiles({
+    name: "other.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("alpha,beta\n1,2\n"),
+  });
+  await expect(page.locator('[data-slot="alert"]')).toContainText("missing columns");
+  // the dashboard is still there
+  await expect(page.getByTestId("kpi-value").first()).toHaveText("500");
+});
+
+test("signing out wipes the copies kept on this device", async ({ page }) => {
+  const email = await signUp(page);
+  await newProject(page);
+  await page.goto("/app");
+  await page.getByRole("button", { name: new RegExp(email) }).click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
+  await expect(page).toHaveURL("/");
+
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill("correct-horse-battery");
+  await page.locator("form").getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/app$/);
+  await page.getByTestId("project-card").first().click();
   await expect(page.getByText("Attach your file to open this dashboard")).toBeVisible();
 });
 

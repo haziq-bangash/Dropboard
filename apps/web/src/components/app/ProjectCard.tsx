@@ -18,6 +18,8 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { authClient } from "@/lib/auth-client";
+import { removeProjectData } from "@/lib/local-data";
 import { projectsApi, type ProjectSummary } from "@/lib/projects";
 import { useProjects } from "./projects-store";
 
@@ -26,6 +28,7 @@ const when = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day:
 export function ProjectCard({ project, onError }: { project: ProjectSummary; onError: (message: string) => void }) {
   const router = useRouter();
   const { refresh } = useProjects();
+  const { data: session } = authClient.useSession();
   const [dialog, setDialog] = useState<"rename" | "delete" | null>(null);
   const [title, setTitle] = useState(project.title);
   const [busy, setBusy] = useState(false);
@@ -130,7 +133,12 @@ export function ProjectCard({ project, onError }: { project: ProjectSummary; onE
             <Button variant="outline" onClick={() => setDialog(null)}>
               Keep it
             </Button>
-            <Button variant="destructive" disabled={busy} onClick={() => run(() => projectsApi.remove(project.id))}>
+            <Button variant="destructive" disabled={busy} onClick={() =>
+                run(async () => {
+                  await projectsApi.remove(project.id);
+                  if (session) await removeProjectData(session.user.id, project.id);
+                })
+              }>
               Delete project
             </Button>
           </DialogFooter>

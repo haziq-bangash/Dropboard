@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
+import { clearLocalData } from "@/lib/local-data";
+import { setLoaded } from "@/lib/loaded-data";
 import { Logo } from "./Logo";
 import { ASSISTANT } from "@/lib/brand";
 
@@ -35,7 +37,11 @@ export function Header() {
             <Button size="sm" className="rounded-full" render={<Link href="/app" />} nativeButton={false}>
               Open app
             </Button>
-            <Button variant="outline" size="sm" onClick={() => authClient.signOut()}>
+            <Button variant="outline" size="sm" onClick={async () => {
+                setLoaded(null);
+                await clearLocalData();
+                await authClient.signOut();
+              }}>
               Sign out
             </Button>
           </div>
