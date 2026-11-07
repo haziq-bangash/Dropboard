@@ -18,8 +18,9 @@ import { AppSidebar } from "./AppSidebar";
 export function AppFrame({ children }: { children: React.ReactNode }) {
   const { data: session, isPending, isRefetching } = authClient.useSession();
 
-  // right after signing in the cached session can still read "signed out" for a moment
-  if (isPending || isRefetching) {
+  // Right after signing in the cached session can still read "signed out" for a moment. Wait only then: a refresh
+  // while we already know who this is (a tab regaining focus, a name change) must not replace the page.
+  if (isPending || (!session && isRefetching)) {
     return (
       <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">
         Loading…

@@ -7,6 +7,7 @@ import {
   Globe,
   LogOut,
   Plus,
+  Settings,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -51,6 +52,12 @@ const NAV = [
     label: "New project",
     icon: Plus,
     match: (p: string) => p === "/app/new",
+  },
+  {
+    href: "/app/account",
+    label: "Account",
+    icon: Settings,
+    match: (p: string) => p === "/app/account",
   },
 ];
 

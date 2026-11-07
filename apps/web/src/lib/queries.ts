@@ -7,13 +7,15 @@ import {
   saveProjectData,
 } from "./local-data";
 import { getLoaded, setLoaded, type LoadedData } from "./loaded-data";
-import { projectsApi } from "./projects";
+import { ApiError, projectsApi } from "./projects";
 
 /** Every query key in one place, so invalidating one thing never means hunting for strings. */
 export const keys = {
   projects: ["projects"] as const,
   project: (id: string) => ["project", id] as const,
   providers: ["providers"] as const,
+  summary: ["account-summary"] as const,
+  sessions: ["sessions"] as const,
   /** The rows of a project, in the browser. Not cached after the page closes: the DuckDB table is shared by all projects. */
   projectData: (userId: string, id: string) =>
     ["project-data", userId, id] as const,
@@ -171,4 +173,28 @@ export function useKeepOnDevice(userId: string | undefined, projectId: string) {
       await qc.invalidateQueries({ queryKey: keys.kept(userId, projectId) });
     },
   };
+}
+
+export interface AccountSummary {
+  plan: string;
+  memberSince: string | null;
+  signInMethods: string[];
+  usage: {
+    projects: { used: number; max: number };
+    publishedLinks: { used: number; max: number };
+    pilotToday: { used: number; max: number };
+  };
+}
+
+/** Plan, usage and how this account signs in. */
+export function useAccountSummary() {
+  return useQuery({
+    queryKey: keys.summary,
+    queryFn: async () => {
+      const res = await fetch("/api/me/summary");
+      if (!res.ok)
+        throw new ApiError("Could not load your account.", res.status);
+      return (await res.json()) as AccountSummary;
+    },
+  });
 }
