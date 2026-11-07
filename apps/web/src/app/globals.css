@@ -19,3 +19,13 @@ main { max-width: 1100px; margin: 0 auto; padding: 32px 20px 80px; }
 table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
 th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 th { position: sticky; top: 0; background: Canvas; }
+.nav { display: flex; align-items: center; gap: 12px; max-width: 1100px; margin: 0 auto; padding: 14px 20px 0; }
+.nav .brand { font-weight: 700; text-decoration: none; color: inherit; }
+.nav .spacer { flex: 1; }
+button.link { background: none; border: 0; color: var(--accent); cursor: pointer; padding: 0; font: inherit; }
+.gate { display: flex; flex-direction: column; gap: 10px; max-width: 340px; margin: 60px auto; }
+input { padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+button:not(.link) { padding: 9px 14px; border: 0; border-radius: 8px; background: var(--accent); color: white; font: inherit; cursor: pointer; }
+button:disabled { opacity: 0.6; cursor: default; }
+.publish { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; }
+.publish p { flex-basis: 100%; margin: 0; }
