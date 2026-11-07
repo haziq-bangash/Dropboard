@@ -149,3 +149,11 @@ test("deleting the account needs the password, removes everything, and the sign-
   await expect(page.locator('[data-slot="alert"]')).toBeVisible();
   await expect(page).toHaveURL(/\/login$/);
 });
+
+test("the account menu leads to the account page", async ({ page }) => {
+  const email = await signUp(page);
+  await page.getByRole("button", { name: new RegExp(email) }).click();
+  await page.getByRole("menuitem", { name: "Account" }).click();
+  await expect(page).toHaveURL(/\/app\/account$/);
+  await expect(page.getByRole("heading", { name: /Your account/ })).toBeVisible();
+});

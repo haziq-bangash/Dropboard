@@ -139,6 +139,10 @@ export function AppSidebar({
                   </DropdownMenuLabel>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => router.push("/app/account")}>
+                  <Settings />
+                  Account
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => {
                     showGuideAgain(user.id);

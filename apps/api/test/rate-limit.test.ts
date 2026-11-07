@@ -126,3 +126,61 @@ describe("public share viewer limits (real Postgres)", () => {
     expect((await view("does-not-exist", "192.0.2.77")).status).toBe(404);
   });
 });
+
+describe("who counts as the visitor (PROXY_SECRET)", () => {
+  const prisma = createPrisma();
+  const app = createApp({ prisma, auth: createAuth(prisma), shareLimits: { requestsPerMinute: 3, wrongPasswordsPerMinute: 10 } });
+  const emails: string[] = [];
+  const saved = process.env.PROXY_SECRET;
+
+  afterAll(async () => {
+    if (saved === undefined) delete process.env.PROXY_SECRET;
+    else process.env.PROXY_SECRET = saved;
+    await prisma.user.deleteMany({ where: { email: { in: emails } } });
+    await prisma.$disconnect();
+  });
+
+  async function link() {
+    const email = `who-${crypto.randomUUID()}@test.local`;
+    emails.push(email);
+    const signUp = await app.request("/api/auth/sign-up/email", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: ORIGIN },
+      body: JSON.stringify({ email, password: "correct-horse-battery", name: "w" }),
+    });
+    const cookie = signUp.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
+    const headers = { "content-type": "application/json", origin: ORIGIN, cookie };
+    const spec = { version: 1, title: "t", schema: [], charts: [{ id: "c1", type: "bar", title: "b", query: "SELECT 1 AS x", layout: { x: 0, y: 0, w: 1, h: 1 } }] };
+    const { id } = (await (await app.request("/api/projects", { method: "POST", headers, body: JSON.stringify({ spec }) })).json()) as { id: string };
+    const res = await app.request(`/api/projects/${id}/share`, { method: "POST", headers, body: JSON.stringify({ results: { c1: [{ x: 1 }] } }) });
+    return ((await res.json()) as { slug: string }).slug;
+  }
+  const view = (slug: string, headers: Record<string, string>) => app.request(`/api/shares/${slug}`, { headers });
+  // every request in one test arrives from the web app, so the connecting address is the same within it (and differs between tests)
+  const viaWeb = (n: number) => ({ "x-forwarded-for": `34.1.1.${n}` });
+
+  it("counts each visitor separately when the web app passes the right secret", async () => {
+    process.env.PROXY_SECRET = "shared-with-the-web-app";
+    const slug = await link();
+    const as = (ip: string) => ({ ...viaWeb(1), "x-dropboard-proxy-secret": "shared-with-the-web-app", "x-dropboard-client-ip": ip });
+    for (let i = 0; i < 3; i++) expect((await view(slug, as("81.0.0.1"))).status).toBe(200);
+    expect((await view(slug, as("81.0.0.1"))).status).toBe(429);
+    expect((await view(slug, as("81.0.0.2"))).status).toBe(200);
+  });
+
+  it("ignores a claimed address without the right secret", async () => {
+    process.env.PROXY_SECRET = "shared-with-the-web-app";
+    const slug = await link();
+    for (let i = 0; i < 3; i++) expect((await view(slug, { ...viaWeb(2), "x-dropboard-client-ip": `9.9.9.${i}` })).status).toBe(200);
+    // all three claims were ignored, so the connecting address ran out
+    expect((await view(slug, { ...viaWeb(2), "x-dropboard-client-ip": "9.9.9.99" })).status).toBe(429);
+    expect((await view(slug, { ...viaWeb(2), "x-dropboard-proxy-secret": "guess", "x-dropboard-client-ip": "9.9.9.100" })).status).toBe(429);
+  });
+
+  it("ignores the claimed address entirely when no secret is configured", async () => {
+    delete process.env.PROXY_SECRET;
+    const slug = await link();
+    for (let i = 0; i < 3; i++) expect((await view(slug, { ...viaWeb(3), "x-dropboard-proxy-secret": "x", "x-dropboard-client-ip": `7.7.7.${i}` })).status).toBe(200);
+    expect((await view(slug, { ...viaWeb(3), "x-dropboard-proxy-secret": "x", "x-dropboard-client-ip": "7.7.7.99" })).status).toBe(429);
+  });
+});

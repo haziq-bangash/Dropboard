@@ -34,7 +34,13 @@ if ! gcloud secrets describe better-auth-secret --project="$PROJECT_ID" >/dev/nu
   put_secret better-auth-secret "$(openssl rand -base64 48 | tr -d '\n')"
 fi
 
-names="database-url better-auth-secret"
+# Lets the web app tell the API which visitor is asking, so rate limits are per visitor. Created once, then kept.
+if ! gcloud secrets describe proxy-secret --project="$PROJECT_ID" >/dev/null 2>&1; then
+  put_secret proxy-secret "$(openssl rand -base64 36 | tr -d '
+')"
+fi
+
+names="database-url better-auth-secret proxy-secret"
 if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
   put_secret anthropic-api-key "$ANTHROPIC_API_KEY"
   names="$names anthropic-api-key"
