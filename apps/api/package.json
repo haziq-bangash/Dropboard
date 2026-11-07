@@ -10,6 +10,8 @@
     "typecheck": "prisma generate && tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
+    "@dropboard/engine": "workspace:^",
     "@dropboard/spec": "workspace:*",
     "@hono/node-server": "^1.13.0",
     "@hono/zod-validator": "^0.4.0",
