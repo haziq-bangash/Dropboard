@@ -70,3 +70,27 @@ export const AskInput = z.object({
 export type AiTable = z.infer<typeof AiTable>;
 export type GenerateInput = z.infer<typeof GenerateInput>;
 export type AskInput = z.infer<typeof AskInput>;
+
+// ---- Projects (a saved dashboard plus where its data came from) ----
+
+export const ProjectSource = z.object({
+  fileName: z.string().trim().min(1).max(200),
+  rowCount: z.number().int().nonnegative(),
+});
+
+export const CreateProjectInput = z.object({
+  spec: DashboardSpec,
+  source: ProjectSource.optional(),
+});
+
+export const UpdateProjectInput = z
+  .object({
+    title: z.string().trim().min(1).max(120).optional(),
+    spec: DashboardSpec.optional(),
+    source: ProjectSource.optional(),
+  })
+  .refine((v) => v.title !== undefined || v.spec !== undefined || v.source !== undefined, { message: "nothing to update" });
+
+export type ProjectSource = z.infer<typeof ProjectSource>;
+export type CreateProjectInput = z.infer<typeof CreateProjectInput>;
+export type UpdateProjectInput = z.infer<typeof UpdateProjectInput>;
