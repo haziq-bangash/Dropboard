@@ -3,9 +3,21 @@
 import type { ChartSpec, DashboardSpec } from "@dropboard/spec";
 import * as echarts from "echarts";
 import { useEffect, useRef, useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table as UiTable,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type { RowSource, Rows } from "@/lib/results";
 
 const COLORS = ["#2563eb", "#16a34a", "#d97706", "#9333ea", "#dc2626", "#0891b2"];
+const MUTED = "#a1a1aa";
 
 const fmt = (v: unknown) =>
   typeof v === "number" ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(v ?? "");
@@ -13,28 +25,52 @@ const fmt = (v: unknown) =>
 function toOption(spec: ChartSpec, rows: Rows): echarts.EChartsCoreOption {
   const x = spec.x ?? "x";
   const y = spec.y?.[0] ?? "y";
-  const base = { color: COLORS, tooltip: { trigger: spec.type === "pie" ? "item" : "axis" }, grid: { left: 48, right: 16, top: 16, bottom: 32 } };
+  const axis = {
+    axisLine: { lineStyle: { color: MUTED } },
+    axisLabel: { color: MUTED },
+    splitLine: { lineStyle: { color: "rgba(161,161,170,0.25)" } },
+  };
+  const base = {
+    color: COLORS,
+    tooltip: { trigger: spec.type === "pie" ? "item" : "axis" },
+    grid: { left: 48, right: 16, top: 16, bottom: 32 },
+  };
   switch (spec.type) {
-    case "line":
-    case "area":
     case "bar":
       return {
         ...base,
-        xAxis: { type: spec.type === "bar" ? "category" : "time", data: undefined },
-        yAxis: { type: "value" },
+        xAxis: { ...axis, type: "category", data: rows.map((r) => fmt(r[x])) },
+        yAxis: { ...axis, type: "value" },
+        series: [{ type: "bar", data: rows.map((r) => r[y]), itemStyle: { borderRadius: [4, 4, 0, 0] } }],
+      };
+    case "line":
+    case "area":
+      return {
+        ...base,
+        xAxis: { ...axis, type: "time" },
+        yAxis: { ...axis, type: "value" },
         series: [
           {
-            type: spec.type === "bar" ? "bar" : "line",
-            areaStyle: spec.type === "area" ? {} : undefined,
-            data: rows.map((r) => [r[x] instanceof Date ? (r[x] as Date).getTime() : r[x], r[y]]),
+            type: "line",
+            smooth: true,
+            showSymbol: false,
+            areaStyle: spec.type === "area" ? { opacity: 0.15 } : undefined,
+            data: rows.map((r) => [r[x], r[y]]),
           },
         ],
-        ...(spec.type === "bar" ? { xAxis: { type: "category", data: rows.map((r) => fmt(r[x])) }, series: [{ type: "bar", data: rows.map((r) => r[y]) }] } : {}),
       };
     case "scatter":
-      return { ...base, xAxis: { type: "value" }, yAxis: { type: "value" }, series: [{ type: "scatter", symbolSize: 6, data: rows.map((r) => [r[x], r[y]]) }] };
+      return {
+        ...base,
+        xAxis: { ...axis, type: "value" },
+        yAxis: { ...axis, type: "value" },
+        series: [{ type: "scatter", symbolSize: 6, data: rows.map((r) => [r[x], r[y]]) }],
+      };
     case "pie":
-      return { ...base, series: [{ type: "pie", radius: ["40%", "70%"], data: rows.map((r) => ({ name: fmt(r[x]), value: r[y] })) }] };
+      return {
+        ...base,
+        series: [{ type: "pie", radius: ["45%", "70%"], data: rows.map((r) => ({ name: fmt(r[x]), value: r[y] })) }],
+      };
     default:
       return base;
   }
@@ -53,28 +89,38 @@ function Chart({ spec, rows }: { spec: ChartSpec; rows: Rows }) {
       chart.dispose();
     };
   }, [spec, rows]);
-  return <div ref={ref} style={{ height: 260 }} />;
+  return <div ref={ref} className="h-64 w-full" />;
 }
 
-function Table({ rows }: { rows: Rows }) {
+export function Table({ rows }: { rows: Rows }) {
   const cols = rows[0] ? Object.keys(rows[0]) : [];
   return (
-    <div style={{ overflow: "auto", maxHeight: 320 }}>
-      <table>
-        <thead>
-          <tr>{cols.map((c) => <th key={c}>{c}</th>)}</tr>
-        </thead>
-        <tbody>
+    <div className="max-h-80 overflow-auto rounded-md border">
+      <UiTable>
+        <TableHeader className="sticky top-0 bg-background">
+          <TableRow>
+            {cols.map((c) => (
+              <TableHead key={c}>{c}</TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {rows.map((r, i) => (
-            <tr key={i}>{cols.map((c) => <td key={c}>{fmt(r[c])}</td>)}</tr>
+            <TableRow key={i}>
+              {cols.map((c) => (
+                <TableCell key={c} className="whitespace-nowrap">
+                  {fmt(r[c])}
+                </TableCell>
+              ))}
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </UiTable>
     </div>
   );
 }
 
-function Card({ spec, source }: { spec: ChartSpec; source: RowSource }) {
+function ChartCard({ spec, source }: { spec: ChartSpec; source: RowSource }) {
   const [rows, setRows] = useState<Rows | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,17 +138,36 @@ function Card({ spec, source }: { spec: ChartSpec; source: RowSource }) {
 
   if (spec.type === "kpi") {
     return (
-      <div className="card kpi">
-        <div className="label">{spec.title}</div>
-        <div className="value">{error ? "–" : rows ? fmt(rows[0]?.value) : "…"}</div>
-      </div>
+      <Card size="sm" data-testid="kpi">
+        <CardHeader>
+          <p className="text-sm text-muted-foreground">{spec.title}</p>
+          <div className="text-3xl font-semibold tracking-tight" data-testid="kpi-value">
+            {error ? "–" : rows ? fmt(rows[0]?.value) : <Skeleton className="h-9 w-24" />}
+          </div>
+        </CardHeader>
+      </Card>
     );
   }
+
   return (
-    <div className={`card ${spec.type === "table" ? "wide" : ""}`}>
-      <h3>{spec.title}</h3>
-      {error ? <p className="error">{error}</p> : !rows ? <p>Loading…</p> : spec.type === "table" ? <Table rows={rows} /> : <Chart spec={spec} rows={rows} />}
-    </div>
+    <Card className={spec.type === "table" ? "md:col-span-2" : undefined} data-testid="chart-card">
+      <CardHeader>
+        <CardTitle>{spec.title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {error ? (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : !rows ? (
+          <Skeleton className="h-64 w-full" />
+        ) : spec.type === "table" ? (
+          <Table rows={rows} />
+        ) : (
+          <Chart spec={spec} rows={rows} />
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -110,10 +175,20 @@ export function Dashboard({ spec, source }: { spec: DashboardSpec; source: RowSo
   const kpis = spec.charts.filter((c) => c.type === "kpi");
   const rest = spec.charts.filter((c) => c.type !== "kpi");
   return (
-    <section>
-      <h2>{spec.title}</h2>
-      <div className="grid kpis">{kpis.map((c) => <Card key={c.id} spec={c} source={source} />)}</div>
-      <div className="grid">{rest.map((c) => <Card key={c.id} spec={c} source={source} />)}</div>
+    <section className="flex flex-col gap-4">
+      <h2 className="text-2xl font-semibold tracking-tight">{spec.title}</h2>
+      {kpis.length > 0 && (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {kpis.map((c) => (
+            <ChartCard key={c.id} spec={c} source={source} />
+          ))}
+        </div>
+      )}
+      <div className="grid gap-4 md:grid-cols-2">
+        {rest.map((c) => (
+          <ChartCard key={c.id} spec={c} source={source} />
+        ))}
+      </div>
     </section>
   );
 }

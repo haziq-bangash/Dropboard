@@ -1,13 +1,22 @@
 import { Uploader } from "@/components/Uploader";
+import { Hero } from "@/components/marketing/Hero";
+import { AiPrompts, ClosingCta, ExampleMarquee, FeatureRows, Perks, ToolGrid } from "@/components/marketing/Sections";
 
 export default function Home() {
   return (
-    <main>
-      <header className="hero">
-        <h1>Turn any spreadsheet into a dashboard</h1>
-        <p>Drop an Excel, CSV or JSON file. Get KPIs and charts in seconds, with no signup and no upload.</p>
-      </header>
-      <Uploader />
-    </main>
+    // The uploader owns the drop zone and hides this marketing content once a dashboard is built.
+    <Uploader
+      hero={<Hero />}
+      below={
+        <>
+          <ExampleMarquee />
+          <ToolGrid />
+          <FeatureRows />
+          <AiPrompts />
+          <Perks />
+          <ClosingCta />
+        </>
+      }
+    />
   );
 }

@@ -1,9 +1,23 @@
 "use client";
 
-import type { DashboardSpec } from "@dropboard/spec";
 import { publishableSpec } from "@dropboard/engine";
+import type { DashboardSpec } from "@dropboard/spec";
+import { Check, Copy, Eye, EyeOff, Globe, Share2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { authClient } from "@/lib/auth-client";
 import { collectResults } from "@/lib/results";
 
@@ -22,21 +36,27 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 export function PublishButton({ spec }: { spec: DashboardSpec }) {
   const { data: session } = authClient.useSession();
+  const [open, setOpen] = useState(false);
+  const [protect, setProtect] = useState(false);
   const [password, setPassword] = useState("");
+  const [reveal, setReveal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [link, setLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!session) {
     return (
-      <p className="muted">
-        <Link href="/login" target="_blank">
+      <p className="text-sm text-muted-foreground">
+        <Link href="/login" target="_blank" className="font-medium text-foreground underline underline-offset-4">
           Sign in
         </Link>{" "}
         to publish a shareable link. Your dashboard stays here while you sign in.
       </p>
     );
   }
+
+  const invalidPassword = protect && password.length < 4;
 
   async function publish() {
     setBusy(true);
@@ -47,7 +67,7 @@ export function PublishButton({ spec }: { spec: DashboardSpec }) {
       const { id } = await post<{ id: string }>("/api/dashboards", pub);
       const { slug } = await post<{ slug: string }>(`/api/dashboards/${id}/share`, {
         results,
-        password: password || undefined,
+        password: protect ? password : undefined,
       });
       setLink(`${location.origin}/s/${slug}`);
     } catch (e) {
@@ -58,26 +78,113 @@ export function PublishButton({ spec }: { spec: DashboardSpec }) {
   }
 
   return (
-    <div className="publish">
-      <input
-        type="password"
-        placeholder="Optional link password (4+ chars)"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
-      <button onClick={publish} disabled={busy || (password.length > 0 && password.length < 4)}>
-        {busy ? "Publishing…" : "Publish link"}
-      </button>
-      <span className="muted">Shares charts and summaries only, never your rows.</span>
-      {link && (
-        <p>
-          Published:{" "}
-          <a href={link} target="_blank">
-            {link}
-          </a>
-        </p>
-      )}
-      {error && <p className="error">{error}</p>}
-    </div>
+    <>
+      <Button
+        onClick={() => {
+          setLink(null);
+          setError(null);
+          setOpen(true);
+        }}
+      >
+        <Share2 /> Publish
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Publish dashboard</DialogTitle>
+            <DialogDescription>
+              Creates a read-only link with your charts and summaries. Your rows are never shared.
+            </DialogDescription>
+          </DialogHeader>
+
+          {link ? (
+            <div className="flex flex-col gap-3">
+              <Label htmlFor="share-link">Your link</Label>
+              <div className="flex gap-2">
+                <Input id="share-link" data-testid="share-link" readOnly value={link} onFocus={(e) => e.currentTarget.select()} />
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(link);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  }}
+                >
+                  {copied ? <Check /> : <Copy />}
+                  {copied ? "Copied" : "Copy"}
+                </Button>
+              </div>
+              <a href={link} target="_blank" className="text-sm text-muted-foreground underline underline-offset-4">
+                Open in a new tab
+              </a>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div className="flex items-start gap-3">
+                  <Globe className="mt-0.5 size-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">Search engine indexing</p>
+                    <p className="text-sm text-muted-foreground">Published links are never indexed.</p>
+                  </div>
+                </div>
+                <Switch checked={false} disabled aria-label="Search engine indexing" />
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-lg border p-3">
+                <div className="flex items-center justify-between gap-4">
+                  <Label htmlFor="protect" className="text-sm font-medium">
+                    Password protection
+                  </Label>
+                  <Switch id="protect" checked={protect} onCheckedChange={setProtect} aria-label="Password protection" />
+                </div>
+                {protect && (
+                  <div className="relative">
+                    <Input
+                      type={reveal ? "text" : "password"}
+                      placeholder="At least 4 characters"
+                      aria-label="Link password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      aria-label={reveal ? "Hide password" : "Show password"}
+                      className="absolute inset-y-0 right-2 flex items-center text-muted-foreground"
+                      onClick={() => setReveal(!reveal)}
+                    >
+                      {reveal ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            {link ? (
+              <Button onClick={() => setOpen(false)}>Done</Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={publish} disabled={busy || invalidPassword}>
+                  {busy ? "Publishing…" : "Create link"}
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -1,7 +1,12 @@
 "use client";
 
 import type { DashboardSpec, ShareResults } from "@dropboard/spec";
+import { Lock } from "lucide-react";
 import { useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { SnapshotView } from "./SnapshotView";
 
 export function PasswordGate({ slug }: { slug: string }) {
@@ -13,31 +18,47 @@ export function PasswordGate({ slug }: { slug: string }) {
   if (data) return <SnapshotView spec={data.spec} results={data.results} />;
 
   return (
-    <form
-      className="gate"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setBusy(true);
-        setError(null);
-        const res = await fetch(`/api/shares/${encodeURIComponent(slug)}`, {
-          headers: { "x-share-password": password },
-        });
-        setBusy(false);
-        if (res.ok) setData(await res.json());
-        else setError(res.status === 404 ? "This link is no longer available." : "Wrong password.");
-      }}
-    >
-      <h2>This dashboard is password protected</h2>
-      <input
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="Password"
-        autoFocus
-        required
-      />
-      <button disabled={busy}>{busy ? "Checking…" : "View dashboard"}</button>
-      {error && <p className="error">{error}</p>}
-    </form>
+    <Card className="mx-auto mt-10 w-full max-w-sm">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Lock className="size-4" /> Password protected
+        </CardTitle>
+        <CardDescription>Enter the password to view this dashboard.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setBusy(true);
+            setError(null);
+            const res = await fetch(`/api/shares/${encodeURIComponent(slug)}`, {
+              headers: { "x-share-password": password },
+            });
+            setBusy(false);
+            if (res.ok) setData(await res.json());
+            else setError(res.status === 404 ? "This link is no longer available." : "Wrong password.");
+          }}
+        >
+          <Input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            aria-label="Password"
+            autoFocus
+            required
+          />
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <Button type="submit" disabled={busy}>
+            {busy ? "Checking…" : "View dashboard"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

@@ -1,26 +1,52 @@
 "use client";
 
+import { BarChart3 } from "lucide-react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
+
+const LINKS: [string, string][] = [
+  ["Features", "/#features"],
+  ["How it works", "/#how"],
+  ["AI assistant", "/#ai"],
+  ["Privacy", "/#privacy"],
+];
 
 export function Header() {
   const { data: session, isPending } = authClient.useSession();
   return (
-    <nav className="nav">
-      <Link href="/" className="brand">
-        Dropboard
-      </Link>
-      <span className="spacer" />
-      {isPending ? null : session ? (
-        <>
-          <span className="muted">{session.user.email}</span>
-          <button className="link" onClick={() => authClient.signOut()}>
-            Sign out
-          </button>
-        </>
-      ) : (
-        <Link href="/login">Sign in</Link>
-      )}
-    </nav>
+    <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
+      <nav className="mx-auto flex h-14 w-full max-w-6xl items-center gap-6 px-5">
+        <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
+          <BarChart3 className="size-5" />
+          Dropboard
+        </Link>
+        <div className="hidden flex-1 items-center justify-center gap-6 md:flex">
+          {LINKS.map(([label, href]) => (
+            <Link key={label} href={href} className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+              {label}
+            </Link>
+          ))}
+        </div>
+        <span className="flex-1 md:hidden" />
+        {isPending ? null : session ? (
+          <div className="flex items-center gap-3">
+            <span className="hidden text-sm text-muted-foreground lg:inline">{session.user.email}</span>
+            <Button variant="outline" size="sm" onClick={() => authClient.signOut()}>
+              Sign out
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" render={<Link href="/login" />} nativeButton={false}>
+              Sign in
+            </Button>
+            <Button size="sm" className="rounded-full" render={<Link href="/#upload" />} nativeButton={false}>
+              Try it free
+            </Button>
+          </div>
+        )}
+      </nav>
+    </header>
   );
 }

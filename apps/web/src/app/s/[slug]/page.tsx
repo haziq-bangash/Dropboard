@@ -2,6 +2,7 @@ import type { DashboardSpec, ShareResults } from "@dropboard/spec";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
+import { PageShell } from "@/components/PageShell";
 import { PasswordGate } from "@/components/PasswordGate";
 import { SnapshotView } from "@/components/SnapshotView";
 
@@ -41,9 +42,11 @@ export default async function SharedDashboard({ params }: { params: Promise<{ sl
   const r = await load(slug);
   if (r.kind === "missing") notFound();
   return (
-    <main>
+    <PageShell>
       {r.kind === "ok" ? <SnapshotView spec={r.spec} results={r.results} /> : <PasswordGate slug={slug} />}
-      <p className="muted">Published with Dropboard. This is a snapshot; the original data is not included.</p>
-    </main>
+      <p className="mt-8 text-center text-sm text-muted-foreground">
+        Published with Dropboard. This is a snapshot; the original data is not included.
+      </p>
+    </PageShell>
   );
 }
