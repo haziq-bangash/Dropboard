@@ -44,6 +44,12 @@ if [ -n "${GOOGLE_API_KEY:-}" ]; then
   put_secret google-api-key "$GOOGLE_API_KEY"
   names="$names google-api-key"
 fi
+# Optional: Google sign-in (OAuth client from Google Cloud console > Credentials)
+if [ -n "${GOOGLE_CLIENT_ID:-}" ] && [ -n "${GOOGLE_CLIENT_SECRET:-}" ]; then
+  put_secret google-client-id "$GOOGLE_CLIENT_ID"
+  put_secret google-client-secret "$GOOGLE_CLIENT_SECRET"
+  names="$names google-client-id google-client-secret"
+fi
 
 # Narrow, per-secret access: the runtime account reads values; the deployer may only look the secrets up.
 for name in $names; do

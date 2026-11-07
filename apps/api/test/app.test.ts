@@ -179,3 +179,23 @@ describe("auth and dashboards (real Postgres)", () => {
     });
   });
 });
+
+describe("sign-in providers", () => {
+  it("offers Google only when the OAuth client is configured", async () => {
+    const app = createApp({} as Deps);
+    const saved = { id: process.env.GOOGLE_CLIENT_ID, secret: process.env.GOOGLE_CLIENT_SECRET };
+    try {
+      delete process.env.GOOGLE_CLIENT_ID;
+      delete process.env.GOOGLE_CLIENT_SECRET;
+      expect(await (await app.request("/api/providers")).json()).toEqual({ google: false });
+      process.env.GOOGLE_CLIENT_ID = "id";
+      process.env.GOOGLE_CLIENT_SECRET = "secret";
+      expect(await (await app.request("/api/providers")).json()).toEqual({ google: true });
+    } finally {
+      if (saved.id === undefined) delete process.env.GOOGLE_CLIENT_ID;
+      else process.env.GOOGLE_CLIENT_ID = saved.id;
+      if (saved.secret === undefined) delete process.env.GOOGLE_CLIENT_SECRET;
+      else process.env.GOOGLE_CLIENT_SECRET = saved.secret;
+    }
+  });
+});
