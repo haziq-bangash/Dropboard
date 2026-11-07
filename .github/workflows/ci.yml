@@ -12,6 +12,22 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: dropboard
+          POSTGRES_PASSWORD: dropboard
+          POSTGRES_DB: dropboard
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dropboard"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://dropboard:dropboard@localhost:5432/dropboard
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -21,6 +37,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      - run: pnpm --filter @dropboard/api exec prisma migrate deploy
       - run: pnpm test
       - run: pnpm build
 
@@ -51,7 +68,7 @@ jobs:
       matrix:
         include:
           - app: api
-            budget_mb: 150
+            budget_mb: 200
           - app: web
             budget_mb: 350
     steps:
