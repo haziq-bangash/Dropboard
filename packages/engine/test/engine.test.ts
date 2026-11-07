@@ -56,6 +56,45 @@ describe("suggestDashboard", () => {
   });
 });
 
+describe("suggestDashboard aggregation", () => {
+  const tickets: TableProfile = {
+    rowCount: 500,
+    columns: [
+      { name: "created_date", type: "date", nullCount: 0, distinct: 300 },
+      { name: "resolution_hours", type: "number", nullCount: 0, distinct: 400 },
+      { name: "satisfaction", type: "number", nullCount: 0, distinct: 5 },
+      { name: "revenue", type: "number", nullCount: 0, distinct: 400 },
+      { name: "priority", type: "string", nullCount: 0, distinct: 4 },
+    ],
+  };
+  const byTitle = (title: string) => suggestDashboard("t", tickets).charts.find((c) => c.title === title);
+
+  it("averages durations and scores instead of adding them up", () => {
+    expect(byTitle("Average resolution_hours")?.query).toContain("avg(");
+    expect(byTitle("Average satisfaction")?.query).toContain("avg(");
+    expect(byTitle("Average resolution_hours over time")?.query).toContain("avg(");
+    expect(byTitle("Average resolution_hours by priority")?.query).toContain("avg(");
+  });
+
+  it("still adds up money and counts", () => {
+    const s = suggestDashboard("t", { ...tickets, columns: [tickets.columns[0], tickets.columns[3], tickets.columns[4]] });
+    expect(s.charts.find((c) => c.title === "Total revenue")?.query).toContain("sum(");
+    expect(s.charts.find((c) => c.title === "revenue by priority")?.query).toContain("sum(");
+  });
+
+  it("does not mistake words that merely contain a keyword for one", () => {
+    const s = suggestDashboard("t", {
+      rowCount: 100,
+      columns: [
+        { name: "storage", type: "number", nullCount: 0, distinct: 50 },
+        { name: "average_order_value", type: "number", nullCount: 0, distinct: 50 },
+      ],
+    });
+    expect(s.charts.find((c) => c.title === "Total storage")).toBeDefined();
+    expect(s.charts.find((c) => c.title === "Average average_order_value")).toBeDefined();
+  });
+});
+
 describe("guardSql", () => {
   it("wraps and limits a select", () => {
     expect(guardSql("select 1;")).toEqual({ ok: true, sql: "SELECT * FROM (select 1) LIMIT 10000" });
