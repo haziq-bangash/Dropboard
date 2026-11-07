@@ -16,8 +16,9 @@ import {
 } from "@/components/ui/table";
 import type { RowSource, Rows } from "@/lib/results";
 
-const COLORS = ["#2563eb", "#16a34a", "#d97706", "#9333ea", "#dc2626", "#0891b2"];
-const MUTED = "#a1a1aa";
+// Brand chart palette (see --chart-* in globals.css): midnight green, orange, dark amber, gunmetal, teal tint, sand
+const COLORS = ["#075056", "#FF5B04", "#B8860B", "#233038", "#3E8E94", "#F4D47C"];
+const MUTED = "#6F7F86";
 
 const fmt = (v: unknown) =>
   typeof v === "number" ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(v ?? "");
@@ -28,7 +29,7 @@ function toOption(spec: ChartSpec, rows: Rows): echarts.EChartsCoreOption {
   const axis = {
     axisLine: { lineStyle: { color: MUTED } },
     axisLabel: { color: MUTED },
-    splitLine: { lineStyle: { color: "rgba(161,161,170,0.25)" } },
+    splitLine: { lineStyle: { color: "rgba(211,219,221,0.8)" } },
   };
   const base = {
     color: COLORS,

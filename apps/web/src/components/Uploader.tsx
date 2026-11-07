@@ -44,8 +44,8 @@ export function Uploader({ hero, below }: { hero: React.ReactNode; below: React.
     <div id="upload" className="mx-auto w-full max-w-3xl px-5">
       <label
         className={cn(
-          "group flex cursor-pointer flex-col items-center gap-3 rounded-2xl border-2 border-dashed bg-muted/30 px-6 py-14 text-center transition-colors hover:border-primary/50 hover:bg-muted/50",
-          over && "border-primary bg-muted/60",
+          "group flex cursor-pointer flex-col items-center gap-3 rounded-2xl border-2 border-dashed bg-muted/30 px-6 py-14 text-center transition-colors hover:border-brand hover:bg-muted/50",
+          over && "border-brand bg-muted/60",
         )}
         onDragOver={(e) => {
           e.preventDefault();

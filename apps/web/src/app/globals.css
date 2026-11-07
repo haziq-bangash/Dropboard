@@ -5,6 +5,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+    --color-brand: var(--brand);
+    --color-brand-text: var(--brand-text);
     --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);
     --color-sidebar-ring: var(--sidebar-ring);
@@ -48,38 +50,43 @@
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
+    /* Palette: Ivory Cream #FDF6E3, Gunmetal #233038, Midnight Green #075056,
+       Orange #FF5B04, Sand Yellow #F4D47C, Light Silver #D3DBDD */
+    --background: #FDF6E3;
+    --foreground: #233038;
+    --card: #FFFFFF;
+    --card-foreground: #233038;
+    --popover: #FFFFFF;
+    --popover-foreground: #233038;
+    --primary: #075056;
+    --primary-foreground: #FDF6E3;
+    --secondary: #F4D47C;
+    --secondary-foreground: #233038;
+    --muted: color-mix(in srgb, #D3DBDD 45%, #FDF6E3);
+    --muted-foreground: #5B6A72;
+    --accent: color-mix(in srgb, #F4D47C 35%, #FDF6E3);
+    --accent-foreground: #233038;
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
+    --border: #D3DBDD;
+    --input: #D3DBDD;
+    --ring: #FF5B04;
+    --brand: #FF5B04;
+    /* Slightly darker orange for text so large headings reach 3:1 on cream */
+    --brand-text: #EE5400;
+    --chart-1: #075056;
+    --chart-2: #FF5B04;
+    --chart-3: #B8860B;
+    --chart-4: #233038;
+    --chart-5: #3E8E94;
     --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --sidebar: #FDF6E3;
+    --sidebar-foreground: #233038;
+    --sidebar-primary: #075056;
+    --sidebar-primary-foreground: #FDF6E3;
+    --sidebar-accent: color-mix(in srgb, #F4D47C 35%, #FDF6E3);
+    --sidebar-accent-foreground: #233038;
+    --sidebar-border: #D3DBDD;
+    --sidebar-ring: #FF5B04;
 }
 
 .dark {
@@ -127,17 +134,13 @@
     @apply font-sans;
     }
 }
-/* Marketing marquee: the row is duplicated, so shifting by -50% loops seamlessly */
+/* Hero flow: the track is drawn twice, so shifting by one copy (-50%) loops seamlessly */
 @theme {
-  --animate-marquee: marquee 40s linear infinite;
-  @keyframes marquee {
-    from { transform: translateX(0); }
-    to { transform: translateX(-50%); }
+  --animate-flow-right: flow-right 40s linear infinite;
+  @keyframes flow-right {
+    from { transform: translateX(-50%); }
+    to { transform: translateX(0); }
   }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .animate-marquee { animation: none; }
 }
 
 html { scroll-behavior: smooth; }

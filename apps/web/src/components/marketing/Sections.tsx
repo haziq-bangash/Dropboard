@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MockChat, MockDashboard, MockShare } from "./Mocks";
+import { PromptCarousel } from "./PromptCarousel";
 
 const wrap = "mx-auto w-full max-w-6xl px-5";
 
@@ -24,39 +25,6 @@ function SectionHeading({ title, children }: { title: string; children?: React.R
     <div className="mx-auto mb-10 max-w-2xl text-center">
       <h2 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{title}</h2>
       {children && <p className="mt-3 text-balance text-muted-foreground">{children}</p>}
-    </div>
-  );
-}
-
-// Looping row of example dashboards under the drop zone
-const EXAMPLES = [
-  ["Revenue by region", [60, 85, 45, 70]],
-  ["Orders over time", [30, 45, 40, 62, 58, 80]],
-  ["Top products", [90, 72, 55, 40, 28]],
-  ["Refund rate", [20, 28, 18, 24, 15, 12]],
-  ["Customers by country", [75, 60, 52, 33]],
-  ["Ad spend vs. sales", [35, 50, 48, 66, 74]],
-] as const;
-
-export function ExampleMarquee() {
-  const row = [...EXAMPLES, ...EXAMPLES];
-  return (
-    <div className="relative mt-14 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
-      <div className="flex w-max animate-marquee gap-4">
-        {row.map(([title, bars], i) => (
-          <Card key={i} size="sm" className="w-56 shrink-0">
-            <CardHeader>
-              <CardDescription>Example</CardDescription>
-              <CardTitle className="text-sm">{title}</CardTitle>
-              <div className="mt-2 flex h-14 items-end gap-1.5">
-                {bars.map((h, j) => (
-                  <div key={j} className="flex-1 rounded-t bg-primary/70" style={{ height: `${h}%` }} />
-                ))}
-              </div>
-            </CardHeader>
-          </Card>
-        ))}
-      </div>
     </div>
   );
 }
@@ -80,7 +48,7 @@ export function ToolGrid() {
         {TOOLS.map(({ icon: Icon, title, text }) => (
           <Card key={title} size="sm">
             <CardHeader>
-              <div className="mb-2 flex size-9 items-center justify-center rounded-lg bg-muted">
+              <div className="mb-2 flex size-9 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
                 <Icon className="size-4" />
               </div>
               <CardTitle>{title}</CardTitle>
@@ -110,7 +78,7 @@ function FeatureRow({ id, icon: Icon, title, text, points, cta, visual, flip, ba
     <div id={id} className={`${wrap} grid items-center gap-10 py-14 md:grid-cols-2 md:gap-16`}>
       <div className={flip ? "md:order-2" : undefined}>
         <div className="mb-4 flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-muted">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
             <Icon className="size-5" />
           </div>
           {badge && <Badge>{badge}</Badge>}
@@ -180,21 +148,13 @@ export function FeatureRows() {
   );
 }
 
-const PROMPTS = [
-  "Which region had the highest revenue last quarter?",
-  "Show monthly orders and the average order value",
-  "Top 10 products by revenue",
-  "How many customers ordered more than once?",
-  "Which day of the week sells the most?",
-  "Compare ad spend with sales by channel",
-];
-
 export function AiPrompts() {
-  const chips = [...PROMPTS, ...PROMPTS];
   return (
     <section className="mt-10 bg-foreground py-20 text-background">
       <div className={`${wrap} text-center`}>
-        <Badge className="mb-4 bg-background text-foreground">New</Badge>
+        <Badge variant="secondary" className="mb-4">
+          New
+        </Badge>
         <h2 className="mx-auto max-w-2xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
           Design with AI. Ask anything about your spreadsheet.
         </h2>
@@ -205,15 +165,7 @@ export function AiPrompts() {
           Try it on your file <ArrowRight />
         </Button>
       </div>
-      <div className="relative mt-12 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
-        <div className="flex w-max animate-marquee gap-3">
-          {chips.map((p, i) => (
-            <span key={i} className="rounded-full border border-background/25 px-4 py-2 text-sm whitespace-nowrap">
-              {p}
-            </span>
-          ))}
-        </div>
-      </div>
+      <PromptCarousel />
     </section>
   );
 }
@@ -235,7 +187,7 @@ export function Perks() {
         {PERKS.map(({ icon: Icon, title, text }) => (
           <Card key={title}>
             <CardHeader>
-              <div className="mb-2 flex size-10 items-center justify-center rounded-xl bg-muted">
+              <div className="mb-2 flex size-10 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
                 <Icon className="size-5" />
               </div>
               <CardTitle>{title}</CardTitle>
@@ -251,7 +203,7 @@ export function Perks() {
 export function ClosingCta() {
   return (
     <section className={`${wrap} pb-24`}>
-      <div className="rounded-3xl border bg-muted/40 px-6 py-16 text-center">
+      <div className="rounded-3xl border bg-secondary/40 px-6 py-16 text-center">
         <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Ready to begin?</h2>
         <p className="mx-auto mt-3 max-w-md text-balance text-muted-foreground">
           Drop your first spreadsheet and see your dashboard in seconds. No signup needed.

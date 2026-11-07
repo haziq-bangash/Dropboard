@@ -1,15 +1,20 @@
 import { Uploader } from "@/components/Uploader";
 import { Hero } from "@/components/marketing/Hero";
-import { AiPrompts, ClosingCta, ExampleMarquee, FeatureRows, Perks, ToolGrid } from "@/components/marketing/Sections";
+import { HeroFlow } from "@/components/marketing/HeroFlow";
+import { AiPrompts, ClosingCta, FeatureRows, Perks, ToolGrid } from "@/components/marketing/Sections";
 
 export default function Home() {
   return (
     // The uploader owns the drop zone and hides this marketing content once a dashboard is built.
     <Uploader
-      hero={<Hero />}
+      hero={
+        <>
+          <Hero />
+          <HeroFlow />
+        </>
+      }
       below={
         <>
-          <ExampleMarquee />
           <ToolGrid />
           <FeatureRows />
           <AiPrompts />
