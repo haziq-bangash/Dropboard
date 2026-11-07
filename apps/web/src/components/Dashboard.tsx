@@ -172,12 +172,12 @@ function ChartCard({ spec, source }: { spec: ChartSpec; source: RowSource }) {
   );
 }
 
-export function Dashboard({ spec, source }: { spec: DashboardSpec; source: RowSource }) {
+export function Dashboard({ spec, source, showTitle = true }: { spec: DashboardSpec; source: RowSource; showTitle?: boolean }) {
   const kpis = spec.charts.filter((c) => c.type === "kpi");
   const rest = spec.charts.filter((c) => c.type !== "kpi");
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl font-semibold tracking-tight">{spec.title}</h2>
+      {showTitle && <h2 className="text-2xl font-semibold tracking-tight">{spec.title}</h2>}
       {kpis.length > 0 && (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {kpis.map((c) => (
