@@ -89,3 +89,23 @@ test("each feature card has its own illustration and lifts on hover", async ({ p
   await card.hover();
   await expect.poll(async () => card.evaluate((el) => el.getBoundingClientRect().top)).toBeLessThan(before);
 });
+
+test("Why Dropboard is a bento of six distinct cards with serif stats", async ({ page }) => {
+  await page.goto("/");
+  const perks = page.locator("#privacy").getByTestId("perk");
+  await expect(perks).toHaveCount(6);
+  for (const text of ["rows uploaded", "~3s", "Any spreadsheet", "Built for stores and ops", "Safe sharing", "Free to start"]) {
+    await expect(page.locator("#privacy").getByText(text).first()).toBeVisible();
+  }
+  // the roadmap items are honestly marked as not available yet
+  await expect(page.locator("#privacy").getByText("soon", { exact: false }).first()).toBeVisible();
+});
+
+test("the accent words use the editorial serif", async ({ page }) => {
+  await page.goto("/");
+  const family = await page.locator("h1 em").evaluate((el) => getComputedStyle(el).fontFamily);
+  expect(family).toContain("Instrument");
+  await page.goto("/login");
+  const loginFamily = await page.locator("h1 em").evaluate((el) => getComputedStyle(el).fontFamily);
+  expect(loginFamily).toContain("Instrument");
+});
