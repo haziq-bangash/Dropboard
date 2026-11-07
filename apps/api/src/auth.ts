@@ -23,6 +23,8 @@ export function createAuth(prisma: PrismaClient, mailer?: Mailer) {
     secret: process.env.BETTER_AUTH_SECRET,
     baseURL: process.env.BETTER_AUTH_URL,
     trustedOrigins: allowedOrigins(),
+    // Behind Cloud Run the client address arrives in X-Forwarded-For; without it every user shares one rate-limit bucket
+    advanced: { ipAddress: { ipAddressHeaders: ["x-forwarded-for"] } },
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 8,

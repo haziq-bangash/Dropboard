@@ -17,10 +17,10 @@ export const GOOGLE_DEFAULT_MODEL = "gemini-3.5-flash-lite";
  *
  *   google:
  *     AI_GOOGLE_BACKEND     vertex (default, billed to the Google Cloud project) | gemini-api (AI Studio keys)
- *     GOOGLE_API_KEY        optional on Vertex: with it, Vertex express mode; without it, the service's own identity
+ *     GOOGLE_API_KEY        Vertex express mode, used only when no project is named below
  *                           (Application Default Credentials: on Cloud Run give the service account the Vertex AI User role).
  *                           Required for gemini-api.
- *     GOOGLE_CLOUD_PROJECT  Vertex project when using the service identity
+ *     GOOGLE_CLOUD_PROJECT  Vertex project, billed through the service's own identity; takes priority over a key
  *     AI_GOOGLE_LOCATION    Vertex location, default global
  *
  * Returns undefined when nothing usable is configured; the AI routes then answer 503.
@@ -69,18 +69,19 @@ export function resolveAiOptions(env: Env = process.env, deps: { fetch?: typeof 
         };
       }
 
+      // The service's own identity wins whenever a project is named: a stray key (often restricted to the Gemini API)
+      // must not override it.
+      const project = env.GOOGLE_CLOUD_PROJECT ?? env.GOOGLE_VERTEX_PROJECT;
+      if (project) {
+        const vertex = createVertex({ project, location: env.AI_GOOGLE_LOCATION ?? "global", fetch: deps.fetch });
+        return { provider: "google", modelName, model: vertex(modelName), secrets: [] };
+      }
       if (env.GOOGLE_API_KEY) {
         const vertex = createVertex({ apiKey: env.GOOGLE_API_KEY, fetch: deps.fetch });
         return { provider: "google", modelName, model: vertex(modelName), secrets: [env.GOOGLE_API_KEY] };
       }
-      // the service's own identity: Vertex needs to be told which project to bill
-      const project = env.GOOGLE_CLOUD_PROJECT ?? env.GOOGLE_VERTEX_PROJECT;
-      if (!project) {
-        console.warn("AI_PROVIDER=google without GOOGLE_API_KEY needs GOOGLE_CLOUD_PROJECT: AI routes disabled");
-        return undefined;
-      }
-      const vertex = createVertex({ project, location: env.AI_GOOGLE_LOCATION ?? "global", fetch: deps.fetch });
-      return { provider: "google", modelName, model: vertex(modelName), secrets: [] };
+      console.warn("AI_PROVIDER=google without GOOGLE_API_KEY needs GOOGLE_CLOUD_PROJECT: AI routes disabled");
+      return undefined;
     }
 
     default:
