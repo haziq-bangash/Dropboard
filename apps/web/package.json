@@ -14,6 +14,7 @@
     "@dropboard/engine": "workspace:^",
     "@dropboard/spec": "workspace:^",
     "@duckdb/duckdb-wasm": "1.32.0",
+    "better-auth": "^1.7.18",
     "echarts": "^6.1.0",
     "next": "^16.4.5",
     "react": "^19.3.1",
