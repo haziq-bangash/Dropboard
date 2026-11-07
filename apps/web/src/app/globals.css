@@ -134,17 +134,13 @@
     @apply font-sans;
     }
 }
-/* Marketing marquee: the row is duplicated, so shifting by -50% loops seamlessly */
+/* Hero flow: the track is drawn twice, so shifting by one copy (-50%) loops seamlessly */
 @theme {
-  --animate-marquee: marquee 40s linear infinite;
-  @keyframes marquee {
-    from { transform: translateX(0); }
-    to { transform: translateX(-50%); }
+  --animate-flow-right: flow-right 40s linear infinite;
+  @keyframes flow-right {
+    from { transform: translateX(-50%); }
+    to { transform: translateX(0); }
   }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .animate-marquee { animation: none; }
 }
 
 html { scroll-behavior: smooth; }
