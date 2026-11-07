@@ -16,16 +16,32 @@ import { ProjectsProvider } from "./projects-store";
 /** The signed-in frame: sidebar on the left, page on the right. Sends signed-out visitors to the sign-in page. */
 export function AppFrame({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { data: session, isPending } = authClient.useSession();
+  const {
+    data: session,
+    isPending,
+    isRefetching,
+    refetch,
+  } = authClient.useSession();
 
+  // Right after signing in, the cached session can still read "signed out" for a moment. Ask the server before
+  // sending anyone back to the sign-in page.
   useEffect(() => {
-    if (!isPending && !session) router.replace("/login");
-  }, [isPending, session, router]);
+    if (isPending || isRefetching || session) return;
+    let cancelled = false;
+    void authClient.getSession().then((r) => {
+      if (cancelled) return;
+      if (r.data) void refetch();
+      else router.replace("/login");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isPending, isRefetching, session, router, refetch]);
 
   if (!session) {
     return (
       <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">
-        {isPending ? "Loading…" : "Redirecting to sign in…"}
+        Loading…
       </div>
     );
   }
