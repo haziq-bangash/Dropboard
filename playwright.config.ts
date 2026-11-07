@@ -1,7 +1,8 @@
 import { defineConfig } from "@playwright/test";
 
-const WEB = "http://localhost:3100";
-const API = "http://localhost:3101";
+// Uncommon ports so a local run never reuses some other project's dev server
+const WEB = "http://localhost:4310";
+const API = "http://localhost:4311";
 const DATABASE_URL = process.env.DATABASE_URL ?? "postgres://dropboard:dropboard@localhost:5432/dropboard";
 
 export default defineConfig({
@@ -15,7 +16,7 @@ export default defineConfig({
       url: `${API}/health`,
       reuseExistingServer: !process.env.CI,
       env: {
-        PORT: "3101",
+        PORT: "4311",
         DATABASE_URL,
         BETTER_AUTH_SECRET: "e2e-secret-e2e-secret-e2e-secret-1234",
         BETTER_AUTH_URL: WEB,
@@ -23,7 +24,7 @@ export default defineConfig({
       },
     },
     {
-      command: "pnpm --filter @dropboard/web exec next start -p 3100",
+      command: "pnpm --filter @dropboard/web exec next start -p 4310",
       url: WEB,
       reuseExistingServer: !process.env.CI,
       env: { API_URL: API },
