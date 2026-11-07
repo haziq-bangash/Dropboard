@@ -1,8 +1,10 @@
 import type { DashboardSpec, ShareResults } from "@dropboard/spec";
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { PageShell } from "@/components/PageShell";
+import { clientAddressHeaders } from "@/lib/forward";
 import { PasswordGate } from "@/components/PasswordGate";
 import { SnapshotView } from "@/components/SnapshotView";
 
@@ -20,6 +22,8 @@ const load = cache(async (slug: string): Promise<Result> => {
   try {
     const res = await fetch(`${base}/api/shares/${encodeURIComponent(slug)}`, {
       cache: "no-store",
+      // pass the visitor on, so the API limits visitors and not this server
+      headers: clientAddressHeaders(await headers()),
     });
     if (res.status === 429) return { kind: "busy" };
     if (res.status === 401 || res.status === 403) return { kind: "password" };

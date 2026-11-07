@@ -1,16 +1,30 @@
 // Same-origin proxy to the Hono API, so session cookies stay first-party.
 // Reads API_URL at request time (not build time), so one image works in every environment.
+import { clientAddressHeaders } from "@/lib/forward";
+
 export const dynamic = "force-dynamic";
 
-const HOP_BY_HOP = new Set(["host", "connection", "content-length", "transfer-encoding", "keep-alive", "upgrade"]);
+const HOP_BY_HOP = new Set([
+  "host",
+  "connection",
+  "content-length",
+  "transfer-encoding",
+  "keep-alive",
+  "upgrade",
+]);
 
 async function proxy(req: Request): Promise<Response> {
   const base = process.env.API_URL ?? "http://localhost:8080";
   const url = new URL(req.url);
   const headers = new Headers();
   req.headers.forEach((value, key) => {
-    if (!HOP_BY_HOP.has(key.toLowerCase())) headers.set(key, value);
+    const name = key.toLowerCase();
+    // never pass on a visitor's own claim about who they are: the API only trusts what we set below
+    if (!HOP_BY_HOP.has(name) && !name.startsWith("x-dropboard-"))
+      headers.set(key, value);
   });
+  for (const [name, value] of Object.entries(clientAddressHeaders(req.headers)))
+    headers.set(name, value);
 
   const hasBody = req.method !== "GET" && req.method !== "HEAD";
   let upstream: Response;
@@ -34,4 +48,10 @@ async function proxy(req: Request): Promise<Response> {
   return new Response(upstream.body, { status: upstream.status, headers: out });
 }
 
-export { proxy as GET, proxy as POST, proxy as PUT, proxy as PATCH, proxy as DELETE };
+export {
+  proxy as GET,
+  proxy as POST,
+  proxy as PUT,
+  proxy as PATCH,
+  proxy as DELETE,
+};
