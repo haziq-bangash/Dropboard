@@ -5,6 +5,10 @@
   "scripts": {
     "dev:api": "pnpm --filter @dropboard/api dev",
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^5.1.0"
   }
 }
