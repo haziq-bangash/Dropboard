@@ -3,9 +3,9 @@ FROM node:22-alpine AS build
 WORKDIR /repo
 RUN corepack enable
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* tsconfig.base.json ./
-COPY packages/spec packages/spec
+COPY packages packages
 COPY apps/api apps/api
-RUN pnpm install --frozen-lockfile=false
+RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @dropboard/api build
 
 FROM gcr.io/distroless/nodejs22-debian12:nonroot
