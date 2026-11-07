@@ -70,7 +70,12 @@ jobs:
             # Secrets are optional until Secret Manager is set up (see infra/setup-secrets.sh)
             SECRETS=""
             if gcloud secrets describe better-auth-secret >/dev/null 2>&1 && gcloud secrets describe database-url >/dev/null 2>&1; then
-              SECRETS="--update-secrets=BETTER_AUTH_SECRET=better-auth-secret:latest,DATABASE_URL=database-url:latest"
+              LIST="BETTER_AUTH_SECRET=better-auth-secret:latest,DATABASE_URL=database-url:latest"
+              # AI is optional: routes return 503 until an Anthropic key is stored
+              if gcloud secrets describe anthropic-api-key >/dev/null 2>&1; then
+                LIST="$LIST,ANTHROPIC_API_KEY=anthropic-api-key:latest"
+              fi
+              SECRETS="--update-secrets=$LIST"
             fi
             MEMORY=256Mi
           else
