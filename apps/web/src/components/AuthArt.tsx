@@ -14,7 +14,7 @@ export function AuthArt() {
       </div>
 
       <div className="absolute inset-x-5 bottom-5 rounded-2xl bg-foreground/70 p-7 text-background backdrop-blur-md">
-        <p className="text-[11px] font-semibold tracking-[0.2em] text-secondary uppercase">Private by design</p>
+        <p className="text-sm font-medium tracking-wide text-secondary">Private by design</p>
         <p className="mt-3 font-serif text-[2.6rem] leading-[1.05] tracking-normal text-balance">
           Drop a file. Get a <em className="text-secondary italic">dashboard</em>. Nothing gets uploaded.
         </p>

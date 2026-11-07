@@ -27,7 +27,7 @@ export function MockDashboard() {
           <p className="mb-3 text-sm font-medium">Revenue by month</p>
           <div className="flex h-28 items-end gap-2">
             {BARS.map((h, i) => (
-              <div key={i} className="flex-1 rounded-t bg-primary/80" style={{ height: `${h}%` }} />
+              <div key={i} className={`flex-1 rounded-t ${i === 5 ? "bg-brand" : "bg-primary"}`} style={{ height: `${h}%` }} />
             ))}
           </div>
         </div>
