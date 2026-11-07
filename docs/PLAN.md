@@ -128,3 +128,9 @@ Findings are computed in the browser from the data, so they are free to run and 
 - Work on a branch, open a PR, wait for CI, merge, then sync main.
 - Before pushing: typecheck, unit and API tests, e2e tests, and build and run both Docker images.
 - Each phase ends with a GitHub release.
+
+### Pipeline
+- **CI runs on pull requests only.** Merging does not re-run the same checks. A docs-only change skips browsers and builds; checks, browser tests and image builds run in parallel, with the Playwright browser and Next compiler caches kept between runs. A final `ci` job gives one result for the whole pipeline.
+- **Deploys ship what was verified.** Each image is tagged with a hash of exactly what it is built from. The deploy builds it only if that tag is not in Artifact Registry yet, and redeploys a service only if it is not already running that image with the same settings. An unchanged backend is neither rebuilt nor redeployed, a failed deploy heals on the next run, and a rollback reuses an old image. Run the workflow manually with "force" to redeploy anyway.
+- **Docker builds reuse layers.** Dependencies install from the manifests alone, so a code change does not reinstall them, and Next keeps its compiler cache between builds.
+- Docs-only changes do not deploy.

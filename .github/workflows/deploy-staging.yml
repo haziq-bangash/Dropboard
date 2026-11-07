@@ -1,9 +1,19 @@
 name: Deploy staging
 
+# Pull requests already ran the checks, so this only ships. Each app is rebuilt and redeployed only when what it
+# is made of changed, judged against what is actually running, so a failed deploy heals itself on the next run.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Redeploy even if the running service already matches"
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy-staging
@@ -14,6 +24,22 @@ permissions:
   id-token: write
 
 jobs:
+  # Fingerprint what each image is made of. The same inputs always give the same tag, so a rollback or an
+  # unchanged app reuses an existing image instead of building again.
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.hash.outputs.api }}
+      web: ${{ steps.hash.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: hash
+        run: |
+          shared=(package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json .dockerignore packages)
+          echo "api=$(git ls-tree -r HEAD "${shared[@]}" apps/api | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
+          echo "web=$(git ls-tree -r HEAD "${shared[@]}" apps/web | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
+
+  # Always runs, in parallel with the builds: schema changes must land before the new code does
   migrate:
     runs-on: ubuntu-latest
     environment: staging
@@ -37,15 +63,15 @@ jobs:
       - run: pnpm --filter @dropboard/api exec prisma migrate deploy
         if: env.DATABASE_URL != ''
 
-  deploy:
-    needs: migrate
+  build:
+    needs: plan
     runs-on: ubuntu-latest
     environment: staging
     strategy:
       matrix:
         app: [api, web]
     env:
-      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/dropboard/${{ matrix.app }}:${{ github.sha }}
+      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/dropboard/${{ matrix.app }}:${{ matrix.app == 'api' && needs.plan.outputs.api || needs.plan.outputs.web }}
     steps:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
@@ -53,9 +79,21 @@ jobs:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v2
-      - run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
+      - name: Is this image already built?
+        id: exists
+        run: |
+          if gcloud artifacts docker images describe "$IMAGE" >/dev/null 2>&1; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "$IMAGE already exists, nothing to build"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.exists.outputs.found != 'true'
+        run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
+      - if: steps.exists.outputs.found != 'true'
+        uses: docker/setup-buildx-action@v3
+      - if: steps.exists.outputs.found != 'true'
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: apps/${{ matrix.app }}/Dockerfile
@@ -63,7 +101,23 @@ jobs:
           tags: ${{ env.IMAGE }}
           cache-from: type=gha,scope=${{ matrix.app }}
           cache-to: type=gha,mode=max,scope=${{ matrix.app }}
-      - name: Deploy to Cloud Run
+
+  release:
+    needs: [plan, migrate, build]
+    runs-on: ubuntu-latest
+    environment: staging
+    strategy:
+      matrix:
+        app: [api, web]
+    env:
+      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/dropboard/${{ matrix.app }}:${{ matrix.app == 'api' && needs.plan.outputs.api || needs.plan.outputs.web }}
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Deploy to Cloud Run when it differs from what is running
         run: |
           if [ "${{ matrix.app }}" = api ]; then
             ENV_VARS="WEB_ORIGIN=${{ vars.WEB_URL }},BETTER_AUTH_URL=${{ vars.WEB_URL }}"
@@ -83,7 +137,7 @@ jobs:
             SECRETS=""
             if gcloud secrets describe better-auth-secret >/dev/null 2>&1 && gcloud secrets describe database-url >/dev/null 2>&1; then
               LIST="BETTER_AUTH_SECRET=better-auth-secret:latest,DATABASE_URL=database-url:latest"
-              # AI is optional: routes return 503 until an Anthropic key is stored
+              # AI is optional: routes return 503 until a provider is configured
               if gcloud secrets describe anthropic-api-key >/dev/null 2>&1; then
                 LIST="$LIST,ANTHROPIC_API_KEY=anthropic-api-key:latest"
               fi
@@ -106,6 +160,17 @@ jobs:
             SECRETS=""
             MEMORY=512Mi
           fi
+
+          # Everything besides the image that shapes the revision. If it changes, the service is redeployed.
+          CONFIG=$(printf '%s|%s|%s|%s' "$ENV_VARS" "$SA_FLAG" "$SECRETS" "$MEMORY" | sha256sum | cut -c1-12)
+          RUNNING_IMAGE=$(gcloud run services describe dropboard-${{ matrix.app }} --region "${{ vars.GCP_REGION }}" --format='value(spec.template.spec.containers[0].image)' 2>/dev/null || true)
+          RUNNING_CONFIG=$(gcloud run services describe dropboard-${{ matrix.app }} --region "${{ vars.GCP_REGION }}" --format='value(metadata.labels.config)' 2>/dev/null || true)
+
+          if [ "${{ inputs.force }}" != true ] && [ "$RUNNING_IMAGE" = "$IMAGE" ] && [ "$RUNNING_CONFIG" = "$CONFIG" ]; then
+            echo "dropboard-${{ matrix.app }} already runs this image with this configuration, nothing to deploy"
+            exit 0
+          fi
+
           gcloud run deploy dropboard-${{ matrix.app }} \
             --image "$IMAGE" \
             --region "${{ vars.GCP_REGION }}" \
@@ -117,6 +182,7 @@ jobs:
             --cpu-throttling \
             --cpu-boost \
             --set-env-vars "$ENV_VARS" \
+            --update-labels "config=$CONFIG" \
             $SA_FLAG \
             $SECRETS
       - name: Verify
