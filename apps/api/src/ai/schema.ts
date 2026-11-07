@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 
 // What the model returns. The server fills in ids, layout, x/y and the table schema,
 // so the model only has to get titles and SQL right.
@@ -35,6 +35,16 @@ export class AiRefusal extends Error {
 
 export class AiBadOutput extends Error {
   constructor(message = "The model did not return a usable result") {
+    super(message);
+  }
+}
+
+/** The provider could not be reached or answered with an error (not a refusal, not a bad answer). */
+export class AiProviderError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
     super(message);
   }
 }

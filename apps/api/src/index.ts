@@ -1,7 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import { createAnthropicAi, DEFAULT_MODEL } from "./ai/service";
+import { createAiFromEnv } from "./ai/providers";
 import { createApp } from "./app";
 import { createAuth } from "./auth";
 import { createPrisma } from "./db";
@@ -11,10 +10,9 @@ const port = Number(process.env.PORT ?? 8080); // Cloud Run injects PORT
 function buildApp() {
   if (process.env.DATABASE_URL && process.env.BETTER_AUTH_SECRET) {
     const prisma = createPrisma();
-    const ai = process.env.ANTHROPIC_API_KEY
-      ? createAnthropicAi(new Anthropic(), process.env.ANTHROPIC_MODEL ?? DEFAULT_MODEL)
-      : undefined;
-    if (!ai) console.warn("ANTHROPIC_API_KEY missing: AI routes disabled");
+    const ai = createAiFromEnv();
+    if (ai) console.log(`AI enabled: ${ai.provider}/${ai.model}`);
+    else console.warn("No AI provider configured (see AI_PROVIDER): AI routes disabled");
     return createApp({
       prisma,
       auth: createAuth(prisma),
