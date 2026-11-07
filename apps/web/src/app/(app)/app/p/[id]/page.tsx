@@ -1,6 +1,6 @@
 "use client";
 
-import type { DashboardSpec } from "@dropboard/spec";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Check,
@@ -11,12 +11,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { AiPanel } from "@/components/AiPanel";
 import { Dashboard } from "@/components/Dashboard";
 import { PublishButton } from "@/components/PublishButton";
 import { DropZone } from "@/components/app/DropZone";
-import { useProjects } from "@/components/app/projects-store";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,91 +29,78 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { authClient } from "@/lib/auth-client";
 import { loadFile } from "@/lib/ingest";
+import { localDataSupported } from "@/lib/local-data";
 import {
-  hasProjectData,
-  loadProjectData,
-  localDataSupported,
-  removeProjectData,
-  saveProjectData,
-} from "@/lib/local-data";
-import {
-  getLoaded,
   missingColumns,
+  newLoadId,
   setLoaded,
   type LoadedData,
 } from "@/lib/loaded-data";
-import { ApiError, projectsApi, type ProjectDetail } from "@/lib/projects";
+import { ApiError, type ProjectDetail } from "@/lib/projects";
+import {
+  keys,
+  useKeepOnDevice,
+  useKept,
+  useProject,
+  useProjectData,
+  useProjectMutations,
+} from "@/lib/queries";
 import { liveSource } from "@/lib/results";
+
+/** Read a file for a project: it must have every column the dashboard uses. */
+async function readForProject(
+  project: ProjectDetail,
+  file: File,
+): Promise<LoadedData> {
+  const { profile } = await loadFile(file);
+  const gone = missingColumns(
+    project.spec.schema.map((c) => c.name),
+    profile,
+  );
+  if (gone.length) {
+    throw new Error(
+      `This file is missing columns the dashboard uses: ${gone.slice(0, 5).join(", ")}${gone.length > 5 ? "…" : ""}. Choose the original file or a newer version of it.`,
+    );
+  }
+  const loaded = {
+    projectId: project.id,
+    fileName: file.name,
+    profile,
+    loadId: newLoadId(),
+  };
+  setLoaded(loaded);
+  return loaded;
+}
 
 export default function ProjectPage() {
   const { id } = useParams<{ id: string }>();
-  const { refresh } = useProjects();
-  const [project, setProject] = useState<ProjectDetail | null>(null);
-  const [missing, setMissing] = useState(false);
-  const [data, setData] = useState<LoadedData | null>(() =>
-    getLoaded()?.projectId === id ? getLoaded() : null,
-  );
-  const [error, setError] = useState<string | null>(null);
+  const client = useQueryClient();
   const { data: session } = authClient.useSession();
   const userId = session?.user.id;
-  // true while we look for a copy of the rows kept on this device
-  const [opening, setOpening] = useState(() => getLoaded()?.projectId !== id);
-  // whether a copy of the rows is kept on this device
-  const [kept, setKept] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      setProject(await projectsApi.get(id));
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 404) setMissing(true);
-      else
-        setError(
-          e instanceof Error ? e.message : "Could not open this project.",
-        );
-    }
-  }, [id]);
+  const projectQuery = useProject(id);
+  const project = projectQuery.data;
+  const dataQuery = useProjectData(
+    userId,
+    id,
+    project?.sourceName,
+    Boolean(project),
+  );
+  const kept = useKept(userId, id).data ?? false;
+  const actions = useProjectMutations(userId);
+  const device = useKeepOnDevice(userId, id);
+  const attach = useMutation({
+    mutationFn: async (file: File) => {
+      const loaded = await readForProject(project!, file);
+      await device.attach(loaded);
+      return loaded;
+    },
+  });
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  useEffect(() => {
-    if (data || !userId || !project) return;
-    let cancelled = false;
-    void loadProjectData(userId, id, project.sourceName ?? "saved file").then(
-      (loaded) => {
-        if (cancelled) return;
-        if (loaded) {
-          setLoaded(loaded);
-          setData(loaded);
-          setKept(true);
-        }
-        setOpening(false);
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [data, userId, project, id]);
-
-  // rows that were just loaded (a new project) are copied to this device once
-  useEffect(() => {
-    if (data && userId && !kept && localDataSupported()) {
-      void hasProjectData(userId, id).then((has) => (has ? setKept(true) : saveProjectData(userId, id).then(setKept)));
-    }
-  }, [data, userId, id, kept]);
-
-  async function saveSpec(spec: DashboardSpec) {
-    setProject((p) => (p ? { ...p, spec, title: spec.title } : p));
-    try {
-      await projectsApi.saveSpec(id, spec);
-      void refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save your changes.");
-    }
-  }
-
-  if (missing) {
+  if (
+    projectQuery.error instanceof ApiError &&
+    projectQuery.error.status === 404
+  ) {
     return (
       <div className="mx-auto max-w-xl px-5 py-20 text-center">
         <h1 className="text-2xl font-semibold">Project not found</h1>
@@ -135,9 +121,9 @@ export default function ProjectPage() {
   if (!project) {
     return (
       <div className="mx-auto w-full max-w-6xl px-5 py-8">
-        {error ? (
+        {projectQuery.error ? (
           <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>{projectQuery.error.message}</AlertDescription>
           </Alert>
         ) : (
           <Skeleton className="h-64 w-full rounded-xl" />
@@ -145,6 +131,20 @@ export default function ProjectPage() {
       </div>
     );
   }
+
+  const data = dataQuery.data ?? null;
+  const opening = dataQuery.isPending;
+  // The attach step shows its own error; once the dashboard is open, problems show here
+  const problem =
+    (data ? attach.error?.message : null) ??
+    actions.saveSpec.error?.message ??
+    actions.rename.error?.message ??
+    null;
+  const refreshProject = () =>
+    Promise.all([
+      client.invalidateQueries({ queryKey: keys.project(id) }),
+      client.invalidateQueries({ queryKey: keys.projects }),
+    ]);
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 py-8">
@@ -156,23 +156,17 @@ export default function ProjectPage() {
           <ArrowLeft className="size-4" /> Projects
         </Link>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          {/* keyed by the saved title, so a rename (or Pilot retitling the dashboard) resets the field without an effect */}
           <TitleEditor
+            key={project.title}
             title={project.title}
-            onSave={async (title) => {
-              await projectsApi.rename(id, title);
-              setProject({
-                ...project,
-                title,
-                spec: { ...project.spec, title },
-              });
-              void refresh();
-            }}
+            onSave={(title) => actions.rename.mutateAsync({ id, title })}
           />
           {data && (
             <PublishButton
               spec={project.spec}
               projectId={id}
-              onPublished={() => void load().then(refresh)}
+              onPublished={() => void refreshProject()}
             />
           )}
         </div>
@@ -183,30 +177,19 @@ export default function ProjectPage() {
             <span>· {project.rowCount.toLocaleString()} rows</span>
           )}
         </p>
-        {data && userId && (
+        {data && (
           <DeviceData
-            project={project}
             kept={kept}
-            onReplaced={(d) => {
-              setData(d);
-              setKept(true);
-              setError(null);
-            }}
-            onRemoved={async () => {
-              await removeProjectData(userId, id);
-              setLoaded(null);
-              setData(null);
-              setKept(false);
-            }}
-            userId={userId}
-            onError={setError}
+            replacing={attach.isPending}
+            onReplace={(file) => attach.mutate(file)}
+            onRemove={() => void device.remove()}
           />
         )}
       </div>
 
-      {error && (
+      {problem && (
         <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{problem}</AlertDescription>
         </Alert>
       )}
 
@@ -215,22 +198,21 @@ export default function ProjectPage() {
       ) : !data ? (
         <AttachPanel
           project={project}
-          onAttached={(d) => {
-            setData(d);
-            setKept(false);
-            setError(null);
-          }}
+          busyName={attach.isPending ? attach.variables?.name : null}
+          error={attach.error?.message}
+          onFile={(file) => attach.mutate(file)}
         />
       ) : (
         <>
           <AiPanel
             profile={data.profile}
             spec={project.spec}
-            onSpec={saveSpec}
+            onSpec={(spec) => actions.saveSpec.mutate({ id, spec })}
           />
           <Dashboard
             spec={project.spec}
             source={liveSource}
+            dataKey={data.loadId}
             showTitle={false}
           />
         </>
@@ -238,11 +220,7 @@ export default function ProjectPage() {
 
       <PublishedLinks
         shares={project.shares}
-        onRevoke={async (slug) => {
-          await projectsApi.revokeLink(slug);
-          await load();
-          void refresh();
-        }}
+        onRevoke={(slug) => actions.revokeLink.mutate({ projectId: id, slug })}
       />
     </div>
   );
@@ -253,10 +231,9 @@ function TitleEditor({
   onSave,
 }: {
   title: string;
-  onSave: (title: string) => Promise<void>;
+  onSave: (title: string) => Promise<unknown>;
 }) {
   const [value, setValue] = useState(title);
-  useEffect(() => setValue(title), [title]);
   async function commit() {
     const next = value.trim();
     if (!next) return setValue(title);
@@ -275,42 +252,17 @@ function TitleEditor({
   );
 }
 
-/** Read a file for a project: it must have every column the dashboard uses. */
-async function readForProject(
-  project: ProjectDetail,
-  file: File,
-): Promise<LoadedData> {
-  const { profile } = await loadFile(file);
-  const gone = missingColumns(
-    project.spec.schema.map((c) => c.name),
-    profile,
-  );
-  if (gone.length) {
-    throw new Error(
-      `This file is missing columns the dashboard uses: ${gone.slice(0, 5).join(", ")}${gone.length > 5 ? "…" : ""}. Choose the original file or a newer version of it.`,
-    );
-  }
-  const loaded = { projectId: project.id, fileName: file.name, profile };
-  setLoaded(loaded);
-  return loaded;
-}
-
 function DeviceData({
-  project,
-  userId,
   kept,
-  onReplaced,
-  onRemoved,
-  onError,
+  replacing,
+  onReplace,
+  onRemove,
 }: {
-  project: ProjectDetail;
-  userId: string;
   kept: boolean;
-  onReplaced: (d: LoadedData) => void;
-  onRemoved: () => Promise<void>;
-  onError: (message: string) => void;
+  replacing: boolean;
+  onReplace: (file: File) => void;
+  onRemove: () => void;
 }) {
-  const [busy, setBusy] = useState(false);
   return (
     <div
       className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground"
@@ -325,36 +277,22 @@ function DeviceData({
             : "This browser cannot keep a copy, so you will choose the file again next time"}
       </span>
       <label className="cursor-pointer font-medium text-foreground underline-offset-4 hover:underline">
-        {busy ? "Reading…" : "Replace file"}
+        {replacing ? "Reading…" : "Replace file"}
         <input
           type="file"
           hidden
           accept=".xlsx,.csv,.tsv,.json,.ndjson,.jsonl"
-          onChange={async (e) => {
+          onChange={(e) => {
             const file = e.target.files?.[0];
             e.target.value = "";
-            if (!file) return;
-            setBusy(true);
-            try {
-              const loaded = await readForProject(project, file);
-              await saveProjectData(userId, project.id);
-              onReplaced(loaded);
-            } catch (err) {
-              onError(
-                err instanceof Error
-                  ? err.message
-                  : "Could not read that file.",
-              );
-            } finally {
-              setBusy(false);
-            }
+            if (file) onReplace(file);
           }}
         />
       </label>
       {kept && (
         <button
           type="button"
-          onClick={() => void onRemoved()}
+          onClick={onRemove}
           className="font-medium text-foreground underline-offset-4 hover:underline"
         >
           Remove from this device
@@ -366,26 +304,15 @@ function DeviceData({
 
 function AttachPanel({
   project,
-  onAttached,
+  busyName,
+  error,
+  onFile,
 }: {
   project: ProjectDetail;
-  onAttached: (d: LoadedData) => void;
+  busyName?: string | null;
+  error?: string;
+  onFile: (file: File) => void;
 }) {
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function attach(file: File) {
-    setBusy(file.name);
-    setError(null);
-    try {
-      onAttached(await readForProject(project, file));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not read that file.");
-    } finally {
-      setBusy(null);
-    }
-  }
-
   return (
     <Card>
       <CardHeader>
@@ -403,8 +330,8 @@ function AttachPanel({
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <DropZone
-          onFile={attach}
-          busyName={busy}
+          onFile={onFile}
+          busyName={busyName}
           error={error}
           title="Drop the file here, or click to browse"
         />
@@ -428,7 +355,7 @@ function PublishedLinks({
   onRevoke,
 }: {
   shares: ProjectDetail["shares"];
-  onRevoke: (slug: string) => Promise<void>;
+  onRevoke: (slug: string) => void;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
   if (!shares.length) return null;

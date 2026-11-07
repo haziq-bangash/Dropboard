@@ -2,14 +2,17 @@
 
 import { ArrowRight, Lock, Mail, MailCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
+import { useProviders } from "@/lib/queries";
 import { ASSISTANT } from "@/lib/brand";
 import { Logo } from "./Logo";
+
+const NO_PROVIDERS = { google: false, email: false };
 
 type Mode = "in" | "up" | "forgot" | "sent";
 type Sent = { kind: "confirm" | "reset"; email: string };
@@ -19,16 +22,9 @@ export function AuthForm() {
   const [mode, setMode] = useState<Mode>("in");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [providers, setProviders] = useState({ google: false, email: false });
+  const { data: providers = NO_PROVIDERS } = useProviders();
   const [unconfirmed, setUnconfirmed] = useState<string | null>(null);
   const [sent, setSent] = useState<Sent | null>(null);
-
-  useEffect(() => {
-    fetch("/api/providers")
-      .then((r): Promise<{ google?: boolean; email?: boolean }> => (r.ok ? r.json() : Promise.resolve({})))
-      .then((p) => setProviders({ google: Boolean(p.google), email: Boolean(p.email) }))
-      .catch(() => {});
-  }, []);
 
   function go(next: Mode) {
     setMode(next);

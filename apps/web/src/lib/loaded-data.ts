@@ -9,7 +9,12 @@ export interface LoadedData {
   projectId: string | null;
   fileName: string;
   profile: TableProfile;
+  /** Changes every time rows are loaded, so anything computed from the old rows is not reused for the new ones. */
+  loadId: string;
 }
+
+let loads = 0;
+export const newLoadId = () => String(++loads);
 
 let current: LoadedData | null = null;
 

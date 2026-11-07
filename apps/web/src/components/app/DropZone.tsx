@@ -50,9 +50,15 @@ export function DropZone({
           }}
         />
         <div className="flex size-12 items-center justify-center rounded-full bg-background shadow-sm ring-1 ring-border">
-          {busyName ? <Loader2 className="size-5 animate-spin" /> : <Upload className="size-5" />}
+          {busyName ? (
+            <Loader2 className="size-5 animate-spin" />
+          ) : (
+            <Upload className="size-5" />
+          )}
         </div>
-        <p className="text-lg font-medium">{busyName ? `Reading ${busyName}…` : title}</p>
+        <p className="text-lg font-medium">
+          {busyName ? `Reading ${busyName}…` : title}
+        </p>
         <div className="flex flex-wrap items-center justify-center gap-2">
           {[".xlsx", ".csv", ".json", ".ndjson"].map((t) => (
             <Badge key={t} variant="secondary" className="gap-1">
