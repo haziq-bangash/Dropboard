@@ -17,8 +17,11 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: staging
+    strategy:
+      matrix:
+        app: [api, web]
     env:
-      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/dropboard/api:${{ github.sha }}
+      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/dropboard/${{ matrix.app }}:${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
@@ -31,25 +34,26 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
-          file: apps/api/Dockerfile
+          file: apps/${{ matrix.app }}/Dockerfile
           push: true
           tags: ${{ env.IMAGE }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy dropboard-api \
+          gcloud run deploy dropboard-${{ matrix.app }} \
             --image "$IMAGE" \
             --region "${{ vars.GCP_REGION }}" \
             --allow-unauthenticated \
             --min-instances 0 \
             --max-instances 3 \
             --concurrency 80 \
-            --cpu 1 --memory 256Mi \
+            --cpu 1 --memory ${{ matrix.app == 'web' && '512Mi' || '256Mi' }} \
             --cpu-throttling \
             --cpu-boost \
             --set-env-vars "WEB_ORIGIN=${{ vars.WEB_ORIGIN }}"
       - name: Verify
         run: |
-          url=$(gcloud run services describe dropboard-api --region "${{ vars.GCP_REGION }}" --format='value(status.url)')
-          curl -fsS --retry 5 --retry-delay 3 "$url/healthz"
+          url=$(gcloud run services describe dropboard-${{ matrix.app }} --region "${{ vars.GCP_REGION }}" --format='value(status.url)')
+          path=/healthz; [ "${{ matrix.app }}" = web ] && path=/
+          curl -fsS --retry 5 --retry-delay 3 "$url$path" >/dev/null
