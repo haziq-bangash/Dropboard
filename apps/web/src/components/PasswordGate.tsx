@@ -5,7 +5,13 @@ import { Lock } from "lucide-react";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { SnapshotView } from "./SnapshotView";
 
@@ -13,7 +19,10 @@ export function PasswordGate({ slug }: { slug: string }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [data, setData] = useState<{ spec: DashboardSpec; results: ShareResults } | null>(null);
+  const [data, setData] = useState<{
+    spec: DashboardSpec;
+    results: ShareResults;
+  } | null>(null);
 
   if (data) return <SnapshotView spec={data.spec} results={data.results} />;
 
@@ -23,7 +32,9 @@ export function PasswordGate({ slug }: { slug: string }) {
         <CardTitle className="flex items-center gap-2">
           <Lock className="size-4" /> Password protected
         </CardTitle>
-        <CardDescription>Enter the password to view this dashboard.</CardDescription>
+        <CardDescription>
+          Enter the password to view this dashboard.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -37,7 +48,11 @@ export function PasswordGate({ slug }: { slug: string }) {
             });
             setBusy(false);
             if (res.ok) setData(await res.json());
-            else setError(res.status === 404 ? "This link is no longer available." : "Wrong password.");
+            else if (res.status === 404)
+              setError("This link is no longer available.");
+            else if (res.status === 429)
+              setError("Too many tries. Please wait a minute and try again.");
+            else setError("Wrong password.");
           }}
         >
           <Input
