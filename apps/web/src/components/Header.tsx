@@ -32,6 +32,9 @@ export function Header() {
         {isPending ? null : session ? (
           <div className="flex items-center gap-3">
             <span className="hidden text-sm text-muted-foreground lg:inline">{session.user.email}</span>
+            <Button size="sm" className="rounded-full" render={<Link href="/app" />} nativeButton={false}>
+              Open app
+            </Button>
             <Button variant="outline" size="sm" onClick={() => authClient.signOut()}>
               Sign out
             </Button>
