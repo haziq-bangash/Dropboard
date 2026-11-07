@@ -75,14 +75,17 @@ model Verification {
 // ---- Dropboard ----
 
 model Dashboard {
-  id        String   @id @default(cuid())
-  ownerId   String
-  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  title     String
+  id         String   @id @default(cuid())
+  ownerId    String
+  owner      User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title      String
+  // Where the data came from, shown so people know which file to re-attach. Rows are never stored here.
+  sourceName String?
+  rowCount   Int?
   // DashboardSpec (see packages/spec). Validated with zod before write.
-  spec      Json
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  spec       Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   shares Share[]
 
@@ -120,15 +123,15 @@ model AiCache {
 
 // One row per AI call. Quota counts uncached rows; Phase 4 billing reads the token columns.
 model AiGeneration {
-  id               String   @id @default(cuid())
-  userId           String
-  kind             String
-  cached           Boolean
-  model            String
-  inputTokens      Int      @default(0)
-  outputTokens     Int      @default(0)
-  cacheReadTokens  Int      @default(0)
-  createdAt        DateTime @default(now())
+  id              String   @id @default(cuid())
+  userId          String
+  kind            String
+  cached          Boolean
+  model           String
+  inputTokens     Int      @default(0)
+  outputTokens    Int      @default(0)
+  cacheReadTokens Int      @default(0)
+  createdAt       DateTime @default(now())
 
   @@index([userId, createdAt])
   @@map("ai_generation")
