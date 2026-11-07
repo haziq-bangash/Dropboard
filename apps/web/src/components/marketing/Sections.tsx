@@ -1,15 +1,11 @@
-import {
-  ArrowRight,
-  Bot,
-  Link2,
-  LineChart,
-} from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Grain } from "@/components/art/Grain";
 import { ASSISTANT } from "@/lib/brand";
+import { cn } from "@/lib/utils";
 import { MockChat, MockDashboard, MockShare } from "./Mocks";
 import { AskArt, DashboardArt, FastArt, PilotArt, PrivateArt, ShareArt } from "./ToolArt";
 import { PromptCarousel } from "./PromptCarousel";
@@ -55,45 +51,110 @@ export function ToolGrid() {
   );
 }
 
+type Tone = "sand" | "green" | "orange";
+
+const TONES: Record<Tone, { panel: string; layer: React.ReactNode }> = {
+  sand: {
+    panel: "bg-secondary",
+    layer: (
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 -z-10 opacity-30 [background-image:radial-gradient(circle,#233038_1px,transparent_1.4px)] [background-size:16px_16px]"
+      />
+    ),
+  },
+  green: {
+    panel: "bg-primary",
+    layer: <div aria-hidden="true" className="absolute inset-0 -z-10 bg-cover bg-center opacity-25" style={{ backgroundImage: "url(/art/topo-lines-light.svg)" }} />,
+  },
+  orange: {
+    panel: "bg-gradient-to-br from-[#FFB05A] to-[#FF5B04]",
+    layer: <div aria-hidden="true" className="absolute inset-0 -z-10 bg-cover bg-center opacity-20" style={{ backgroundImage: "url(/art/topo-lines-dark.svg)" }} />,
+  },
+};
+
+/** A colored, grain-textured panel with the mockup floating on it and a tilted chip. */
+function ArtPanel({
+  tone,
+  tilt,
+  chip,
+  chipClass,
+  children,
+}: {
+  tone: Tone;
+  tilt: string;
+  chip: string;
+  chipClass: string;
+  children: React.ReactNode;
+}) {
+  const t = TONES[tone];
+  return (
+    <div
+      data-testid="feature-art"
+      className={cn("relative isolate flex min-h-[420px] items-center justify-center overflow-hidden rounded-3xl p-8 sm:p-12", t.panel)}
+    >
+      {t.layer}
+      <Grain className="-z-10 opacity-40" />
+      <div className={cn("relative w-full max-w-md transition-transform duration-500 hover:rotate-0", tilt)}>{children}</div>
+      <span className={cn("absolute rounded-full bg-background px-4 py-2 text-sm font-medium shadow-lg", chipClass)}>{chip}</span>
+    </div>
+  );
+}
+
+function Em({ children }: { children: React.ReactNode }) {
+  return <em className="font-serif text-[1.14em] italic text-brand-text">{children}</em>;
+}
+
 interface RowProps {
   id?: string;
-  icon: React.ElementType;
-  title: string;
+  index: string;
+  title: React.ReactNode;
   text: string;
   points: [string, string][];
   cta?: { label: string; href: string };
   visual: React.ReactNode;
+  tone: Tone;
+  tilt: string;
+  chip: string;
+  chipClass: string;
   flip?: boolean;
   badge?: string;
 }
 
-function FeatureRow({ id, icon: Icon, title, text, points, cta, visual, flip, badge }: RowProps) {
+function FeatureRow({ id, index, title, text, points, cta, visual, tone, tilt, chip, chipClass, flip, badge }: RowProps) {
   return (
-    <div id={id} className={`${wrap} grid items-center gap-10 py-14 md:grid-cols-2 md:gap-16`}>
+    <div id={id} className={`${wrap} grid items-center gap-10 py-16 md:grid-cols-2 md:gap-16`}>
       <div className={flip ? "md:order-2" : undefined}>
-        <div className="mb-4 flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
-            <Icon className="size-5" />
-          </div>
+        <div className="mb-5 flex items-center gap-3">
+          <span className="font-serif text-6xl leading-none text-brand-text">{index}</span>
           {badge && <Badge>{badge}</Badge>}
         </div>
-        <h3 className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">{title}</h3>
-        <p className="mt-3 text-muted-foreground">{text}</p>
+        <h3 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{title}</h3>
+        <p className="mt-4 text-lg text-muted-foreground">{text}</p>
         {cta && (
-          <Button variant="outline" className="mt-5 rounded-full" render={<Link href={cta.href} />} nativeButton={false}>
+          <Button className="mt-6 rounded-full px-5" render={<Link href={cta.href} />} nativeButton={false}>
             {cta.label} <ArrowRight />
           </Button>
         )}
-        <dl className="mt-8 grid gap-5">
+        <ul className="mt-8 grid gap-5">
           {points.map(([head, body]) => (
-            <div key={head}>
-              <dt className="font-medium">{head}</dt>
-              <dd className="text-sm text-muted-foreground">{body}</dd>
-            </div>
+            <li key={head} className="flex gap-3">
+              <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
+                <Check className="size-3.5" />
+              </span>
+              <div>
+                <p className="font-medium">{head}</p>
+                <p className="text-sm text-muted-foreground">{body}</p>
+              </div>
+            </li>
           ))}
-        </dl>
+        </ul>
       </div>
-      <div className={flip ? "md:order-1" : undefined}>{visual}</div>
+      <div className={flip ? "md:order-1" : undefined}>
+        <ArtPanel tone={tone} tilt={tilt} chip={chip} chipClass={chipClass}>
+          {visual}
+        </ArtPanel>
+      </div>
     </div>
   );
 }
@@ -102,8 +163,12 @@ export function FeatureRows() {
   return (
     <section id="how" className="pt-12">
       <FeatureRow
-        icon={LineChart}
-        title="Instant dashboards, built in your browser"
+        index="01"
+        title={
+          <>
+            Instant dashboards, built in your <Em>browser</Em>
+          </>
+        }
         text="Drop a file and Dropboard reads it, profiles every column and builds a dashboard that fits your data. No setup, no formulas."
         cta={{ label: "Try it now", href: "/#upload" }}
         points={[
@@ -111,30 +176,50 @@ export function FeatureRows() {
           ["Handles big files", "In our tests a 44 MB CSV with 1.4 million rows showed its first numbers in about 3 seconds."],
           ["Excel, CSV and JSON", "Open .xlsx, .csv, .json and .ndjson exports from any tool."],
         ]}
+        tone="sand"
+        tilt="-rotate-1"
+        chip="1.4M rows in about 3 seconds"
+        chipClass="bottom-6 right-6 rotate-3"
         visual={<MockDashboard />}
       />
       <FeatureRow
         flip
+        index="02"
         badge="New"
-        icon={Bot}
-        title={`Ask ${ASSISTANT} anything about your data`}
+        title={
+          <>
+            Ask <Em>{ASSISTANT}</Em> anything about your data
+          </>
+        }
         text={`Describe the dashboard you want or ask a question. ${ASSISTANT} writes the query, and your browser runs it.`}
         points={[
           ["Design with a sentence", "“Focus on revenue by region” rebuilds the dashboard around it."],
           ["Answers you can check", "Every answer shows the SQL behind it, so nothing is a black box."],
           ["Your rows stay private", `${ASSISTANT} is powered by a language model that sees only column names, types and counts. Never your data.`],
         ]}
+        tone="green"
+        tilt="rotate-1"
+        chip="The SQL is always shown"
+        chipClass="left-6 top-6 -rotate-3"
         visual={<MockChat />}
       />
       <FeatureRow
-        icon={Link2}
-        title="Share a link, not your spreadsheet"
+        index="03"
+        title={
+          <>
+            Share a <Em>link</Em>, not your spreadsheet
+          </>
+        }
         text="Publish a read-only snapshot with one click. Viewers see your charts and summaries, and the original file stays with you."
         points={[
           ["Password protection", "Lock a link with a password, and revoke it any time."],
           ["Never indexed", "Shared dashboards are hidden from search engines."],
           ["No raw rows", "The data preview table is removed before anything is published."],
         ]}
+        tone="orange"
+        tilt="-rotate-1"
+        chip="Revoke any time"
+        chipClass="bottom-6 left-6 -rotate-2"
         visual={<MockShare />}
       />
     </section>
@@ -206,7 +291,7 @@ export function Perks() {
         <div className={`${bentoBase} bg-primary text-primary-foreground sm:col-span-2 lg:row-span-2`} data-testid="perk">
           <div aria-hidden="true" className="absolute inset-0 -z-10 bg-cover bg-center opacity-20" style={{ backgroundImage: "url(/art/topo-lines-light.svg)" }} />
           <Grain className="-z-10 opacity-40" />
-          <p className="text-[11px] font-semibold tracking-[0.2em] uppercase opacity-70">Private by design</p>
+          <p className="text-sm font-medium tracking-wide opacity-75">Private by design</p>
           <Stat>
             <span className="block text-[8.5rem] sm:text-[11rem]">0</span>
           </Stat>
@@ -217,7 +302,7 @@ export function Perks() {
         {/* Fast */}
         <div className={`${bentoBase} bg-secondary text-secondary-foreground`} data-testid="perk">
           <Grain className="-z-10 opacity-40" />
-          <p className="text-[11px] font-semibold tracking-[0.2em] uppercase opacity-70">Fast</p>
+          <p className="text-sm font-medium tracking-wide opacity-75">Fast</p>
           <Stat>
             <span className="block text-7xl">~3s</span>
           </Stat>
@@ -243,7 +328,7 @@ export function Perks() {
           <div className="absolute right-5 top-5 flex gap-2">
             {["Shopify", "Stripe", "GA4"].map((t, i) => (
               <Chip key={t} tilt={["-rotate-3", "rotate-2", "-rotate-1"][i]} className="border border-dashed border-foreground/60 bg-background/70">
-                {t} <span className="text-[10px] font-semibold tracking-wider uppercase opacity-70">soon</span>
+                {t} <span className="text-xs font-medium opacity-70">soon</span>
               </Chip>
             ))}
           </div>
@@ -273,7 +358,7 @@ export function Perks() {
 
         {/* Free to start */}
         <div className={`${bentoBase} border-2 border-dashed border-brand bg-card text-foreground sm:col-span-2`} data-testid="perk">
-          <p className="text-[11px] font-semibold tracking-[0.2em] text-brand-text uppercase">Free to start</p>
+          <p className="text-sm font-medium tracking-wide text-brand-text">Free to start</p>
           <Stat>
             <span className="block text-7xl sm:text-8xl">
               <em className="text-brand-text italic">Free</em>
