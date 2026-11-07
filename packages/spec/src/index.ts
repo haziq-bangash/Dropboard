@@ -39,3 +39,34 @@ export const PublishInput = z.object({
 
 export type ShareResults = z.infer<typeof ShareResults>;
 export type PublishInput = z.infer<typeof PublishInput>;
+
+// ---- AI requests (schema and stats only: never row values) ----
+
+export const AiColumn = z.object({
+  name: z.string().min(1).max(200),
+  type: ColumnType,
+  nullCount: z.number().int().nonnegative().optional(),
+  distinct: z.number().int().nonnegative().optional(),
+});
+
+export const AiTable = z.object({
+  rowCount: z.number().int().nonnegative(),
+  columns: z.array(AiColumn).min(1).max(200),
+});
+
+export const GenerateInput = z.object({
+  table: AiTable,
+  // What the user wants, e.g. "focus on revenue by region". Optional for a first pass.
+  instruction: z.string().trim().max(500).optional(),
+  // When present, the model edits this dashboard instead of starting fresh.
+  current: DashboardSpec.optional(),
+});
+
+export const AskInput = z.object({
+  table: AiTable,
+  question: z.string().trim().min(3).max(500),
+});
+
+export type AiTable = z.infer<typeof AiTable>;
+export type GenerateInput = z.infer<typeof GenerateInput>;
+export type AskInput = z.infer<typeof AskInput>;
