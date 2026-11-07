@@ -13,8 +13,8 @@ import {
 } from "lucide-react";
 
 // Decorative hero: raw rows (gray placeholders) stream into the logo and come out as insight cards.
-// Pure CSS. Each row draws the same moving track twice, the left half as placeholders and the right half
-// as finished cards, so every card turns into an insight as it crosses the center line.
+// Pure CSS. Each row draws the same moving track twice, once as placeholders and once as finished cards,
+// and cross-fades them around the center line, so every card morphs as it passes the logo.
 // All numbers are sample data for illustration only.
 
 interface Insight {
@@ -111,11 +111,18 @@ function InsightCard({ icon: Icon, title, sub, value, delta, up }: Insight) {
   );
 }
 
+// Half-width (px) of the band around the center where a placeholder fades into its finished card.
+const FADE = 70;
+const toPlaceholder = `linear-gradient(to right, black calc(50% - ${FADE}px), transparent calc(50% + ${FADE}px))`;
+const toInsight = `linear-gradient(to right, transparent calc(50% - ${FADE}px), black calc(50% + ${FADE}px))`;
+const mask = (image: string) => ({ maskImage: image, WebkitMaskImage: image });
+
 function Row({ cards, duration, delay }: { cards: Insight[]; duration: number; delay: number }) {
   // The sequence is rendered twice and shifted by exactly one copy, so the loop has no visible jump.
   const sequence = [...cards, ...cards];
   const track = (placeholder: boolean) => (
     <div
+      data-track
       className="flex w-max gap-4 pr-4 motion-safe:animate-flow-right"
       style={{ animationDuration: `${duration}s`, animationDelay: `${delay}s` }}
     >
@@ -124,8 +131,12 @@ function Row({ cards, duration, delay }: { cards: Insight[]; duration: number; d
   );
   return (
     <div className="relative h-[68px]">
-      <div className="absolute inset-0 [clip-path:inset(0_50%_0_0)]">{track(true)}</div>
-      <div className="absolute inset-0 [clip-path:inset(0_0_0_50%)]">{track(false)}</div>
+      <div data-layer="placeholder" className="absolute inset-0" style={mask(toPlaceholder)}>
+        {track(true)}
+      </div>
+      <div data-layer="insight" className="absolute inset-0" style={mask(toInsight)}>
+        {track(false)}
+      </div>
     </div>
   );
 }
@@ -133,27 +144,32 @@ function Row({ cards, duration, delay }: { cards: Insight[]; duration: number; d
 export function HeroFlow() {
   return (
     <div aria-hidden="true" className="pointer-events-none mx-auto mt-4 w-full max-w-6xl select-none">
-      <div className="relative h-[340px] overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]">
+      <div className="relative h-[380px] overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]">
         <div className="absolute inset-x-0 top-4 flex flex-col gap-6">
           {ROWS.map((row, i) => (
             <Row key={i} {...row} />
           ))}
         </div>
 
-        {/* beam through the logo, then a funnel that ends at the drop zone below */}
-        <div className="absolute inset-y-0 left-1/2 z-10 w-1.5 -translate-x-1/2 rounded-full bg-gradient-to-b from-brand/0 via-brand to-primary shadow-[0_0_24px_rgba(255,91,4,0.45)]" />
+        {/* One continuous shape: a beam that flares into a funnel and fades out above the drop zone.
+            Orange above the logo, midnight green below it; the color change sits behind the logo tile. */}
         <svg
-          viewBox="0 0 300 90"
-          preserveAspectRatio="none"
-          className="absolute bottom-0 left-1/2 z-10 h-[90px] w-[420px] -translate-x-1/2"
+          width="420"
+          height="380"
+          viewBox="0 0 420 380"
+          className="absolute inset-y-0 left-1/2 z-10 -translate-x-1/2 drop-shadow-[0_0_14px_rgba(255,91,4,0.35)]"
         >
           <defs>
-            <linearGradient id="hero-funnel" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="#075056" />
+            <linearGradient id="hero-beam" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#FF5B04" stopOpacity="0" />
+              <stop offset="0.1" stopColor="#FF5B04" />
+              <stop offset="0.3" stopColor="#FF5B04" />
+              <stop offset="0.46" stopColor="#075056" />
+              <stop offset="0.78" stopColor="#075056" />
               <stop offset="1" stopColor="#075056" stopOpacity="0" />
             </linearGradient>
           </defs>
-          <path d="M146 0 L154 0 C154 30 175 60 300 90 L0 90 C125 60 146 30 146 0 Z" fill="url(#hero-funnel)" />
+          <path d="M207 0 L213 0 L213 280 C213 320 255 360 420 380 L0 380 C165 360 207 320 207 280 Z" fill="url(#hero-beam)" />
         </svg>
         <div className="absolute left-1/2 top-[142px] z-20 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg ring-4 ring-background">
           <BarChart3 className="size-8" />
