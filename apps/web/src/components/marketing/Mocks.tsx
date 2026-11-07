@@ -1,5 +1,6 @@
 import { Copy, Lock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { ASSISTANT } from "@/lib/brand";
 import { Switch } from "@/components/ui/switch";
 
 // Static product mockups for the marketing page. Sample numbers only, not real data.
@@ -26,7 +27,7 @@ export function MockDashboard() {
           <p className="mb-3 text-sm font-medium">Revenue by month</p>
           <div className="flex h-28 items-end gap-2">
             {BARS.map((h, i) => (
-              <div key={i} className="flex-1 rounded-t bg-primary/80" style={{ height: `${h}%` }} />
+              <div key={i} className={`flex-1 rounded-t ${i === 5 ? "bg-brand" : "bg-primary"}`} style={{ height: `${h}%` }} />
             ))}
           </div>
         </div>
@@ -58,7 +59,7 @@ export function MockChat() {
             ))}
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">The AI saw only column names. The answer was computed in the browser.</p>
+        <p className="text-xs text-muted-foreground">{ASSISTANT} saw only column names. The answer was computed in the browser.</p>
       </CardContent>
     </Card>
   );

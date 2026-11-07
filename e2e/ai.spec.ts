@@ -19,20 +19,20 @@ async function upload(page: Page) {
   await expect(page.getByTestId("kpi-value").first()).toHaveText("500", { timeout: 30_000 });
 }
 
-test("signed-out visitors are asked to sign in for AI", async ({ page }) => {
+test("signed-out visitors are asked to sign in for Pilot", async ({ page }) => {
   await upload(page);
-  await expect(page.getByText("to use the AI assistant")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Design with AI" })).toHaveCount(0);
+  await expect(page.getByText("to use Pilot")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Design with Pilot" })).toHaveCount(0);
 });
 
-test("AI reports clearly when the server has no model configured", async ({ page }) => {
+test("Pilot reports clearly when the server has no model configured", async ({ page }) => {
   await signUp(page);
   await upload(page);
-  await page.getByRole("button", { name: "Design with AI" }).click();
-  await expect(page.locator('[data-slot="alert"]')).toContainText("AI is not available yet");
+  await page.getByRole("button", { name: "Design with Pilot" }).click();
+  await expect(page.locator('[data-slot="alert"]')).toContainText("Pilot is not available yet");
 });
 
-test("AI-designed dashboards replace the current one and drop charts that do not fit the data", async ({ page }) => {
+test("Pilot-designed dashboards replace the current one and drop charts that do not fit the data", async ({ page }) => {
   await signUp(page);
   await upload(page);
 
@@ -66,14 +66,14 @@ test("AI-designed dashboards replace the current one and drop charts that do not
   );
 
   await page.getByLabel("Dashboard instruction").fill("focus on revenue by region");
-  await page.getByRole("button", { name: "Design with AI" }).click();
+  await page.getByRole("button", { name: "Design with Pilot" }).click();
 
   await expect(page.getByRole("heading", { name: "Revenue by region", exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("Total amount")).toBeVisible();
   await expect(page.getByText("Amount by region")).toBeVisible();
   await expect(page.getByText("Bad column")).toHaveCount(0);
   await expect(page.getByText(/1 suggested chart did not fit your data/)).toBeVisible();
-  await expect(page.getByText("7 AI requests left today.")).toBeVisible();
+  await expect(page.getByText("7 requests left today.")).toBeVisible();
 });
 
 test("asking a question runs the returned SQL in the browser and shows the answer", async ({ page }) => {

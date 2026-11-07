@@ -4,11 +4,12 @@ import { BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
+import { ASSISTANT } from "@/lib/brand";
 
 const LINKS: [string, string][] = [
   ["Features", "/#features"],
   ["How it works", "/#how"],
-  ["AI assistant", "/#ai"],
+  [ASSISTANT, "/#pilot"],
   ["Privacy", "/#privacy"],
 ];
 
