@@ -72,7 +72,7 @@ jobs:
           echo "image size: $((size/1024/1024)) MB"
           [ "$size" -lt $((${{ matrix.budget_mb }}*1024*1024)) ] || { echo "image exceeds ${{ matrix.budget_mb }} MB"; exit 1; }
           docker run -d --name app -p 8080:8080 dropboard-${{ matrix.app }}:ci
-          path=/healthz; [ "${{ matrix.app }}" = web ] && path=/
+          path=/health; [ "${{ matrix.app }}" = web ] && path=/
           for i in $(seq 1 15); do
             curl -fs localhost:8080$path >/dev/null && exit 0
             sleep 1
