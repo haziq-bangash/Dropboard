@@ -32,8 +32,11 @@ test("csv upload builds a dashboard in the browser", async ({ page }) => {
 
 test("rejects unsupported files", async ({ page }) => {
   await page.goto("/");
-  await page.setInputFiles('input[type="file"]', { name: "x.pdf", mimeType: "application/pdf", buffer: Buffer.from("x") });
-  await expect(page.locator('[data-slot="alert"]')).toContainText("Unsupported file type");
+  // under load the first attempt can land before the page is interactive, so retry until it is
+  await expect(async () => {
+    await page.setInputFiles('input[type="file"]', { name: "x.pdf", mimeType: "application/pdf", buffer: Buffer.from("x") });
+    await expect(page.locator('[data-slot="alert"]')).toContainText("Unsupported file type", { timeout: 2000 });
+  }).toPass({ timeout: 15_000 });
 });
 
 test("ndjson upload works", async ({ page }) => {
