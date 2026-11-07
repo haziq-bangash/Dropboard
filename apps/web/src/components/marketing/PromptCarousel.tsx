@@ -30,6 +30,7 @@ export function PromptCarousel() {
   const [index, setIndex] = useState(0);
   const [animate, setAnimate] = useState(true);
 
+  // A timer is a subscription to the outside world, so this is the one effect the carousel needs.
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const id = setInterval(() => setIndex((i) => (i >= N ? i : i + 1)), INTERVAL);
@@ -37,15 +38,12 @@ export function PromptCarousel() {
   }, []);
 
   // After sliding onto the repeated copy of the first prompt, jump back to the real one without animating.
-  useEffect(() => {
+  function wrapAround() {
     if (index !== N) return;
-    const t = setTimeout(() => {
-      setAnimate(false);
-      setIndex(0);
-      requestAnimationFrame(() => requestAnimationFrame(() => setAnimate(true)));
-    }, SLIDE + 50);
-    return () => clearTimeout(t);
-  }, [index]);
+    setAnimate(false);
+    setIndex(0);
+    requestAnimationFrame(() => requestAnimationFrame(() => setAnimate(true)));
+  }
 
   const transition = animate ? `transform ${SLIDE}ms cubic-bezier(0.4, 0, 0.2, 1)` : "none";
 
@@ -61,7 +59,10 @@ export function PromptCarousel() {
       <div aria-hidden="true" className="relative h-[400px]">
         {/* faded background list */}
         <div className="absolute inset-0 overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_30%,black_70%,transparent)]">
-          <div style={{ transform: `translateY(${-index * ROW}px)`, transition }}>
+          <div
+            style={{ transform: `translateY(${-index * ROW}px)`, transition }}
+            onTransitionEnd={(e) => e.target === e.currentTarget && wrapAround()}
+          >
             {ITEMS.map((p, i) => (
               <div key={i} className="flex items-center px-8 text-xl font-medium text-background/40" style={{ height: ROW }}>
                 {p}

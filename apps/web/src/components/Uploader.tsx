@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { loadFile } from "@/lib/ingest";
+import { newLoadId } from "@/lib/loaded-data";
 import { liveSource } from "@/lib/results";
 import { AiPanel } from "./AiPanel";
 import { Dashboard } from "./Dashboard";
@@ -18,7 +19,7 @@ type State =
   | { status: "idle" }
   | { status: "loading"; name: string }
   | { status: "error"; message: string }
-  | { status: "ready"; spec: DashboardSpec; profile: TableProfile; ms: number };
+  | { status: "ready"; spec: DashboardSpec; profile: TableProfile; ms: number; loadId: string };
 
 /**
  * The drop zone and the dashboard builder. `hero` and `below` are marketing content (server-rendered
@@ -33,7 +34,7 @@ export function Uploader({ hero, below }: { hero: React.ReactNode; below: React.
     const t0 = performance.now();
     try {
       const { title, profile } = await loadFile(file);
-      setState({ status: "ready", spec: suggestDashboard(title, profile), profile, ms: Math.round(performance.now() - t0) });
+      setState({ status: "ready", spec: suggestDashboard(title, profile), profile, ms: Math.round(performance.now() - t0), loadId: newLoadId() });
       window.scrollTo({ top: 0 });
     } catch (e) {
       setState({ status: "error", message: e instanceof Error ? e.message : "Could not read that file." });
@@ -114,7 +115,7 @@ export function Uploader({ hero, below }: { hero: React.ReactNode; below: React.
         <PublishButton spec={state.spec} />
       </div>
       <AiPanel profile={state.profile} spec={state.spec} onSpec={(spec) => setState({ ...state, spec })} />
-      <Dashboard spec={state.spec} source={liveSource} />
+      <Dashboard spec={state.spec} source={liveSource} dataKey={state.loadId} />
     </PageShell>
   );
 }

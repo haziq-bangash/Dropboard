@@ -2,7 +2,8 @@
 
 import type { ChartSpec, DashboardSpec } from "@dropboard/spec";
 import * as echarts from "echarts";
-import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -79,6 +80,7 @@ function toOption(spec: ChartSpec, rows: Rows): echarts.EChartsCoreOption {
 
 function Chart({ spec, rows }: { spec: ChartSpec; rows: Rows }) {
   const ref = useRef<HTMLDivElement>(null);
+  // ECharts owns a canvas outside React: create it, resize it with the window, and dispose it. Nothing else fits here.
   useEffect(() => {
     if (!ref.current) return;
     const chart = echarts.init(ref.current);
@@ -121,21 +123,18 @@ export function Table({ rows }: { rows: Rows }) {
   );
 }
 
-function ChartCard({ spec, source }: { spec: ChartSpec; source: RowSource }) {
-  const [rows, setRows] = useState<Rows | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setRows(null);
-    setError(null);
-    source(spec)
-      .then((r) => !cancelled && setRows(r))
-      .catch((e: Error) => !cancelled && setError(e.message));
-    return () => {
-      cancelled = true;
-    };
-  }, [spec, source]);
+function ChartCard({ spec, source, dataKey }: { spec: ChartSpec; source: RowSource; dataKey: string }) {
+  // Keyed by which rows are loaded, so the same SQL on a different file is never answered from the old rows
+  const query = useQuery({
+    queryKey: ["chart-rows", dataKey, spec.id, spec.query],
+    queryFn: () => source(spec),
+    staleTime: Infinity,
+    gcTime: 5 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const rows: Rows | null = query.data ?? null;
+  const error = query.error ? (query.error instanceof Error ? query.error.message : "Could not load this chart.") : null;
 
   if (spec.type === "kpi") {
     return (
@@ -172,7 +171,18 @@ function ChartCard({ spec, source }: { spec: ChartSpec; source: RowSource }) {
   );
 }
 
-export function Dashboard({ spec, source, showTitle = true }: { spec: DashboardSpec; source: RowSource; showTitle?: boolean }) {
+export function Dashboard({
+  spec,
+  source,
+  dataKey,
+  showTitle = true,
+}: {
+  spec: DashboardSpec;
+  source: RowSource;
+  /** Identifies the rows behind the source (a load id, or "snapshot"). Cached chart results are reused only for the same key. */
+  dataKey: string;
+  showTitle?: boolean;
+}) {
   const kpis = spec.charts.filter((c) => c.type === "kpi");
   const rest = spec.charts.filter((c) => c.type !== "kpi");
   return (
@@ -181,13 +191,13 @@ export function Dashboard({ spec, source, showTitle = true }: { spec: DashboardS
       {kpis.length > 0 && (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {kpis.map((c) => (
-            <ChartCard key={c.id} spec={c} source={source} />
+            <ChartCard key={c.id} spec={c} source={source} dataKey={dataKey} />
           ))}
         </div>
       )}
       <div className="grid gap-4 md:grid-cols-2">
         {rest.map((c) => (
-          <ChartCard key={c.id} spec={c} source={source} />
+          <ChartCard key={c.id} spec={c} source={source} dataKey={dataKey} />
         ))}
       </div>
     </section>
