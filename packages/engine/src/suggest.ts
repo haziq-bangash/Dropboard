@@ -8,6 +8,11 @@ const MAX_CATEGORIES = 20;
 const looksLikeId = (c: ColumnProfile, rows: number) =>
   /(^|_|\s)id$/i.test(c.name) || (c.type !== "number" && c.distinct >= rows * 0.9 && rows > 20);
 
+// Names that say a column is a rate, price, duration or score. Adding those up means little, so they are averaged.
+const AVERAGED = /(^|[_s-])(avg|average|rate|ratio|pct|percent|percentage|price|score|satisfaction|rating|age|duration|minutes|hours|days|seconds|latency|margin|discount)($|[_s-])/i;
+const aggregate = (c: ColumnProfile) => (AVERAGED.test(c.name) ? "avg" : "sum");
+const label = (c: ColumnProfile) => (aggregate(c) === "avg" ? `Average ${c.name}` : c.name);
+
 const isMeasure = (c: ColumnProfile, rows: number) =>
   c.type === "number" && !looksLikeId(c, rows) && c.distinct > 1;
 
@@ -29,15 +34,19 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
   // KPIs: row count + totals of the first measures
   add({ type: "kpi", title: "Rows", query: "SELECT count(*) AS value FROM data" });
   for (const m of measures.slice(0, 2)) {
-    add({ type: "kpi", title: `Total ${m.name}`, query: `SELECT sum(${q(m.name)}) AS value FROM data` });
+    add({
+      type: "kpi",
+      title: aggregate(m) === "avg" ? `Average ${m.name}` : `Total ${m.name}`,
+      query: `SELECT ${aggregate(m)}(${q(m.name)}) AS value FROM data`,
+    });
   }
 
   // Trend: first date x first measure
   if (dates[0] && measures[0]) {
     add({
       type: "line",
-      title: `${measures[0].name} over time`,
-      query: `SELECT date_trunc('month', ${q(dates[0].name)}) AS x, sum(${q(measures[0].name)}) AS y FROM data WHERE ${q(dates[0].name)} IS NOT NULL GROUP BY 1 ORDER BY 1`,
+      title: `${label(measures[0])} over time`,
+      query: `SELECT date_trunc('month', ${q(dates[0].name)}) AS x, ${aggregate(measures[0])}(${q(measures[0].name)}) AS y FROM data WHERE ${q(dates[0].name)} IS NOT NULL GROUP BY 1 ORDER BY 1`,
       x: "x",
       y: ["y"],
     });
@@ -45,11 +54,11 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
 
   // Category breakdowns
   for (const cat of categories.slice(0, 2)) {
-    const value = measures[0] ? `sum(${q(measures[0].name)})` : "count(*)";
-    const label = measures[0] ? `${measures[0].name} by ${cat.name}` : `Rows by ${cat.name}`;
+    const value = measures[0] ? `${aggregate(measures[0])}(${q(measures[0].name)})` : "count(*)";
+    const title = measures[0] ? `${label(measures[0])} by ${cat.name}` : `Rows by ${cat.name}`;
     add({
       type: "bar",
-      title: label,
+      title,
       query: `SELECT ${q(cat.name)} AS x, ${value} AS y FROM data GROUP BY 1 ORDER BY 2 DESC LIMIT ${MAX_CATEGORIES}`,
       x: "x",
       y: ["y"],

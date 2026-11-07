@@ -47,7 +47,11 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
     <TooltipProvider>
       <SidebarProvider>
         <AppSidebar
-          user={{ name: session.user.name, email: session.user.email }}
+          user={{
+            id: session.user.id,
+            name: session.user.name,
+            email: session.user.email,
+          }}
         />
         <SidebarInset>
           <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4 md:hidden">

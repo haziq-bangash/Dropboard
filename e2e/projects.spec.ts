@@ -1,18 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
+import { signUp } from "./helpers";
 
 const CSV = path.join(__dirname, "fixtures", "sales.csv");
-
-async function signUp(page: Page) {
-  const email = `e2e-${Date.now()}-${Math.floor(Math.random() * 1e6)}@test.local`;
-  await page.goto("/login");
-  await page.getByRole("button", { name: "No account? Sign up" }).click();
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill("correct-horse-battery");
-  await page.getByRole("button", { name: "Sign up", exact: true }).click();
-  await expect(page).toHaveURL(/\/app$/);
-  return email;
-}
 
 async function newProject(page: Page) {
   await page.goto("/app/new");
