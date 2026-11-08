@@ -15,6 +15,8 @@ export const keys = {
   project: (id: string) => ["project", id] as const,
   providers: ["providers"] as const,
   summary: ["account-summary"] as const,
+  billing: ["billing"] as const,
+  plans: ["plans"] as const,
   sessions: ["sessions"] as const,
   /** The rows of a project, in the browser. Not cached after the page closes: the DuckDB table is shared by all projects. */
   projectData: (userId: string, id: string) =>
@@ -22,8 +24,8 @@ export const keys = {
   kept: (userId: string, id: string) => ["kept", userId, id] as const,
 };
 
-export function useProjectList() {
-  return useQuery({ queryKey: keys.projects, queryFn: projectsApi.list });
+export function useProjectList(enabled = true) {
+  return useQuery({ queryKey: keys.projects, queryFn: projectsApi.list, enabled });
 }
 
 export function useProject(id: string) {
@@ -177,6 +179,7 @@ export function useKeepOnDevice(userId: string | undefined, projectId: string) {
 
 export interface AccountSummary {
   plan: string;
+  planId?: "free" | "pro" | "team";
   memberSince: string | null;
   signInMethods: string[];
   usage: {

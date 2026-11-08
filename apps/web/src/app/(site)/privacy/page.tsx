@@ -39,6 +39,10 @@ export default function Privacy() {
             link to your Google account if you sign in with Google.
           </li>
           <li>
+            <strong>Your plan:</strong> if you pay for a plan, which plan, its status and when the current period ends, with the customer and
+            subscription numbers Stripe gives us. We never see or keep your card details; Stripe does.
+          </li>
+          <li>
             <strong>Your sign-ins:</strong> for each session, when it started and ends, the network address it came from and the browser
             it used, so that we can protect your account and show you where you are signed in.
           </li>
@@ -100,6 +104,9 @@ export default function Privacy() {
           </li>
           <li>
             <strong>Resend</strong>, to send the emails you ask for: confirming your address and resetting your password.
+          </li>
+          <li>
+            <strong>Stripe</strong>, if you pay for a plan, to take payment, send receipts and handle tax.
           </li>
           <li>
             <strong>Google</strong>, if you choose to sign in with Google. Google tells us your name and email address.

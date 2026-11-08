@@ -1,5 +1,7 @@
 "use client";
 
+import { Suspense } from "react";
+import { BillingSection } from "@/components/app/BillingSection";
 import {
   DataSection,
   DeleteSection,
@@ -17,7 +19,7 @@ export default function Account() {
   if (!session) return null;
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-5 py-10">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-5 py-10">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">
           Your{" "}
@@ -29,12 +31,20 @@ export default function Account() {
           Your plan, how you sign in, and what we hold about you.
         </p>
       </div>
-      <PlanSection />
-      <ProfileSection />
-      <PasswordSection summary={summary} />
-      <SessionsSection />
-      <DataSection userId={session.user.id} />
-      <DeleteSection summary={summary} email={session.user.email} />
+      <div className="flex max-w-3xl flex-col gap-6">
+        <PlanSection />
+      </div>
+      {/* the plans are three tiles side by side, so they get a wider column than the forms */}
+      <Suspense fallback={null}>
+        <BillingSection />
+      </Suspense>
+      <div className="flex max-w-3xl flex-col gap-6">
+        <ProfileSection />
+        <PasswordSection summary={summary} />
+        <SessionsSection />
+        <DataSection userId={session.user.id} />
+        <DeleteSection summary={summary} email={session.user.email} />
+      </div>
     </div>
   );
 }

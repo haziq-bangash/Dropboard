@@ -27,7 +27,7 @@ const PRODUCT: [string, string][] = [
 ];
 
 /** On a phone there is room for one menu button, so everything goes in it. */
-const ALL: [string, string][] = [...PRODUCT, ["Trust center", "/trust"], ["Privacy policy", "/privacy"], ["Terms of use", "/terms"]];
+const ALL: [string, string][] = [...PRODUCT, ["Pricing", "/pricing"], ["Trust center", "/trust"], ["Privacy policy", "/privacy"], ["Terms of use", "/terms"]];
 
 const ITEM = "rounded-xl px-3 py-2";
 const MENU = "min-w-56 rounded-2xl p-2";
@@ -59,6 +59,9 @@ export function Header() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          <Link href="/pricing" className={NAV_LINK}>
+            Pricing
+          </Link>
           <Link href="/trust" className={NAV_LINK}>
             Trust center
           </Link>
