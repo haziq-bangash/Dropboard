@@ -180,7 +180,7 @@ describe("provider selection", () => {
   });
 
   it("picks OpenAI and xAI only when they are named, with their own keys and default models", () => {
-    expect(pick({ AI_PROVIDER: "openai", OPENAI_API_KEY: "k" })).toBe("openai/gpt-5.4-mini");
+    expect(pick({ AI_PROVIDER: "openai", OPENAI_API_KEY: "k" })).toBe("openai/gpt-6-luna");
     expect(pick({ AI_PROVIDER: "xai", XAI_API_KEY: "k" })).toBe("xai/grok-4.20-0309-non-reasoning");
     expect(pick({ AI_PROVIDER: "openai", OPENAI_API_KEY: "k", AI_MODEL: "gpt-5.5" })).toBe("openai/gpt-5.5");
     // a key on its own never switches the provider on
@@ -231,7 +231,7 @@ describe("OpenAI and xAI over the wire", () => {
     expect(calls[0].headers.authorization).toBe("Bearer sk-openai-test");
     expect(calls[0].url).not.toContain("sk-openai-test");
     expect(calls[0].body).not.toContain("sk-openai-test");
-    expect(calls[0].body).toContain('"model":"gpt-5.4-mini"');
+    expect(calls[0].body).toContain('"model":"gpt-6-luna"');
     expect(calls[0].body).toContain('"effort":"low"');
   });
 

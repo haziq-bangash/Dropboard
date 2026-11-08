@@ -10,7 +10,7 @@ type Env = Record<string, string | undefined>;
 
 export const ANTHROPIC_DEFAULT_MODEL = "claude-haiku-5-5";
 export const GOOGLE_DEFAULT_MODEL = "gemini-3.5-flash-lite";
-export const OPENAI_DEFAULT_MODEL = "gpt-5.4-mini";
+export const OPENAI_DEFAULT_MODEL = "gpt-6-luna";
 export const XAI_DEFAULT_MODEL = "grok-4.20-0309-non-reasoning";
 
 /**
@@ -20,7 +20,7 @@ export const XAI_DEFAULT_MODEL = "grok-4.20-0309-non-reasoning";
  *                       openai and xai are chosen only by naming them)
  *   AI_MODEL            model name (defaults per provider; ANTHROPIC_MODEL still works)
  *
- *   openai:  OPENAI_API_KEY (default model gpt-5.4-mini)
+ *   openai:  OPENAI_API_KEY (default model gpt-6-luna)
  *   xai:     XAI_API_KEY (default model grok-4.20-0309-non-reasoning)
  *
  *   google:
