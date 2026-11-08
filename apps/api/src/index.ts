@@ -8,6 +8,20 @@ import { createPrisma } from "./db";
 
 const port = Number(process.env.PORT ?? 8080); // Cloud Run injects PORT
 
+/**
+ * Import-by-link checks every address so the server can never be turned against its own network. The end-to-end tests have to fetch
+ * from a server on this machine, so they may loosen the checks with this variable. It is ignored in production, and says so.
+ */
+function importOptions() {
+  if (process.env.IMPORT_ALLOW_PRIVATE_FOR_TESTS !== "1") return undefined;
+  if (process.env.NODE_ENV === "production") {
+    console.warn("IMPORT_ALLOW_PRIVATE_FOR_TESTS is set in production and is being ignored");
+    return undefined;
+  }
+  console.warn("Import-by-link is allowed to reach private addresses (tests only)");
+  return { allowPrivate: true };
+}
+
 function buildApp() {
   if (process.env.DATABASE_URL && process.env.BETTER_AUTH_SECRET) {
     const prisma = createPrisma();
@@ -22,6 +36,7 @@ function buildApp() {
       mailer,
       ai,
       aiDailyLimit: Number(process.env.AI_DAILY_LIMIT) || undefined,
+      importOptions: importOptions(),
     });
   }
   // Not configured yet: stay up so health checks pass, but refuse API traffic clearly.

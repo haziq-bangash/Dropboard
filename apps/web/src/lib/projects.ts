@@ -4,6 +4,8 @@ export interface ProjectSummary {
   id: string;
   title: string;
   sourceName: string | null;
+  /** The link the data was fetched from, when it came from one. */
+  sourceUrl: string | null;
   rowCount: number | null;
   charts: number;
   published: boolean;
@@ -21,6 +23,7 @@ export interface ProjectDetail {
   title: string;
   spec: DashboardSpec;
   sourceName: string | null;
+  sourceUrl: string | null;
   rowCount: number | null;
   updatedAt: string;
   shares: { slug: string; createdAt: string; passwordProtected: boolean }[];

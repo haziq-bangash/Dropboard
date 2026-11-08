@@ -106,6 +106,8 @@ export type AskInput = z.infer<typeof AskInput>;
 export const ProjectSource = z.object({
   fileName: z.string().trim().min(1).max(200),
   rowCount: z.number().int().nonnegative(),
+  // the https address the data was fetched from, when it came from a link, so it can be refreshed
+  url: z.string().trim().url().max(2000).optional(),
 });
 
 export const CreateProjectInput = z.object({

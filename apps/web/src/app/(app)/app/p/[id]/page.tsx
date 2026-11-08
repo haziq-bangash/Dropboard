@@ -35,6 +35,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { authClient } from "@/lib/auth-client";
+import { fetchLink } from "@/lib/import-sources";
 import { loadFile } from "@/lib/ingest";
 import { localDataSupported } from "@/lib/local-data";
 import {
@@ -103,6 +104,14 @@ export default function ProjectPage() {
       return loaded;
     },
   });
+  // a project that came from a link can fetch it again: the file goes through the same checks as one that is chosen by hand
+  const refresh = useMutation({
+    mutationFn: async () => {
+      const loaded = await readForProject(project!, await fetchLink(project!.sourceUrl!));
+      await device.attach(loaded);
+      return loaded;
+    },
+  });
 
   if (
     projectQuery.error instanceof ApiError &&
@@ -143,7 +152,7 @@ export default function ProjectPage() {
   const opening = dataQuery.isPending;
   // The attach step shows its own error; once the dashboard is open, problems show here
   const problem =
-    (data ? attach.error?.message : null) ??
+    (data ? (attach.error?.message ?? refresh.error?.message) : null) ??
     actions.saveSpec.error?.message ??
     actions.rename.error?.message ??
     null;
@@ -189,6 +198,8 @@ export default function ProjectPage() {
             kept={kept}
             replacing={attach.isPending}
             onReplace={(file) => attach.mutate(file)}
+            onRefresh={project.sourceUrl ? () => refresh.mutate() : undefined}
+            refreshing={refresh.isPending}
             onRemove={() => void device.remove()}
           />
         )}
@@ -206,8 +217,10 @@ export default function ProjectPage() {
         <AttachPanel
           project={project}
           busyName={attach.isPending ? attach.variables?.name : null}
-          error={attach.error?.message}
+          error={attach.error?.message ?? refresh.error?.message}
           onFile={(file) => attach.mutate(file)}
+          onFetch={project.sourceUrl ? () => refresh.mutate() : undefined}
+          fetching={refresh.isPending}
         />
       ) : (
         <>
@@ -292,11 +305,16 @@ function DeviceData({
   kept,
   replacing,
   onReplace,
+  onRefresh,
+  refreshing,
   onRemove,
 }: {
   kept: boolean;
   replacing: boolean;
   onReplace: (file: File) => void;
+  /** Present when the data came from a link. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
   onRemove: () => void;
 }) {
   return (
@@ -325,6 +343,16 @@ function DeviceData({
           }}
         />
       </label>
+      {onRefresh && (
+        <button
+          type="button"
+          disabled={refreshing}
+          onClick={onRefresh}
+          className="font-medium text-foreground underline-offset-4 hover:underline disabled:opacity-60"
+        >
+          {refreshing ? "Fetching…" : "Refresh from link"}
+        </button>
+      )}
       {kept && (
         <button
           type="button"
@@ -343,11 +371,16 @@ function AttachPanel({
   busyName,
   error,
   onFile,
+  onFetch,
+  fetching,
 }: {
   project: ProjectDetail;
   busyName?: string | null;
   error?: string;
   onFile: (file: File) => void;
+  /** Present when the data came from a link: fetch it again instead of choosing a file. */
+  onFetch?: () => void;
+  fetching?: boolean;
 }) {
   return (
     <EmptyTile tone="yellow" title="Attach your file to open this dashboard">
@@ -355,6 +388,14 @@ function AttachPanel({
         Your rows are never stored on our servers, so choose {project.sourceName ? <strong>{project.sourceName}</strong> : "the file"} again to see the
         charts. A newer version with the same columns works too.
       </p>
+      {onFetch && (
+        <div className="mt-4">
+          <Button className="rounded-full" disabled={fetching} onClick={onFetch} data-testid="fetch-again">
+            {fetching ? "Fetching…" : "Fetch it again from the link"}
+          </Button>
+          <p className="mt-2 text-sm opacity-90">The link is saved with this project. It goes through Dropboard&apos;s server on the way in and is not stored.</p>
+        </div>
+      )}
       <div className="mt-5 flex flex-col gap-4 text-foreground">
         <div className="rounded-2xl bg-card p-2">
           <DropZone onFile={onFile} busyName={busyName} error={error} title="Drop the file here, or click to browse" />
