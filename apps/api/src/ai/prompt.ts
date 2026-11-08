@@ -42,6 +42,10 @@ The data lives in a DuckDB table named "data".
 - Return a result that directly answers the question, with readable column aliases and at most 100 rows.
 - explanation is one or two plain sentences describing what the query computes. If the schema cannot answer the question, return a query that gets as close as possible and say what is missing in the explanation.`;
 
+export const REPAIR_SYSTEM = `${ASK_SYSTEM}
+
+Your previous query for this question failed when it ran. You are given the query and the database error, with any quoted data values removed. Return a corrected query that answers the same question. Fix the cause named in the error, for example a wrong column name or a type that needs a cast, and change nothing else.`;
+
 /** Describe the table with schema and stats only. Row values are never included. */
 export function describeTable(table: AiTable): string {
   const lines = table.columns.map((c) => {
@@ -61,6 +65,15 @@ export function generateMessage(input: GenerateInput): string {
   }
   parts.push(input.instruction ? `Instruction: ${input.instruction}` : "Instruction: none, design a strong general-purpose dashboard.");
   return parts.join("\n\n");
+}
+
+export function repairMessage(table: AiTable, question: string, sql: string, error: string): string {
+  return `${askMessage(table, question)}
+
+Failed query:
+${sql}
+
+Database error: ${error}`;
 }
 
 export function askMessage(table: AiTable, question: string): string {

@@ -1,4 +1,4 @@
-import type { AskInput, GenerateInput } from "@dropboard/spec";
+import type { AskInput, GenerateInput, RepairInput } from "@dropboard/spec";
 import type { AiAskOutput, AiDashboardOutput, AiUsage } from "./schema";
 
 /**
@@ -11,6 +11,8 @@ export interface AiService {
   /** Model name within that vendor. */
   readonly model: string;
   generate(input: GenerateInput): Promise<{ output: AiDashboardOutput; usage: AiUsage }>;
+  /** One corrected attempt at a question whose query failed. */
+  repair(input: RepairInput): Promise<{ output: AiAskOutput; usage: AiUsage }>;
   ask(input: AskInput): Promise<{ output: AiAskOutput; usage: AiUsage }>;
 }
 
