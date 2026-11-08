@@ -1,6 +1,6 @@
 import { APICallError, generateText, NoObjectGeneratedError, Output, type LanguageModel } from "ai";
 import type { z } from "zod";
-import { ASK_SYSTEM, SYSTEM, askMessage, generateMessage } from "./prompt";
+import { ASK_SYSTEM, REPAIR_SYSTEM, SYSTEM, askMessage, generateMessage, repairMessage } from "./prompt";
 import { AiAskOutput, AiBadOutput, AiDashboardOutput, AiProviderError, AiRefusal, type AiUsage } from "./schema";
 import type { AiService } from "./service";
 
@@ -91,6 +91,7 @@ export function createAiSdkService(o: AiSdkOptions): AiService {
     provider: o.provider,
     model: o.modelName,
     generate: (input) => call(SYSTEM, generateMessage(input), AiDashboardOutput),
+    repair: (input) => call(REPAIR_SYSTEM, repairMessage(input.table, input.question, input.sql, input.error), AiAskOutput),
     ask: (input) => call(ASK_SYSTEM, askMessage(input.table, input.question), AiAskOutput),
   };
 }

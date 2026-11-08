@@ -1,6 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
-import { guardSql, tidySql } from "@dropboard/engine";
-import { AskInput, GenerateInput } from "@dropboard/spec";
+import { guardSql, scrubDbError, tidySql } from "@dropboard/engine";
+import { AskInput, GenerateInput, RepairInput } from "@dropboard/spec";
 import type { Hono, MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import type { Prisma, PrismaClient } from "../generated/prisma/client";
@@ -85,6 +85,27 @@ export function registerAiRoutes(app: Hono<AppEnv>, { prisma, ai, dailyLimit = D
       if (!guarded.ok) throw new AiBadOutput(`Unsafe query: ${guarded.reason}`);
       await log(userId, "ask", false, usage);
       return c.json({ sql: tidySql(output.sql).trim().replace(/;+\s*$/, ""), explanation: output.explanation, remaining: left - 1 });
+    } catch (e) {
+      return failure(c, e);
+    }
+  });
+
+  // The browser ran the query from /api/ask and it failed. One corrected attempt, counted like any model call.
+  app.post("/api/ai/repair", requireUser, small, zValidator("json", RepairInput), async (c) => {
+    if (!ai) return c.json({ error: "ai not configured" }, 503);
+    const userId = c.get("userId");
+    const left = await remaining(userId);
+    if (left <= 0) return c.json({ error: "daily limit reached", remaining: 0 }, 429);
+
+    const input = c.req.valid("json");
+    // scrubbed again here, so a client that skipped it still cannot send a data value to the model
+    const error = scrubDbError(input.error, input.table.columns.map((col) => col.name));
+    try {
+      const { output, usage } = await ai.repair({ ...input, error });
+      const guarded = guardSql(output.sql);
+      if (!guarded.ok) throw new AiBadOutput(`Unsafe query: ${guarded.reason}`);
+      await log(userId, "repair", false, usage);
+      return c.json({ sql: tidySql(output.sql).trim().replace(/;+s*$/, ""), explanation: output.explanation, remaining: left - 1 });
     } catch (e) {
       return failure(c, e);
     }

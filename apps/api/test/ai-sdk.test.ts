@@ -74,6 +74,15 @@ describe("AI SDK service", () => {
     expect(JSON.stringify(model.doGenerateCalls[0].prompt)).toContain("Question: how many rows?");
   });
 
+  it("repairs a failed query with the error in the prompt and the same output shape", async () => {
+    const { ai, model } = service(result(JSON.stringify({ sql: "SELECT count(*) FROM data", explanation: "Fixed." })));
+    const out = await ai.repair({ table: input.table, question: "how many rows?", sql: "SELECT count(x) FROM data", error: "Binder Error: column not found" });
+    expect(out.output.sql).toBe("SELECT count(*) FROM data");
+    const sent = JSON.stringify(model.doGenerateCalls[0].prompt);
+    expect(sent).toContain("Failed query:");
+    expect(sent).toContain("Database error: Binder Error: column not found");
+  });
+
   it("treats a content filter as a refusal", async () => {
     const { ai } = service(result("", "content-filter"));
     await expect(ai.generate(input)).rejects.toThrow(AiRefusal);

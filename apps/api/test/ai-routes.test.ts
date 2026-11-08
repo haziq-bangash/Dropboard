@@ -1,4 +1,4 @@
-import type { AskInput, GenerateInput } from "@dropboard/spec";
+import type { AskInput, GenerateInput, RepairInput } from "@dropboard/spec";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AiBadOutput, AiRefusal, type AiAskOutput, type AiDashboardOutput } from "../src/ai/schema";
 import type { AiService } from "../src/ai/service";
@@ -22,8 +22,8 @@ const goodOutput: AiDashboardOutput = {
 };
 
 /** A scripted stand-in for the model. */
-function fakeAi(opts: { generate?: () => AiDashboardOutput; ask?: () => AiAskOutput; fail?: Error } = {}) {
-  const calls = { generate: 0, ask: 0 };
+function fakeAi(opts: { generate?: () => AiDashboardOutput; ask?: () => AiAskOutput; repair?: (input: RepairInput) => AiAskOutput; fail?: Error } = {}) {
+  const calls = { generate: 0, ask: 0, repair: 0, repairInputs: [] as RepairInput[] };
   const usage = { inputTokens: 100, outputTokens: 50, cacheReadTokens: 0 };
   const service: AiService = {
     provider: "fake",
@@ -32,6 +32,12 @@ function fakeAi(opts: { generate?: () => AiDashboardOutput; ask?: () => AiAskOut
       calls.generate++;
       if (opts.fail) throw opts.fail;
       return { output: (opts.generate ?? (() => goodOutput))(), usage };
+    },
+    async repair(input: RepairInput) {
+      calls.repair++;
+      calls.repairInputs.push(input);
+      if (opts.fail) throw opts.fail;
+      return { output: (opts.repair ?? (() => ({ sql: 'SELECT count(*) AS n FROM data', explanation: "Counts rows." })))(input), usage };
     },
     async ask(_: AskInput) {
       calls.ask++;
@@ -187,6 +193,44 @@ describe("POST /api/ai/generate", () => {
     const user = await prisma.user.findFirstOrThrow({ where: { name: "usage", email: { in: emails } } });
     const row = await prisma.aiGeneration.findFirstOrThrow({ where: { userId: user.id } });
     expect(row).toMatchObject({ kind: "generate", cached: false, model: "fake/fake-model", inputTokens: 100, outputTokens: 50 });
+  });
+});
+
+describe("POST /api/ai/repair", () => {
+  const body = { table: tableInput().table, question: "How many rows are there?", sql: 'SELECT count(x) FROM data', error: "Binder Error: Referenced column \"x\" not found" };
+
+  it("requires a session and a configured model", async () => {
+    expect((await post(createApp({ prisma, auth, ai: fakeAi().service }), "/api/ai/repair", null, body)).status).toBe(401);
+    const cookie = await signUp("repno");
+    expect((await post(createApp({ prisma, auth }), "/api/ai/repair", cookie, body)).status).toBe(503);
+  });
+
+  it("returns a corrected, guarded query and uses one request", async () => {
+    const f = fakeAi({ repair: () => ({ sql: "SELECT count(*) AS n FROM data;", explanation: "Counts rows." }) });
+    const app = createApp({ prisma, auth, ai: f.service, aiDailyLimit: 3 });
+    const cookie = await signUp("rep");
+    const res = await post(app, "/api/ai/repair", cookie, body);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ sql: "SELECT count(*) AS n FROM data", explanation: "Counts rows.", remaining: 2 });
+    expect(f.calls.repair).toBe(1);
+  });
+
+  it("removes quoted data values from the error before the model sees it", async () => {
+    const f = fakeAi();
+    const app = createApp({ prisma, auth, ai: f.service });
+    const cookie = await signUp("repscrub");
+    const res = await post(app, "/api/ai/repair", cookie, { ...body, error: "Conversion Error: Could not convert string 'Jane Doe' to INT32" });
+    expect(res.status).toBe(200);
+    expect(f.calls.repairInputs[0].error).not.toContain("Jane");
+  });
+
+  it("rejects unsafe SQL from the model, and stops at the daily limit", async () => {
+    const unsafe = createApp({ prisma, auth, ai: fakeAi({ repair: () => ({ sql: "COPY data TO '/tmp/x.csv'", explanation: "x" }) }).service });
+    expect((await post(unsafe, "/api/ai/repair", await signUp("repu"), body)).status).toBe(502);
+    const limited = createApp({ prisma, auth, ai: fakeAi().service, aiDailyLimit: 1 });
+    const cookie = await signUp("repq");
+    expect((await post(limited, "/api/ai/generate", cookie, tableInput())).status).toBe(200);
+    expect((await post(limited, "/api/ai/repair", cookie, body)).status).toBe(429);
   });
 });
 

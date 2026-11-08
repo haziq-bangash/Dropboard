@@ -155,6 +155,46 @@ test("asking a question runs the returned SQL in the browser and shows the answe
   expect(sentBody).not.toContain("2025-01-");
 });
 
+test("a failed question is repaired once, and the error sent back carries no data values", async ({ page }) => {
+  await signUp(page);
+  await upload(page);
+
+  // the first query fails inside DuckDB with an error that quotes a real value from the data
+  await page.route("**/api/ai/ask", (route) =>
+    route.fulfill({ json: { sql: 'SELECT CAST("region" AS INTEGER) AS n FROM data', explanation: "Wrong.", remaining: 5 } }),
+  );
+  let repairBody = "";
+  await page.route("**/api/ai/repair", (route) => {
+    repairBody = route.request().postData() ?? "";
+    return route.fulfill({
+      json: { sql: 'SELECT "region", count(*) AS orders FROM data GROUP BY 1 ORDER BY 2 DESC', explanation: "Counts orders per region.", remaining: 4 },
+    });
+  });
+
+  await page.getByLabel("Question about your data").fill("How many orders per region?");
+  await page.getByRole("button", { name: "Ask", exact: true }).click();
+
+  await expect(page.getByText("Counts orders per region.")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("first query failed, so it tried once more")).toBeVisible();
+  await expect(page.getByText("4 requests left today")).toBeVisible();
+
+  const body = JSON.parse(repairBody) as { error: string; sql: string };
+  expect(body.error).toContain("Could not convert");
+  for (const value of ["North", "South", "East", "West"]) expect(body.error).not.toContain(value);
+});
+
+test("when the repair fails too, the person sees the usual message", async ({ page }) => {
+  await signUp(page);
+  await upload(page);
+  await page.route("**/api/ai/ask", (route) =>
+    route.fulfill({ json: { sql: 'SELECT CAST("region" AS INTEGER) AS n FROM data', explanation: "Wrong.", remaining: 5 } }),
+  );
+  await page.route("**/api/ai/repair", (route) => route.fulfill({ status: 502, json: { error: "no" } }));
+  await page.getByLabel("Question about your data").fill("How many orders per region?");
+  await page.getByRole("button", { name: "Ask", exact: true }).click();
+  await expect(page.locator('[data-slot="alert"]')).toContainText("did not work on your data");
+});
+
 test("a histogram and a heatmap that Pilot names by column are drawn and described", async ({ page }) => {
   await signUp(page);
   await upload(page);

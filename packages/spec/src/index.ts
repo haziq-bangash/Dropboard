@@ -69,7 +69,16 @@ export const AskInput = z.object({
   question: z.string().trim().min(3).max(500),
 });
 
+// A question's query failed in the browser. The error text has already had quoted values removed (see scrubDbError).
+export const RepairInput = z.object({
+  table: AiTable,
+  question: z.string().trim().min(3).max(500),
+  sql: z.string().trim().min(1).max(4000),
+  error: z.string().trim().min(1).max(400),
+});
+
 export type AiTable = z.infer<typeof AiTable>;
+export type RepairInput = z.infer<typeof RepairInput>;
 export type GenerateInput = z.infer<typeof GenerateInput>;
 export type AskInput = z.infer<typeof AskInput>;
 

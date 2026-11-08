@@ -1,4 +1,4 @@
-import { bindQuery, guardSql, mapDuckDbType, type TableProfile } from "@dropboard/engine";
+import { bindQuery, guardSql, mapDuckDbType, scrubDbError, type TableProfile } from "@dropboard/engine";
 import type { AiTable, DashboardSpec } from "@dropboard/spec";
 import { ASSISTANT } from "./brand";
 import { runQuery } from "./duckdb";
@@ -94,11 +94,31 @@ export async function askQuestion(table: AiTable, question: string) {
   const res = await post<{ sql: string; explanation: string; remaining: number }>("/api/ai/ask", { table, question });
   const guarded = guardSql(res.sql);
   if (!guarded.ok) throw new AiError(`${ASSISTANT} returned an unsafe query and it was not run.`, 502);
-  let rows: Rows;
   try {
-    rows = await runQuery(guarded.sql);
-  } catch {
-    throw new AiError(`${ASSISTANT}'s query did not work on your data. Try rephrasing.`, 502);
+    const rows = await runQuery(guarded.sql);
+    return { sql: res.sql, explanation: res.explanation, rows: rows.slice(0, 100), remaining: res.remaining, repaired: false };
+  } catch (first) {
+    // One retry: the database error goes back to the model with every quoted value removed. Rows are never sent.
+    const failed = new AiError(`${ASSISTANT}'s query did not work on your data. Try rephrasing.`, 502);
+    if (res.remaining <= 0) throw failed;
+    let fixed: { sql: string; explanation: string; remaining: number };
+    try {
+      fixed = await post<typeof fixed>("/api/ai/repair", {
+        table,
+        question,
+        sql: res.sql,
+        error: scrubDbError(first instanceof Error ? first.message : String(first), table.columns.map((c) => c.name)) || "The query failed.",
+      });
+    } catch {
+      throw failed;
+    }
+    const again = guardSql(fixed.sql);
+    if (!again.ok) throw failed;
+    try {
+      const rows = await runQuery(again.sql);
+      return { sql: fixed.sql, explanation: fixed.explanation, rows: rows.slice(0, 100), remaining: fixed.remaining, repaired: true };
+    } catch {
+      throw failed;
+    }
   }
-  return { sql: res.sql, explanation: res.explanation, rows: rows.slice(0, 100), remaining: res.remaining };
 }
