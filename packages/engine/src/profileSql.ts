@@ -1,5 +1,6 @@
 import { mapDuckDbType, q, type ColumnProfile, type TableProfile } from "./profile";
 import type { RunSql } from "./summarize";
+import { findCustomers } from "./cohort";
 import { detectPeriodKind } from "./periods";
 import { isYearColumn, looksLikeId, timeColumn, timeExpression } from "./understand";
 
@@ -65,7 +66,10 @@ export async function buildProfile(run: RunSql): Promise<TableProfile> {
 
   const profile: TableProfile = { rowCount, columns };
   const panel = await findPanel(profile, run);
-  return panel ? { ...profile, panel } : profile;
+  const withPanel = panel ? { ...profile, panel } : profile;
+  // people who come back over months: only where the rows are not already one per entity per period
+  const customers = panel ? undefined : findCustomers(withPanel);
+  return customers ? { ...withPanel, customers } : withPanel;
 }
 
 /**

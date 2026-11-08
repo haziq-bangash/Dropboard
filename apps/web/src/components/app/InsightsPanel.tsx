@@ -16,6 +16,8 @@ import {
   PieChart,
   Repeat,
   Layers,
+  AudioWaveform,
+  MessageSquareText,
   ShieldAlert,
   TrendingDown,
   TrendingUp,
@@ -50,6 +52,10 @@ export const KIND: Record<FindingKind, { label: string; icon: LucideIcon }> = {
   contextual: { label: "Out of pattern", icon: Activity },
   quality: { label: "Data quality", icon: ShieldAlert },
   pareto: { label: "Concentration", icon: Layers },
+  shape: { label: "Unusual shape", icon: AudioWaveform },
+  text: { label: "Free text", icon: MessageSquareText },
+  retention: { label: "Who comes back", icon: Repeat },
+  cohorttrend: { label: "Staying power", icon: Repeat },
 };
 
 /** The numbers behind a finding, in plain words, so a claim can be traced. */
@@ -86,6 +92,14 @@ function evidenceLines(f: Finding): string[] {
     lines.push(`Ranked #${e.from} at the start and #${e.to} at the end, out of ${e.groups}`);
   if (f.kind === "pareto")
     lines.push(`The top 20% hold ${(Number(e.share20) * 100).toFixed(0)}% of the total, the top 10% hold ${(Number(e.share10) * 100).toFixed(0)}%, across ${e.groups} values; an even spread would give the top 20% a fifth`);
+  if (f.kind === "shape")
+    lines.push(`Every ${e.length}-point stretch was compared with the stretch most like it elsewhere; this one's best match was only ${Math.round(Number(e.similarity) * 100)}% alike, ${e.spreadsAway} times the usual spread beyond how well other stretches match`);
+  if (f.kind === "text")
+    lines.push(`Counted from ${e.filled} values, in your browser: lengths, and the words that are in many rows. The words are never sent anywhere`);
+  if (f.kind === "retention")
+    lines.push(`${e.returned} of ${e.people} people with at least three months since their first were active in a later month; a count of people, not a test`);
+  if (f.kind === "cohorttrend")
+    lines.push(`Compared ${e.earlierPeople} people in older groups with ${e.laterPeople} in newer ones, and checked so that only about 5% of what is listed could be chance`);
   if (f.kind === "quality")
     lines.push("A check on the values in the file, not a statistical test, so there is no chance of it being a fluke");
   if (f.kind === "unusualrows")

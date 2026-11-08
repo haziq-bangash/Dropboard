@@ -1,0 +1,52 @@
+name: Browsers
+
+# The parts of the suite that depend on the browser (reading spreadsheets as a stream, the database in the page, charts, a small
+# screen), in Firefox, WebKit (Safari's engine) and a phone-sized Chromium. It takes several minutes and downloads three browsers,
+# so it runs weekly and on request, not on every pull request. It keeps no cache, so it leaves the repository's cache alone.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  browsers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: dropboard
+          POSTGRES_PASSWORD: dropboard
+          POSTGRES_DB: dropboard
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dropboard"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://dropboard:dropboard@localhost:5432/dropboard
+      CROSS_BROWSER: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @dropboard/api exec prisma migrate deploy
+      - run: pnpm --filter @dropboard/api build
+      - run: pnpm --filter @dropboard/web build
+      - run: pnpm exec playwright install --with-deps firefox webkit chromium
+      - run: pnpm exec playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: test-results

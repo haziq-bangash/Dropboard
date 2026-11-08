@@ -105,7 +105,7 @@ describe.each(DATASETS)("corpus: $title ($rows rows)", (dataset) => {
     if (!dataset.insights) {
       // tables of entities over periods have their own standouts; every other ordinary table has no concentration to report
       if (dataset.panel) return;
-      expect(findings.filter((f) => f.kind === "pareto" || f.kind === "standout").map((f) => f.sentence), "nothing to report where nothing was planted").toEqual([]);
+      expect(findings.filter((f) => f.kind === "pareto" || f.kind === "standout" || f.kind === "cohorttrend").map((f) => f.sentence), "nothing to report where nothing was planted").toEqual([]);
       return;
     }
     for (const want of dataset.insights) {
@@ -125,7 +125,7 @@ describe.each(DATASETS)("corpus: $title ($rows rows)", (dataset) => {
 
   it("finds the anomalies planted in it, and none in a table that has none", async () => {
     const { findings } = await result;
-    const anomalous = findings.filter((f) => f.kind === "unusualrows" || f.kind === "contextual");
+    const anomalous = findings.filter((f) => f.kind === "unusualrows" || f.kind === "contextual" || f.kind === "shape");
     if (!dataset.anomalies) {
       expect(anomalous.map((f) => f.sentence), "no anomaly where none was planted").toEqual([]);
       return;

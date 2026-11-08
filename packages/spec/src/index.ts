@@ -4,7 +4,7 @@ export const ColumnType = z.enum(["number", "string", "date", "boolean"]);
 
 export const ChartSpec = z.object({
   id: z.string(),
-  type: z.enum(["bar", "line", "area", "pie", "scatter", "map", "regions", "histogram", "heatmap", "boxplot", "calendar", "treemap", "funnel", "sankey", "cities", "table", "kpi"]),
+  type: z.enum(["bar", "line", "area", "pie", "scatter", "map", "regions", "histogram", "heatmap", "boxplot", "calendar", "treemap", "funnel", "sankey", "cities", "flows", "table", "kpi"]),
   title: z.string().max(120),
   // SQL run client-side in DuckDB-WASM against table "data"
   query: z.string().max(4000),
@@ -85,7 +85,7 @@ export const NarrateInput = z.object({
     .array(
       z.object({
         id: z.string().min(1).max(8),
-        kind: z.enum(["trend", "change", "outlier", "correlation", "dominance", "concentration", "missing", "seasonal", "latest", "duplicates", "leader", "standout", "entitytrend", "jump", "rankshift", "unusualrows", "contextual", "quality", "pareto"]),
+        kind: z.enum(["trend", "change", "outlier", "correlation", "dominance", "concentration", "missing", "seasonal", "latest", "duplicates", "leader", "standout", "entitytrend", "jump", "rankshift", "unusualrows", "contextual", "quality", "pareto", "retention", "cohorttrend", "text", "shape"]),
         columns: z.array(z.string().max(200)).max(2),
         facts: z.record(z.string().max(40), z.number().finite()),
         tokens: z.array(z.enum(["{label}", "{at}", "{worstValue}", "{peak}", "{low}"])).max(5),

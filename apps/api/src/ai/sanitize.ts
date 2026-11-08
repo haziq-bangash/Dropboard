@@ -1,4 +1,4 @@
-import { guardSql, boxplotChart, calendarChart, citiesChart, funnelChart, heatmapChart, histogramChart, mapChart, regionsChart, sankeyChart, treemapChart, tidySql, type ColumnProfile } from "@dropboard/engine";
+import { guardSql, flowMapChart, templateChart, TEMPLATE_TYPES, type TemplateType, boxplotChart, calendarChart, citiesChart, funnelChart, heatmapChart, histogramChart, mapChart, regionsChart, sankeyChart, treemapChart, tidySql, type ColumnProfile } from "@dropboard/engine";
 import { DashboardSpec, type AiTable } from "@dropboard/spec";
 import { AiBadOutput, SPECIAL_CHARTS, type AiChartInput, type AiDashboardInput } from "./schema";
 
@@ -76,6 +76,15 @@ function fromColumns(table: AiTable, c: AiChartInput): Built | string {
       if (names[1] !== undefined && !isType(names[1], "number")) return `${names[1]} is not a number column`;
       return citiesChart(names[0], names[1] ? profile(names[1]) : undefined);
     }
+    case "flows": {
+      const e = need(2);
+      if (e) return e;
+      if (!isType(names[0], "string") || !isType(names[1], "string")) return "a flow map needs two text columns of cities";
+      if (names[0] === names[1]) return "a flow map needs two different columns";
+      if ((find(names[0])?.distinct ?? 0) > MAX_CITY_VALUES || (find(names[1])?.distinct ?? 0) > MAX_CITY_VALUES) return "a flow map needs columns with fewer different values";
+      if (names[2] !== undefined && !isType(names[2], "number")) return `${names[2]} is not a number column`;
+      return flowMapChart(names[0], names[1], names[2] ? profile(names[2]) : undefined);
+    }
     case "treemap": {
       const e = need(1);
       if (e) return e;
@@ -146,6 +155,16 @@ export function buildSpec(table: AiTable, output: AiDashboardInput): { spec: Das
         title: c.title.trim().slice(0, 120) || built.title,
         layout: { x: 0, y: 0, w: 1, h: 1 },
       });
+      continue;
+    }
+    // a headline number, bars, a pie, a line or an area named by columns instead of written as SQL: built from a template
+    if (!c.query.trim() && c.columns?.length && (TEMPLATE_TYPES as readonly string[]).includes(c.type)) {
+      const built = templateChart(c.type as TemplateType, c.columns, table.columns, c.title.trim().slice(0, 120));
+      if (typeof built === "string") {
+        dropped.push({ title: c.title, reason: built });
+        continue;
+      }
+      charts.push({ id: `c${charts.length + 1}`, ...built, layout: { x: 0, y: 0, w: 1, h: 1 } });
       continue;
     }
     const guarded = guardSql(c.query);

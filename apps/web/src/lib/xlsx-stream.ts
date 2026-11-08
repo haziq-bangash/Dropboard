@@ -310,35 +310,39 @@ export async function xlsxToCsv(file: Blob, onProgress?: (fraction: number) => v
         buffer = buffer.slice(open + 1);
         inData = true;
       }
+      // Walk along the text with a position, and look for the end of the data once per piece: cutting the buffer after every row, or
+      // searching all of it for the end each time, cost a lot more than reading the row (and far more still in Safari's engine).
+      let pos = 0;
+      const endOfData = buffer.indexOf("</sheetData>");
       for (;;) {
-        const start = buffer.indexOf("<row");
+        const start = buffer.indexOf("<row", pos);
         // after the data come things like <rowBreaks>, which are not rows
-        const endOfData = buffer.indexOf("</sheetData>");
         if (endOfData >= 0 && (start < 0 || start > endOfData)) {
           finished = true;
           break;
         }
         if (start < 0) {
-          buffer = buffer.slice(Math.max(0, buffer.length - 4));
+          pos = Math.max(pos, buffer.length - 4);
           break;
         }
         const open = buffer.indexOf(">", start);
         if (open < 0) {
-          buffer = buffer.slice(start);
+          pos = start;
           break;
         }
         if (buffer[open - 1] === "/") {
-          buffer = buffer.slice(open + 1);
+          pos = open + 1;
           continue;
         }
         const close = buffer.indexOf("</row>", open);
         if (close < 0) {
-          buffer = buffer.slice(start);
+          pos = start;
           break;
         }
         row(buffer.slice(open + 1, close));
-        buffer = buffer.slice(close + 6);
+        pos = close + 6;
       }
+      buffer = buffer.slice(pos);
       if (finished) break;
       // give the page a turn now and then, so it stays responsive and can show progress
       if (Date.now() - lastYield > 60) {

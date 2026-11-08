@@ -81,3 +81,9 @@ Same 51 questions, 2 tries each, run side by side on 8 Nov 2026. `gpt-6-luna`: 1
 ## Treemap, funnel and flow diagram (Nov 2026)
 
 Pilot can also choose these three by naming columns, built by the same code as an Add a chart menu on the dashboard. One live check on 8 Nov 2026 with `gpt-6-luna`, three tries, on the store sample with an instruction asking for a treemap of revenue by region and category, a funnel of the channels and a flow diagram from region to channel: all three tries returned those three charts plus two headline numbers, nothing was dropped, and every chart's query ran. A smoke test, not a measurement.
+
+## Templates for the common chart shapes (Nov 2026)
+
+For a headline number, bars, a pie, a line or an area, Pilot now names columns and an aggregation (sum, avg, count, min, max, median, distinct, and a step of day to year for time) and the engine builds the query from a template, after checking every name against the table. SQL is still written, and still guarded, for what a template cannot say: a filter, a ratio of two columns, a window. The prompt version went from 7 to 8, so older cached dashboards are not reused.
+
+One live check on 8 Nov 2026 with `gpt-6-luna`, two tries each on five sample tables (ten dashboards): all 67 charts of these five kinds were returned in the column form, none was dropped, and all 72 charts in the dashboards ran and returned rows. A smoke test, not a measurement. It also shows the model does not reach for SQL at all on these shapes when it does not have to, so a dashboard from Pilot is plainer than one with hand-written ratios; the Ask box still writes SQL for any question.

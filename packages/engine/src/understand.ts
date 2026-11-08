@@ -1,4 +1,5 @@
 import { isDatedPeriod, periodDateSql } from "./periods";
+import { ZIP_NAME } from "./places";
 import { q, type ColumnProfile, type TableProfile } from "./profile";
 
 /**
@@ -47,6 +48,8 @@ export function isYearColumn(c: ColumnProfile, rows: number): boolean {
 /** Does this column look like an identifier: a name that says so, or a value for nearly every row. */
 export function looksLikeId(c: ColumnProfile, rows: number): boolean {
   const n = words(c.name);
+  // a postal code is a label, whatever it is stored as: adding up ZIP codes means nothing
+  if (c.type === "number" && ZIP_NAME.test(c.name)) return true;
   if (c.type === "number" && c.integer !== false && rows > 20 && c.distinct >= rows * 0.98 && c.min !== undefined && c.max !== undefined && c.max - c.min + 1 <= c.distinct * 1.05) return true;
   if (ID_NAME.test(n) && (rows <= 20 || c.distinct >= Math.min(rows * 0.5, 50))) return true;
   return c.type !== "number" && rows > 20 && c.distinct >= rows * 0.9;

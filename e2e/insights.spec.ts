@@ -82,7 +82,9 @@ test("data with nothing in it gets an honest 'nothing stands out', not an invent
   await expect(page.getByTestId("finding")).toHaveCount(0);
 });
 
-test("switching back and forth keeps both tabs working, and the findings survive a reload from the saved copy", async ({ page }) => {
+test("switching back and forth keeps both tabs working, and the findings survive a reload from the saved copy", async ({ page, browserName }) => {
+  // Playwright's WebKit has no private storage (OPFS), as in a private window: the app then asks for the file again, which is its fallback
+  test.skip(browserName === "webkit", "a saved copy needs the browser's private storage");
   await signUp(page);
   await openSample(page, "Support tickets");
   await openInsights(page);

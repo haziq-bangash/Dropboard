@@ -1,4 +1,7 @@
+import { shapeDiscord } from "./anomaly/discord";
 import { seriesAnomalies } from "./anomaly/series";
+import { cohortFindings, type CohortInput } from "./cohort";
+import { textFindings, type TextInput } from "./text";
 import { clamp01, fmt, observedChange, pct, pctFine } from "./format";
 import { qualityFindings, type QualityInput } from "./quality";
 import { groupFindings, panelChecks, panelTrendCandidates, strongestTrends } from "./panelInsights";
@@ -15,7 +18,7 @@ import { benjaminiHochberg, changePoint, dominance, mannKendall, mean, median, o
  *   3. Findings come back ranked, with a plain sentence and the numbers behind it.
  */
 
-export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "concentration" | "missing" | "seasonal" | "latest" | "duplicates" | "leader" | "standout" | "entitytrend" | "jump" | "rankshift" | "unusualrows" | "contextual" | "quality" | "pareto";
+export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "concentration" | "missing" | "seasonal" | "latest" | "duplicates" | "leader" | "standout" | "entitytrend" | "jump" | "rankshift" | "unusualrows" | "contextual" | "quality" | "pareto" | "retention" | "cohorttrend" | "text" | "shape";
 
 /** The rows or points behind a finding, for a person to look at. They stay in the browser: nothing here is ever sent to a model. */
 export interface FindingDetails {
@@ -95,6 +98,10 @@ export interface InsightInput {
   groups?: { column: string; measure: string; values: { label: string; value: number }[] }[];
   /** How much of a measure the biggest few values of a text column hold (customers, products): shares as fractions of the total. */
   pareto?: { column: string; measure: string; groups: number; top10: number; top20: number; biggest: number }[];
+  /** Who comes back: cohorts of people by the month they first appear, and how many of each are active again later. */
+  cohorts?: CohortInput;
+  /** Free-text columns: how long the answers are and which words come up in many rows. The words stay in the browser. */
+  text?: TextInput[];
   /** Checks on the values themselves: spellings, placeholders, numbers as text, impossible dates, empty periods, repeated keys. */
   quality?: QualityInput;
   /** How many rows are exact copies of an earlier row. */
@@ -217,6 +224,32 @@ function describe(f: RawFinding): Pick<Finding, "headline" | "figure" | "next"> 
         headline: `A few ${a} values drive most of ${b}`,
         figure: { value: pct(Number(e.share20)), label: `of ${b} from the top 20%` },
         next: `Ask whether depending on so few ${a} values is a risk, and what it would take to grow the rest.`,
+      };
+    case "retention":
+      return {
+        headline: `${pct(Number(e.share))} of ${a} values came back`,
+        figure: { value: pct(Number(e.share)), label: "active again in a later month" },
+        next: "Look at what the ones who stayed have in common (a first product, a channel, a price), and what could bring back the rest.",
+      };
+    case "cohorttrend": {
+      const change = Number(e.change);
+      return {
+        headline: `Newer ${a} values ${change > 0 ? "stay better" : "stay less"}`,
+        figure: { value: `${change >= 0 ? "+" : "-"}${Math.round(Math.abs(change) * 100)} points`, label: "next-month return, newer against older" },
+        next: "Find out what changed for the newer group: how they were found, what they first bought, or what the service was like in their first month.",
+      };
+    }
+    case "shape":
+      return {
+        headline: `${a} broke its usual shape`,
+        figure: { value: `${e.length} points`, label: "that match no other stretch" },
+        next: "Check whether something changed during that stretch (a closure, a campaign, a change in how it was recorded) before reading the rest of the series as a pattern.",
+      };
+    case "text":
+      return {
+        headline: `${a} is free text`,
+        figure: { value: `${fmt(Number(e.median))} characters`, label: "in a typical answer" },
+        next: e.label ? "Read a sample of the rows that mention the most common words, and group them by hand into the few themes people raise." : "Read a sample of the rows: with no word in common across many of them, the themes may be spread thin.",
       };
     case "unusualrows":
       return {
@@ -404,6 +437,10 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
     });
   }
 
+  // who comes back: the plain rate is a fact, and newer cohorts staying better or worse is one more test in the same correction
+  const cohort = cohortFindings(input.cohorts);
+  if (cohort.trend) candidates.push({ ...cohort.trend.finding, tested: true, passesFloor: cohort.trend.passesFloor });
+
   // each entity's own series is one more test in the same correction
   for (const c of panelTrendCandidates(input.panel ?? [])) candidates.push({ ...c.finding, tested: true, passesFloor: c.passesFloor });
 
@@ -534,6 +571,8 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
     found = found.filter((x) => x.kind !== "outlier");
   }
 
+  found.push(...cohort.facts);
+  found.push(...textFindings(input.text));
   found.push(...qualityFindings(input.quality, input.rowCount));
   found.push(...groupFindings(input));
 
@@ -544,6 +583,22 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
     const period = s.unit === "month" ? 12 : s.unit === "day" ? 7 : 0;
     for (const a of seriesAnomalies(s.y, phases && period ? { season: { phases, period } } : {}).slice(0, 2)) {
       contextual.push(contextualFinding(s.column, null, s.labels?.[a.index] ?? `point ${a.index + 1}`, a, !!phases));
+    }
+    // a stretch with a shape of its own that no single point gives away (a summer without its peak), only where no point was out of pattern
+    if (!contextual.some((c) => c.columns[0] === s.column && !c.evidence.label)) {
+      const d = shapeDiscord(s.y, period ? { length: period } : {});
+      if (d) {
+        const from = s.labels?.[d.index] ?? `point ${d.index + 1}`;
+        const to = s.labels?.[d.index + d.length - 1] ?? `point ${d.index + d.length}`;
+        contextual.push({
+          kind: "shape",
+          columns: [s.column],
+          sentence: `${s.column} has a stretch with a shape unlike any other, ${from} to ${to}: it does not follow the pattern the rest of the series repeats, even though its values are not out of range.`,
+          p: null,
+          strength: 0.5 + clamp01((d.z - 7) / 40) * 0.25,
+          evidence: { at: `${from} to ${to}`, length: d.length, similarity: Number(Math.max(0, d.similarity).toFixed(2)), spreadsAway: Number(d.z.toFixed(1)) },
+        });
+      }
     }
   }
   for (const p of input.panel ?? []) {

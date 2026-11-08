@@ -14,6 +14,9 @@ import { MintThread, StoryCollage } from "@/components/art/StoryArt";
 import { EmptyTile } from "@/components/marketing/bento";
 import { KIND } from "@/components/app/InsightsPanel";
 import { Skeleton } from "@/components/ui/skeleton";
+import { imageName } from "@/lib/image-name";
+import { renderStoryImage, type StoryImage } from "@/lib/story-image";
+import { Download } from "lucide-react";
 import { useInsights } from "@/lib/insights";
 
 /**
@@ -31,6 +34,22 @@ export function StoryPanel({
   const insights = useInsights(profile, dataKey);
   const { data: session } = authClient.useSession();
   const narrate = useMutation({ mutationFn: narrateStory });
+  // the story as one picture, drawn here from the text on the page and saved to the device
+  const save = useMutation({
+    mutationFn: async (story: StoryImage) => {
+      const headline = document.querySelector('[data-testid="story-headline"]');
+      const serif = headline ? getComputedStyle(headline).fontFamily : "serif";
+      const blob = await renderStoryImage(story, { serif, sans: getComputedStyle(document.body).fontFamily });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = imageName(`story ${story.headline}`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      // the browser reads the file after the click, so the address is kept for a while before it is let go
+      setTimeout(() => URL.revokeObjectURL(link.href), 30_000);
+    },
+  });
 
   if (insights.isPending) {
     return (
@@ -108,6 +127,27 @@ export function StoryPanel({
               </li>
             ))}
           </ul>
+          <Button
+            variant="outline"
+            className="mt-5 rounded-full"
+            data-testid="story-save"
+            disabled={save.isPending}
+            onClick={() =>
+              save.mutate({
+                headline: lead.headline,
+                italicFrom,
+                subline: `${profile.rowCount.toLocaleString()} rows and ${profile.columns.length} columns, read in your browser.`,
+                tags: kinds,
+                figures: figures.map((f) => ({ value: f.figure.value, label: f.figure.label, headline: f.headline })),
+                lead: lead.sentence,
+                chapters: chapters.map((f) => ({ headline: f.headline, sentence: f.sentence })),
+                footer: "Made with Dropboard. It describes patterns in this data; it does not explain them.",
+              })
+            }
+          >
+            <Download className="size-4" aria-hidden="true" /> {save.isPending ? "Drawing…" : "Save as image"}
+          </Button>
+          {save.error && <p role="alert" className="mt-2 text-sm text-destructive">The picture could not be saved. Try again.</p>}
         </div>
         <StoryCollage />
       </header>

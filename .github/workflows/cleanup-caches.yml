@@ -1,0 +1,26 @@
+name: Clean up caches
+
+# Each pull request saves its own copy of the build, browser and Next caches, and none of them can be used again once it is closed.
+# Left alone they fill the repository's cache allowance and push out the caches of main that every build reads.
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete this pull request's caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: refs/pull/${{ github.event.pull_request.number }}/merge
+        run: |
+          ids=$(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$REF" --limit 100 --json id --jq '.[].id')
+          for id in $ids; do
+            gh cache delete "$id" --repo "$GITHUB_REPOSITORY" || true
+          done
+          echo "cleaned the caches of $REF"

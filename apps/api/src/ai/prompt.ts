@@ -1,7 +1,7 @@
 import type { AiTable, GenerateInput, NarrateInput } from "@dropboard/spec";
 
 /** Bump when SYSTEM changes, so cached dashboards from older prompts are not reused. */
-export const PROMPT_VERSION = 7;
+export const PROMPT_VERSION = 9;
 
 export const SYSTEM = `You design dashboards for tabular data. You will be given only the SCHEMA of a table (column names, types, null counts and approximate distinct counts). You never see any row values, so never guess or quote values.
 
@@ -16,7 +16,12 @@ Rules for queries:
   - bar, pie: columns aliased x (category) and y (number). Order by y descending and LIMIT 20.
   - line, area: columns aliased x (a date or ordered value) and y (number), ordered by x. For dates use date_trunc('month', "col") or another grain that suits the span.
   - scatter: columns aliased x and y, both numbers, with LIMIT 1000.
-- Eleven more chart types are not written as SQL. For these, set query to an empty string and list column names in columns, using exact names from the schema:
+- Prefer the column form for the common shapes. For kpi, bar, pie, line and area, leave query empty and list columns instead, and the query is built for you from the column names, so it cannot be wrong:
+  - kpi: columns = [a number column] and optionally an aggregation word after it: sum, avg, count, min, max, median or distinct. Without one, a number column is summed.
+  - bar, pie: columns = [a text column to group by] and optionally [a number column to measure] and an aggregation word. With no number column it counts rows.
+  - line, area: columns = [a date column] and optionally [a number column], an aggregation word and a step word: day, week, month, quarter or year (month when none). With no number column it counts rows.
+  Write SQL only for what these cannot say: a filter, a ratio of two columns, a window, a calculation.
+- Twelve more chart types are not written as SQL. For these, set query to an empty string and list column names in columns, using exact names from the schema:
   - histogram: columns = [a number column]. Shows how its values are spread out.
   - heatmap: columns = [text column, text column] and optionally a number column third. Both text columns need few distinct values (25 at most). Shows each pair shaded by the number, or by row count.
   - boxplot: columns = [text column, number column]. The text column needs few distinct values (25 at most). Shows how the number varies within each group.
@@ -25,6 +30,7 @@ Rules for queries:
   - map: columns = [latitude, longitude], both number columns. Only when the schema has a latitude and a longitude.
   - regions: columns = [a text column of countries] and optionally a number column second. Only when a column clearly holds country names or codes. Shades a world map.
   - cities: columns = [a text column of city names] and optionally a number column second. Only when a column clearly holds city names. Draws a bubble on a world map for each known city.
+  - flows: columns = [a text column of origin cities, a text column of destination cities] and optionally a number column third. Only when both columns clearly hold city names. Draws a line between each pair of cities on a world map, thicker for bigger routes.
   - treemap: columns = [a text column] and optionally a second text column to split each tile (both with 40 distinct values at most), and optionally a number column last. Shows how a total divides up.
   - funnel: columns = [a text column of stages with 12 distinct values at most] and optionally a number column. Shows stages from the largest to the smallest.
   - sankey: columns = [a text column, a text column] and optionally a number column third. Both text columns need few distinct values (25 at most). Shows how things move from the values of the first column to the values of the second.
@@ -68,6 +74,10 @@ Rules:
 - unusualrows: flagged rows out of scored, share as a fraction, strongestZ how far out the most unusual one is in robust spreads. Never say anything about what is in the rows.
 - contextual: change is how far a point was from what its trend and season predict, as a fraction (0 when not meaningful), actual and expected are the two values, spreadsAway how unusual. {at} is the period; {label} the entity when there is one.
 - pareto: share20 and share10 are the fractions of a total held by the top 20% and top 10% of values, groups how many values there are, biggestShare the largest single value's fraction.
+- retention: share is the fraction of people (of people counted) who were active in a later month after their first, nextMonth the fraction who came back the very next month, cohorts how many monthly groups were followed.
+- cohorttrend: earlier and later are the fractions of older and newer groups who came back the next month, change their difference as a fraction; earlierPeople and laterPeople are the sizes. {at} stands for the span of newer groups.
+- shape: one stretch of a series whose pattern is unlike every other stretch though its values are not out of range. length is how many points it spans, similarity how well its closest match fits (1 is the same shape), spreadsAway how unusual that is. {at} stands for the stretch.
+- text: a column of free text. median and p90 are lengths in characters, topShare the fraction of rows containing the most common word, repeated the fraction of values that duplicate another row. {label} stands for that most common word. Never guess what the text says.
 - quality: a problem in the data itself. count and share say how much of it; label stands for an example value. Describe the problem and what to fix, not what the values mean.
 - duplicates: duplicateRows is how many rows are copies, share is that as a fraction of all rows.
 - Plain, specific wording. No hype.`;

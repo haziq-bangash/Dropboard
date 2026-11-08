@@ -1,5 +1,5 @@
 import type { ChartSpec } from "@dropboard/spec";
-import { countryCode, usStateCode } from "./places";
+import { countryCode, usRegionCode, usStateName } from "./places";
 
 /**
  * A plain sentence or two describing what a chart shows, for people who cannot see it (a screen reader reads it in place
@@ -23,6 +23,7 @@ const KIND: Record<ChartSpec["type"], string> = {
   funnel: "Funnel",
   sankey: "Flow diagram",
   cities: "City map",
+  flows: "Flow map",
   kpi: "Headline number",
   table: "Table",
 };
@@ -98,6 +99,20 @@ export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y" 
     const top = bins.reduce((m, b) => (b.n > m.n ? b : m));
     const end = (b: { from: number; width: number }) => (Number.isFinite(b.width) ? b.from + b.width : b.from);
     return `${head} ${bins.length} bins from ${said(bins[0].from)} to ${said(end(bins[bins.length - 1]))}. The most rows, ${said(top.n)} of ${said(total)}, fall between ${said(top.from)} and ${said(end(top))}.`;
+  }
+
+  if (spec.type === "flows") {
+    const routes = rows.map((r) => ({ from: r[spec.x ?? "x"], to: r.target, v: Number(r[spec.y?.[0] ?? "y"]) })).filter((r) => Number.isFinite(r.v));
+    if (!routes.length) return `${head} No data.`;
+    const drawn = known ? routes.filter((r) => known(r.from) && known(r.to)) : routes;
+    if (!drawn.length) return `${head} No pair of values is two cities in the list, so nothing is drawn.`;
+    const left = routes.length - drawn.length;
+    const places = new Set(drawn.flatMap((r) => [name(r.from), name(r.to)]));
+    const top = [...drawn].sort((a, b) => b.v - a.v);
+    const shown = top.slice(0, 4).map((r) => `${name(r.from)} to ${name(r.to)} ${said(r.v)}`);
+    const more = top.length - shown.length;
+    const unmatched = left > 0 ? ` ${left} other route${left === 1 ? " has" : "s have"} a place that is not a known city and ${left === 1 ? "is" : "are"} not shown.` : "";
+    return `${head} ${top.length} route${top.length === 1 ? "" : "s"} between ${places.size} cities, biggest first: ${list(shown)}${more > 0 ? `, and ${more} more` : ""}.${unmatched}`;
   }
 
   if (spec.type === "cities") {
@@ -184,9 +199,23 @@ export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y" 
     case "regions": {
       // only values that match a country or state are shaded, so only those are counted as shaded
       const us = spec.map === "us";
-      const matches = us ? usStateCode : countryCode;
-      const top = points.filter((p) => matches(p.x) !== null).sort((a, b) => b.y - a.y);
-      const left = points.length - top.length;
+      const matches = us ? usRegionCode : countryCode;
+      // several ZIP prefixes in one state are one shaded state
+      const folded = new Map<string, { y: number; label: unknown; biggest: number }>();
+      let unmatchedCount = 0;
+      for (const p of points) {
+        const code = matches(p.x);
+        if (code === null) {
+          unmatchedCount++;
+          continue;
+        }
+        const seen = folded.get(code);
+        // named as the file wrote it, except a ZIP prefix, which is named by its state
+        const label = us && /^[0-9]/.test(String(p.x).trim()) ? (usStateName(code) ?? code) : p.x;
+        folded.set(code, { y: (seen?.y ?? 0) + p.y, label: seen && seen.biggest >= p.y ? seen.label : label, biggest: Math.max(seen?.biggest ?? -Infinity, p.y) });
+      }
+      const top = [...folded.values()].map((v) => ({ x: v.label, y: v.y })).sort((a, b) => b.y - a.y);
+      const left = unmatchedCount;
       const unmatched = left > 0 ? ` ${left} other value${left === 1 ? " does" : "s do"} not match a ${us ? "state" : "country"} and ${left === 1 ? "is" : "are"} not shown.` : "";
       if (top.length === 0) return `${head} No value matches a ${us ? "state" : "country"}, so nothing is shaded.`;
       const shown = top.slice(0, 5).map((p) => `${name(p.x)} ${said(p.y)}`);

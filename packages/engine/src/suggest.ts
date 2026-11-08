@@ -1,9 +1,35 @@
 import type { ChartSpec, DashboardSpec } from "@dropboard/spec";
 import { q, type ColumnProfile, type TableProfile } from "./profile";
 import { periodOrderSql } from "./periods";
+import { freeTextColumns, wordsChartQuery } from "./text";
 import { aggregateFor, looksLikeId, measureKind, timeColumn, timeExpression, valueKind } from "./understand";
 
 const MAX_CHARTS = 10;
+
+/** How much each kind of chart usually tells a reader, when nothing about the data says otherwise: the headline numbers, the story over time and the places first, the finer views of one measure last. */
+/** What each further chart of the same kind loses from its score. */
+const VARIETY = 12;
+
+const PRIORITY: Record<ChartSpec["type"], number> = {
+  kpi: 100,
+  line: 95,
+  area: 90,
+  regions: 86,
+  map: 86,
+  cities: 86,
+  flows: 84,
+  bar: 80,
+  treemap: 70,
+  funnel: 70,
+  sankey: 70,
+  scatter: 52,
+  histogram: 62,
+  boxplot: 60,
+  heatmap: 58,
+  calendar: 66,
+  pie: 45,
+  table: 0,
+};
 const HISTOGRAM_BINS = 20;
 const HEATMAP_MAX_SIDE = 12;
 const MAX_CATEGORIES = 20;
@@ -109,6 +135,28 @@ export function calendarChart(date: string): Omit<ChartSpec, "id" | "layout"> {
   };
 }
 
+/**
+ * People by the month they first appear (rows), and the share of each group active again 0, 1, 2... months later (columns).
+ * Month 0 is always 100%. Cells for months not over yet are left out, so a young group's row simply stops.
+ */
+export function cohortChart(person: string, when: string): Omit<ChartSpec, "id" | "layout"> {
+  const who = q(person);
+  return {
+    type: "heatmap",
+    title: `Share of ${person} values active again, by first month`,
+    query:
+      `WITH f AS (SELECT ${who} AS who, date_trunc('month', CAST(${when} AS DATE)) AS m FROM data WHERE ${who} IS NOT NULL AND ${when} IS NOT NULL GROUP BY 1, 2), ` +
+      `first AS (SELECT who, min(m) AS c FROM f GROUP BY 1), ` +
+      `last AS (SELECT max(m) AS l FROM f), ` +
+      `size AS (SELECT c, count(*) AS n FROM first GROUP BY 1), ` +
+      `active AS (SELECT first.c AS c, date_diff('month', first.c, f.m) AS k, count(*) AS n FROM f JOIN first USING (who) GROUP BY 1, 2) ` +
+      `SELECT strftime(active.c, '%Y-%m') AS x, 'Month ' || CAST(active.k AS VARCHAR) AS y, CAST(round(100.0 * active.n / size.n, 1) AS DOUBLE) AS value ` +
+      `FROM active JOIN size USING (c), last WHERE active.k <= 12 AND date_diff('month', active.c, last.l) >= active.k AND size.n >= 20 ORDER BY 1, 2`,
+    x: "x",
+    y: ["y"],
+  };
+}
+
 /** Two categories against each other, each cell shaded by a measure (or by how many rows fall in it). */
 export function heatmapChart(a: string, b: string, measure?: ColumnProfile): Omit<ChartSpec, "id" | "layout"> {
   const value = measure ? `${aggregate(measure)}(${q(measure.name)})` : "count(*)";
@@ -135,6 +183,22 @@ export function regionsChart(column: string, measure?: ColumnProfile, map: "worl
     x: "x",
     y: ["y"],
     ...(map === "us" ? { map } : {}),
+  };
+}
+
+/** ZIP codes on a map of the United States: grouped by their first three digits, each drawn in the state most of that prefix lies in. */
+export function zipRegionsChart(column: string, measure?: ColumnProfile): Omit<ChartSpec, "id" | "layout"> {
+  const col = q(column);
+  const value = measure ? `${aggregate(measure)}(${q(measure.name)})` : "count(*)";
+  // ZIP+4 loses its last four digits, and a number that lost its leading zeros gets them back
+  const prefix = `substr(lpad(regexp_replace(CAST(${col} AS VARCHAR), '-.*$', ''), 5, '0'), 1, 3)`;
+  return {
+    type: "regions",
+    title: measure ? `${label(measure)} by state, from ${column}` : `Rows by state, from ${column}`,
+    query: `SELECT ${prefix} AS x, ${value} AS y FROM data WHERE ${col} IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 1000`,
+    x: "x",
+    y: ["y"],
+    map: "us",
   };
 }
 
@@ -289,11 +353,29 @@ export function citiesChart(column: string, measure?: ColumnProfile): Omit<Chart
 }
 
 /**
+ * Lines between cities on a world map, one for each pair of an origin and a destination, as thick as a measure or as how many rows
+ * the pair has. The renderer looks both names up in the city list. x is where it starts, target where it ends, y the size and n the
+ * rows behind the pair, so a route with a few rows can be left out of a published copy.
+ */
+export function flowMapChart(from: string, to: string, measure?: ColumnProfile): Omit<ChartSpec, "id" | "layout"> {
+  const v = total(measure);
+  const a = q(from);
+  const b = q(to);
+  return {
+    type: "flows",
+    title: `${measure ? label(measure) : "Rows"} from ${from} to ${to}`,
+    query: `SELECT ${a} AS x, ${b} AS target, ${v} AS y, count(*) AS n FROM data WHERE ${a} IS NOT NULL AND ${b} IS NOT NULL AND ${a} <> ${b} GROUP BY 1, 2 HAVING ${v} > 0 ORDER BY 3 DESC LIMIT 150`,
+    x: "x",
+    y: ["y"],
+  };
+}
+
+/**
  * Drop the bins on a map, the groups in a box plot, the bands in a flow diagram and the cities that hold too few rows to publish: a
  * box or a band over one or two rows would show the values themselves. Other charts are returned as they are.
  */
 export function applyPrivacyFloor<T extends Record<string, unknown>>(chart: Pick<ChartSpec, "type">, rows: T[]): T[] {
-  return chart.type === "map" || chart.type === "boxplot" || chart.type === "sankey" || chart.type === "cities" ? rows.filter((r) => Number(r.n) >= MAP_MIN_ROWS) : rows;
+  return chart.type === "map" || chart.type === "boxplot" || chart.type === "sankey" || chart.type === "cities" || chart.type === "flows" ? rows.filter((r) => Number(r.n) >= MAP_MIN_ROWS) : rows;
 }
 
 export function suggestDashboard(title: string, profile: TableProfile): DashboardSpec {
@@ -312,11 +394,33 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
   const dates = columns.filter((c) => c.type === "date");
   const time = timeColumn(profile);
 
-  const charts: ChartSpec[] = [];
-  const add = (c: Omit<ChartSpec, "id" | "layout">) => {
-    // up to ten charts, and always one more place for the data preview, so a rich file never pushes it out
-    if (charts.length >= (c.type === "table" ? MAX_CHARTS + 1 : MAX_CHARTS)) return;
-    charts.push({ ...c, id: `c${charts.length + 1}`, layout: { x: 0, y: 0, w: 1, h: 1 } });
+  // Every chart that could be drawn is a candidate with a score for what it tells a reader, and the best ten are kept (always with the
+  // data preview as one more), shown in the order they were thought of. A rich file used to keep whichever came first.
+  const candidates: { chart: Omit<ChartSpec, "id" | "layout">; score: number }[] = [];
+  const add = (c: Omit<ChartSpec, "id" | "layout">, score: number = PRIORITY[c.type]) => {
+    candidates.push({ chart: c, score });
+  };
+  const charts = {
+    /** The chosen charts, numbered. */
+    pick(): ChartSpec[] {
+      const body = candidates.filter((x) => x.chart.type !== "table");
+      // a fourth bar chart says less than a first map: each further chart of a kind is worth a little less, so a rich file gets a variety
+      const seen = new Map<string, number>();
+      const worth = body.map((x) => {
+        const before = seen.get(x.chart.type) ?? 0;
+        seen.set(x.chart.type, before + 1);
+        return x.score - before * VARIETY;
+      });
+      const kept = new Set(
+        body
+          .map((x, i) => ({ x, i, worth: worth[i] }))
+          .sort((a, b) => b.worth - a.worth || a.i - b.i)
+          .slice(0, MAX_CHARTS)
+          .map(({ x }) => x),
+      );
+      const table = candidates.find((x) => x.chart.type === "table");
+      return [...body.filter((x) => kept.has(x)), ...(table ? [table] : [])].map((x, i) => ({ ...x.chart, id: `c${i + 1}`, layout: { x: 0, y: 0, w: 1, h: 1 } }));
+    },
   };
 
   // One row per entity per period (a company by year): each entity's own story, and who leads, in place of the totals of a plain table
@@ -362,7 +466,7 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
     }
     if (main.distinct > HISTOGRAM_BINS) add(histogramChart(main.name));
     add({ type: "table", title: "Data preview", query: "SELECT * FROM data LIMIT 100" });
-    return { version: 1, title, schema: columns.map((c) => ({ name: c.name, type: c.type })), charts };
+    return { version: 1, title, schema: columns.map((c) => ({ name: c.name, type: c.type })), charts: charts.pick() };
   }
 
   // KPIs: row count + totals of the first measures
@@ -390,11 +494,16 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
     });
   }
 
+  // Who comes back: each month's new people, and the share of them active in each month after
+  if (profile.customers) add(cohortChart(profile.customers.column, timeExpression(time!.column, time!.kind)), 88);
+
   // Places: a latitude and longitude pair becomes a map of where the rows are
   if (profile.coordinates) add(mapChart(profile.coordinates.lat, profile.coordinates.lon));
 
   if (profile.states) add(regionsChart(profile.states, measures[0], "us"));
+  else if (profile.zips) add(zipRegionsChart(profile.zips, measures[0]));
   else if (profile.countries) add(regionsChart(profile.countries, measures[0]));
+  if (profile.flows) add(flowMapChart(profile.flows.from, profile.flows.to, measures[0]), 84);
   if (profile.cities) add(citiesChart(profile.cities, measures[0]));
 
   // Category breakdowns
@@ -423,6 +532,12 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
     });
   }
 
+  // Free text: the words people use most
+  const freeText = freeTextColumns(profile)[0];
+  if (freeText) {
+    add({ type: "bar", title: `Most common words in ${freeText.name}`, query: wordsChartQuery(freeText.name, rows), x: "x", y: ["y"] }, 78);
+  }
+
   // How the main measure is spread out, when it takes enough different values to have a shape
   const spread = measures.find((m) => m.distinct > HISTOGRAM_BINS);
   if (spread) add(histogramChart(spread.name));
@@ -441,13 +556,18 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
   // Share of rows for a small category
   const small = categories.find((c) => c.distinct <= 6);
   if (small) {
-    add({
-      type: "pie",
-      title: `Share of rows by ${small.name}`,
-      query: `SELECT ${q(small.name)} AS x, count(*) AS y FROM data GROUP BY 1 ORDER BY 2 DESC`,
-      x: "x",
-      y: ["y"],
-    });
+    // a share already read off a bar of the same column says nothing new
+    const shown = candidates.some((x) => x.chart.type === "bar" && x.chart.query.includes(`${q(small.name)} AS x`));
+    add(
+      {
+        type: "pie",
+        title: `Share of rows by ${small.name}`,
+        query: `SELECT ${q(small.name)} AS x, count(*) AS y FROM data GROUP BY 1 ORDER BY 2 DESC`,
+        x: "x",
+        y: ["y"],
+      },
+      shown ? 15 : PRIORITY.pie,
+    );
   }
 
   // Relationship between two measures
@@ -470,6 +590,6 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
     version: 1,
     title,
     schema: columns.map((c) => ({ name: c.name, type: c.type })),
-    charts,
+    charts: charts.pick(),
   };
 }

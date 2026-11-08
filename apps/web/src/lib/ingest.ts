@@ -1,4 +1,4 @@
-import { buildProfile, CITY_NAME_HINT, detectCityColumn, detectCoordinates, detectPlaceColumn, MAX_CITIES, q, tidyColumnNames, type Range, type TableProfile } from "@dropboard/engine";
+import { buildProfile, CITY_NAME_HINT, detectCityColumn, detectCoordinates, detectPlaceColumn, detectZipColumn, findFlowColumns, MAX_CITIES, q, tidyColumnNames, ZIP_NAME, type Range, type TableProfile } from "@dropboard/engine";
 import { DuckDBDataProtocol } from "@duckdb/duckdb-wasm";
 import { getDb, resetDb, runQuery } from "./duckdb";
 import { loadCities } from "./cities";
@@ -172,23 +172,37 @@ export async function profileTable(): Promise<TableProfile> {
     if (countries && states) break;
   }
 
+  // a column of ZIP codes, named like one: text or whole numbers, with any number of values
+  let zips: string | undefined;
+  if (!states) {
+    for (const c of columns.filter((c) => ZIP_NAME.test(c.name) && (c.type === "string" || (c.type === "number" && c.integer === true)) && c.distinct >= 2).slice(0, 3)) {
+      const values = (await runQuery(`SELECT DISTINCT ${q(c.name)} AS v FROM data WHERE ${q(c.name)} IS NOT NULL LIMIT 300`)).map((v) => v.v);
+      if (detectZipColumn(c.name, values)) {
+        zips = c.name;
+        break;
+      }
+    }
+  }
+
   // a column named like a place, with more values than a country list allows, might be cities: the list is fetched only then
   let cities: string | undefined;
+  let flows: { from: string; to: string } | undefined;
   const maybeCities = columns.filter((c) => c.type === "string" && c.distinct >= 2 && c.distinct <= MAX_CITIES && c.name !== countries && c.name !== states && CITY_NAME_HINT.test(c.name)).slice(0, 4);
   if (maybeCities.length) {
     try {
       const index = await loadCities();
+      const found: string[] = [];
       for (const c of maybeCities) {
         const values = (await runQuery(`SELECT DISTINCT ${q(c.name)} AS v FROM data WHERE ${q(c.name)} IS NOT NULL LIMIT ${MAX_CITIES}`)).map((v) => v.v);
-        if (detectCityColumn(c.name, values, c.distinct, index)) {
-          cities = c.name;
-          break;
-        }
+        if (detectCityColumn(c.name, values, c.distinct, index)) found.push(c.name);
       }
+      cities = found[0];
+      // an origin and a destination, both cities: the routes between them
+      flows = findFlowColumns(found);
     } catch {
       // without the list there is no city map, and everything else still works
     }
   }
 
-  return { ...base, ...(coordinates ? { coordinates } : {}), ...(countries ? { countries } : {}), ...(states ? { states } : {}), ...(cities ? { cities } : {}) };
+  return { ...base, ...(coordinates ? { coordinates } : {}), ...(countries ? { countries } : {}), ...(states ? { states } : {}), ...(zips ? { zips } : {}), ...(cities ? { cities } : {}), ...(flows ? { flows } : {}) };
 }
