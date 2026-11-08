@@ -39,16 +39,17 @@ test("the footer leads to the legal pages and the trust center, and the title te
   expect(await title.evaluate((el) => getComputedStyle(el).textTransform)).toBe("none");
 });
 
-test("the trust center states what is in place, and says plainly what is not", async ({ page }) => {
+test("the trust center states what is in place and tested, and claims no certification it does not hold", async ({ page }) => {
   await page.goto("/trust");
   await expect(page.getByText("rows uploaded to our servers")).toBeVisible();
-  const badges = page.getByRole("list", { name: "What we do and what we do not" }).getByRole("listitem");
+  const badges = page.getByRole("list", { name: "What we do to protect your data" }).getByRole("listitem");
   await expect(badges).toHaveCount(12);
-  // honest: the certifications we do not hold are listed as not yet, never as achieved
-  const soc = badges.filter({ hasText: "SOC 2 and ISO 27001" });
-  await expect(soc).toContainText("Not yet");
-  await expect(soc).toContainText("Not certified");
-  expect(await badges.filter({ hasText: "In place" }).count()).toBeGreaterThanOrEqual(8);
+  expect(await badges.filter({ hasText: "In place" }).count()).toBeGreaterThanOrEqual(9);
+  await expect(badges.filter({ hasText: "By design" })).toHaveCount(1);
+  await expect(badges.filter({ hasText: "Tested" })).toHaveCount(1);
+  // no certification is claimed, and none is named as missing
+  const text = await page.locator("main").innerText();
+  expect(text).not.toMatch(/SOC 2|ISO 27001|HIPAA|certified/i);
   // every status label is in sentence case
   const label = badges.first().locator("span").last();
   expect(await label.evaluate((el) => getComputedStyle(el).textTransform)).toBe("none");
