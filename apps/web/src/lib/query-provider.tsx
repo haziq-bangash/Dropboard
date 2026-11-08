@@ -9,8 +9,21 @@ import {
 import { useState } from "react";
 import { ApiError } from "./projects";
 
+let leaving = false;
+
+/**
+ * Call right before deliberately leaving the app (signing out, deleting the account). The session ends on purpose, so a
+ * request that was already in flight and comes back 401 must not send the person somewhere else than where we are
+ * taking them. The mark clears itself after a few seconds, so a later expired session is still handled.
+ */
+export function markLeaving() {
+  leaving = true;
+  setTimeout(() => (leaving = false), 5000);
+}
+
 /** A session that has expired shows up as a 401 from any request: send the person to sign in once, from one place. */
 function onUnauthorized(error: unknown) {
+  if (leaving) return;
   if (
     error instanceof ApiError &&
     error.status === 401 &&

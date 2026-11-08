@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
 import { clearLocalData } from "@/lib/local-data";
+import { markLeaving } from "@/lib/query-provider";
 import { setLoaded } from "@/lib/loaded-data";
 import {
   keys,
@@ -515,7 +516,9 @@ export function DeleteSection({
     mutationFn: async (password: string | undefined) =>
       unwrap(await authClient.deleteUser(password ? { password } : {})),
     onSuccess: async () => {
-      // the account is gone, so any request still in flight would come back 401: drop them all before leaving
+      // the account is gone, so any request still in flight would come back 401: stand down the sign-in redirect, drop
+      // the cached answers, and leave
+      markLeaving();
       client.clear();
       setLoaded(null);
       await clearLocalData();
