@@ -10,44 +10,47 @@ pnpm --filter @dropboard/api exec tsx eval/run.ts --rescore eval/results/<run>.j
 
 ## How it works
 
-- **Questions.** 42 questions over the four sample datasets, 12 of them harder (shares of a total, medians, ratios, date filters, gaps between statistics). Each has gold SQL, with several forms where a question can be answered more than one way (a month as a date, a number or a name).
+- **Questions.** 42 questions over the four sample datasets, 12 of them harder (shares of a total, medians, ratios, date filters, gaps between statistics). Each has gold SQL, with several forms where a question can be answered more than one way (a month as a date, a number or a name). A test checks that every gold query runs, and that no "which is highest?" question has a tied answer.
 - **What the model sees.** Only column names, types and counts, exactly like the real service. Never a row.
 - **Scoring.** The model's SQL goes through the same guard as the server, runs in DuckDB (the engine the browser uses), and is compared with the gold answer. Extra columns, column order and row order do not count against it. A "which is highest?" answered with every group, the right one first, is counted separately as *usable*.
 - **Dashboards.** Each model designs a dashboard per dataset. Every chart is run, and counts as working only if it returns rows with the columns the renderer binds to.
 
-## Results (run 8 Nov 2026, 2 trials per question)
+## Results (8 Nov 2026, 2 trials per question, 84 answers per model)
 
 | Model | Exactly right | Usable (right answer first) | Median time | Tokens in / out per question |
 |---|---|---|---|---|
-| openai/gpt-5.4-mini | 98% | 98% | 3.2 s | 352 / 124 |
-| openai/gpt-5.4-nano | 96% | 98% | 1.8 s | 352 / 102 |
-| xai/grok-4.3 | 93% | 95% | 4.4 s | 571 / 368 |
-| xai/grok-4.20-0309-non-reasoning | 92% | 93% | 1.3 s | 563 / 60 |
-| anthropic/claude-haiku-5-5 | not measured | | | |
-| anthropic/claude-sonnet-5-5 | not measured | | | |
+| openai/gpt-5.4-mini | 99% | 100% | 3.0 s | 352 / 117 |
+| openai/gpt-5.4-nano | 96% | 99% | 1.8 s | 352 / 104 |
+| xai/grok-4.20-0309-non-reasoning | 92% | 94% | 1.2 s | 563 / 60 |
+| xai/grok-4.3 | 89% | 92% | 4.0 s | 571 / 372 |
+| anthropic/claude-haiku-5-5, claude-sonnet-5-5 | not measured | | | |
 | google/gemini-3.5-flash-lite (Vertex) | not measured | | | |
 
-| Model | Charts that work | Fully working dashboards | Median time |
-|---|---|---|---|
-| openai/gpt-5.4-mini | 100% | 8/8 | 5.7 s |
-| xai/grok-4.20-0309-non-reasoning | 100% | 8/8 | 3.8 s |
-| xai/grok-4.3 | 100% | 8/8 | 9.8 s |
-| openai/gpt-5.4-nano | 84% | 5/8 | 4.0 s |
+| Model | Charts that work | Fully working dashboards | Median time | Tokens in / out |
+|---|---|---|---|---|
+| openai/gpt-5.4-mini | 100% | 8/8 | 4.7 s | 603 / 498 |
+| xai/grok-4.20-0309-non-reasoning | 100% | 8/8 | 3.6 s | 825 / 325 |
+| xai/grok-4.3 | 100% | 8/8 | 13.5 s | 833 / 1108 |
+| openai/gpt-5.4-nano | 88% | 5/8 | 4.8 s | 603 / 434 |
+
+"Charts that work" is measured before the product's own repair of misnamed columns (see below), so for `gpt-5.4-nano` it understates what a person would now see.
 
 ## What this does and does not show
 
 - **Not measured: Anthropic and Google.** Every Anthropic call was refused with "credit balance too low" on the key used, and Vertex needs Google Cloud credentials this run did not use. Both need a re-run before any default is chosen. The numbers above say nothing about them.
-- **No prices.** Only token counts are recorded, because current prices for these model names were not confirmed. Cost per question follows from tokens times the vendor's price once that is checked on their pricing page.
-- **Small sample.** 84 answers per model on made-up data with simple tables. A gap of a few points between neighbours (98 against 96, 93 against 92) is within noise. The gaps worth acting on are the large ones: `gpt-5.4-nano` wrote 16% of its dashboard charts so the renderer could not bind them, and `grok-4.20-0309-non-reasoning` missed more of the harder questions.
-- **Speed is real but not the whole story.** The reasoning-style models took 3 to 10 seconds for a dashboard, the non-reasoning one under 4. The `gpt-5.4-mini` setting uses low reasoning effort; more would be slower.
+- **No prices.** Only token counts are recorded, because current prices for these model names were not confirmed. Cost per question is tokens times the vendor's price, once that is checked on their pricing page.
+- **Small sample.** 84 answers per model, on made-up data with simple tables. Differences of a few points between neighbours (99 against 96, 92 against 89) are within noise. The gaps worth acting on are larger: `gpt-5.4-nano` wrote some dashboard charts the renderer could not bind, and the two Grok models more often wrote SQL that failed or answered a different reading of the question.
+- **Speed.** `grok-4.20-0309-non-reasoning` is the quickest at about 1 second per answer. The reasoning-style models take 3 to 14 seconds for a dashboard. `gpt-5.4-mini` runs with low reasoning effort; more would be slower.
+- **A flaw in the first run, now fixed.** The first version of the question set had a tied answer ("Which category has the most tickets?": two categories with 104). The gold answer picked one arbitrarily, and two OpenAI models, which break ties alphabetically, were marked wrong for a fair answer. That question was replaced and a test now guards against ties. The numbers above are from the re-run after the fix.
 
 ## What the failures taught us
 
-- **Chart columns.** The weakest model named its headline column `total_revenue` where the renderer expects `value`, so the chart could not draw. That is fixable in the product without a better model: when a query's columns do not match, use the first one or two columns. (Done in a follow-up.)
-- **Forgotten FROM.** Two answers from one model were SQL missing `FROM data`. A single retry that feeds the database error back to the model, as the plan already proposes, should recover these.
+- **Misnamed chart columns (fixed).** `gpt-5.4-nano` named a headline number `total_amount` where the renderer reads `value`, so it drew blank. The product now looks at the columns a query returns and renames them to the ones the renderer reads, and drops a chart only when nothing numeric is left to plot.
+- **SQL with escaped line breaks (fixed).** One answer came back with a literal backslash-n instead of a line break, which does not parse. Such answers are now tidied before they run.
+- **Missing FROM (to do).** `grok-4.3` wrote SQL with no `FROM data` in 4 of 84 answers. The plan already proposes one retry that sends the database's error back to the model; these are exactly the cases it would recover.
+- **A different reading.** "What was the return on ad spend from July onwards?" was answered per month by one model on both tries, instead of as one figure. That is a fair reading of an ambiguous question, so it counts as wrong here but is not a defect to chase.
 - **"Which is highest?" returning every group.** Several models list all groups, best first. That reads fine on screen, which is why it is scored as usable.
-- **A real ambiguity.** "Which category has the most tickets?" was missed by every OpenAI answer on one of four runs because the sample has a near tie. Ties make some questions genuinely ambiguous.
 
 ## Reading it for a default
 
-For answer quality alone, `gpt-5.4-mini` led, with every dashboard chart working. `grok-4.20-0309-non-reasoning` is the fastest and held up on dashboards but dropped more answers. Until Anthropic and Gemini are measured with the same questions, there is nothing here to justify changing the current default, and no setting has been changed.
+For answer quality alone, `gpt-5.4-mini` led, with every dashboard chart working and a median of 3 seconds per answer. `grok-4.20-0309-non-reasoning` is the fastest and held up on dashboards but gave fewer right answers. Until Anthropic and Gemini are measured with the same questions, there is nothing here to justify changing the current default, and no setting has been changed.
