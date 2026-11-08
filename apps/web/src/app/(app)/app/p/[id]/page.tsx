@@ -20,6 +20,7 @@ import { InsightsPanel } from "@/components/app/InsightsPanel";
 import { StoryPanel } from "@/components/app/StoryPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AddChartMenu } from "@/components/app/AddChartMenu";
+import { EmptyTile } from "@/components/marketing/bento";
 import { PlacesMenu } from "@/components/app/PlacesMenu";
 import { SampleNotice } from "@/components/SampleNotice";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -349,39 +350,23 @@ function AttachPanel({
   onFile: (file: File) => void;
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Attach your file to open this dashboard</CardTitle>
-        <CardDescription>
-          Your rows are never stored on our servers, so choose{" "}
-          {project.sourceName ? (
-            <strong>{project.sourceName}</strong>
-          ) : (
-            "the file"
-          )}{" "}
-          again to see the charts. A newer version with the same columns works
-          too.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <DropZone
-          onFile={onFile}
-          busyName={busyName}
-          error={error}
-          title="Drop the file here, or click to browse"
-        />
+    <EmptyTile tone="yellow" title="Attach your file to open this dashboard">
+      <p>
+        Your rows are never stored on our servers, so choose {project.sourceName ? <strong>{project.sourceName}</strong> : "the file"} again to see the
+        charts. A newer version with the same columns works too.
+      </p>
+      <div className="mt-5 flex flex-col gap-4 text-foreground">
+        <div className="rounded-2xl bg-card p-2">
+          <DropZone onFile={onFile} busyName={busyName} error={error} title="Drop the file here, or click to browse" />
+        </div>
         {project.spec.charts.length > 0 && (
-          <p className="text-sm text-muted-foreground">
-            This dashboard has {project.spec.charts.length} charts:{" "}
-            {project.spec.charts
-              .slice(0, 4)
-              .map((c) => c.title)
-              .join(", ")}
+          <p className="text-sm opacity-80">
+            This dashboard has {project.spec.charts.length} charts: {project.spec.charts.slice(0, 4).map((c) => c.title).join(", ")}
             {project.spec.charts.length > 4 ? "…" : ""}
           </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </EmptyTile>
   );
 }
 

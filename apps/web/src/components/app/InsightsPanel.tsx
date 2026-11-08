@@ -26,9 +26,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table } from "@/components/Dashboard";
+import { Grain } from "@/components/art/Grain";
+import { bentoTile, EmptyTile, Stat, TONES } from "@/components/marketing/bento";
 import { useInsights } from "@/lib/insights";
 
-const KIND: Record<FindingKind, { label: string; icon: LucideIcon }> = {
+export const KIND: Record<FindingKind, { label: string; icon: LucideIcon }> = {
   trend: { label: "Trend", icon: TrendingUp },
   change: { label: "Step change", icon: Flag },
   outlier: { label: "Outlier", icon: CircleAlert },
@@ -115,23 +117,18 @@ function evidenceLines(f: Finding): string[] {
   return lines;
 }
 
-function Tile({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-}) {
+/** A summary figure as one of the homepage's tiles: the number set large in the serif face. */
+function Tile({ label, value, hint, tone, layout = "", big = false }: { label: string; value: string; hint?: string; tone: keyof typeof TONES; layout?: string; big?: boolean }) {
   return (
-    <Card size="sm">
-      <CardContent>
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="mt-1 text-2xl font-semibold tracking-tight">{value}</p>
-        {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
-      </CardContent>
-    </Card>
+    <div className={`${bentoTile} ${TONES[tone]} ${layout} p-5`} data-testid="tile">
+      {tone === "teal" && <div aria-hidden="true" className="absolute inset-0 -z-10 bg-cover bg-center opacity-20" style={{ backgroundImage: "url(/art/topo-lines-light.svg)" }} />}
+      <Grain className="-z-10 opacity-40" />
+      <p className="text-sm font-medium tracking-wide opacity-75">{label}</p>
+      <Stat>
+        <span className={`mt-1 block ${big ? "text-7xl sm:text-8xl" : "text-5xl"}`}>{value}</span>
+      </Stat>
+      {hint && <p className="mt-2 text-sm opacity-80">{hint}</p>}
+    </div>
   );
 }
 
@@ -149,21 +146,19 @@ export function InsightsPanel({
 
   return (
     <div className="flex flex-col gap-6" data-testid="insights">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Tile label="Rows" value={profile.rowCount.toLocaleString()} />
+      <div className="grid grid-cols-2 gap-4 lg:auto-rows-[150px] lg:grid-cols-4">
+        <Tile tone="teal" layout="col-span-2 min-h-[220px] lg:row-span-2" big label="Rows" value={profile.rowCount.toLocaleString()} hint="read in your browser" />
+        <Tile tone="yellow" layout="min-h-[150px]" label="Columns" value={String(profile.columns.length)} hint={`${numeric} numeric`} />
         <Tile
-          label="Columns"
-          value={String(profile.columns.length)}
-          hint={`${numeric} numeric`}
-        />
-        <Tile
+          tone="grey"
+          layout="min-h-[150px]"
           label="Completeness"
-          value={
-            cells ? `${Math.round((1 - empty / cells) * 1000) / 10}%` : "n/a"
-          }
+          value={cells ? `${Math.round((1 - empty / cells) * 1000) / 10}%` : "n/a"}
           hint="cells with a value"
         />
         <Tile
+          tone="orange"
+          layout="col-span-2 min-h-[150px]"
           label="Findings"
           value={insights.data ? String(insights.data.findings.length) : "…"}
           hint={insights.data ? `found in ${insights.data.ms} ms` : "looking"}
@@ -196,16 +191,10 @@ export function InsightsPanel({
             </AlertDescription>
           </Alert>
         ) : insights.data.findings.length === 0 ? (
-          <Card className="mt-4" data-testid="no-findings">
-            <CardContent>
-              <p className="font-medium">Nothing stands out</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                No trend, relationship, step, outlier or lopsided category in
-                this data was both clear and large enough to report. That is a
-                result too: the numbers look steady and unrelated.
-              </p>
-            </CardContent>
-          </Card>
+          <EmptyTile className="mt-4" tone="grey" title="Nothing stands out" data-testid="no-findings">
+            No trend, relationship, step, outlier or lopsided category in this data was both clear and large enough to report. That is a result too: the
+            numbers look steady and unrelated.
+          </EmptyTile>
         ) : (
           <ol className="mt-4 grid gap-3">
             {insights.data.findings.map((f) => {
