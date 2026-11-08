@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import path from "node:path";
 import { signUp } from "./helpers";
 
 test("a new account sees the getting-started card, and dismissing it sticks", async ({ page }) => {
@@ -327,4 +328,18 @@ test("present mode walks through the charts full screen with the keyboard, on th
   await expect(view.getByRole("img", { name: /^Bar chart: revenue by region/ })).toBeVisible({ timeout: 30_000 });
   await walk(view);
   await stranger.close();
+});
+
+test("a file with US states opens with a shaded map of the United States", async ({ page }) => {
+  await page.goto("/");
+  await page.setInputFiles('input[type="file"]', path.join(__dirname, "fixtures", "us-states.csv"));
+  await expect(page.getByTestId("kpi-value").first()).not.toHaveText("", { timeout: 30_000 });
+  const map = page.getByRole("img", { name: /^Region map: sales by state/ });
+  await expect(map).toBeVisible({ timeout: 30_000 });
+  await expect(map).toHaveAttribute("aria-label", /14 places shaded, highest first: .+\./);
+  await expect(map.locator("canvas").first()).toBeVisible();
+  // the shapes come from the states file, not the world file
+  const loaded = await page.evaluate(() => performance.getEntriesByType("resource").map((r) => r.name).filter((n) => n.includes("/geo/")));
+  expect(loaded.some((n) => n.endsWith("/geo/us-states.json"))).toBe(true);
+  expect(loaded.some((n) => n.endsWith("/geo/world.json"))).toBe(false);
 });

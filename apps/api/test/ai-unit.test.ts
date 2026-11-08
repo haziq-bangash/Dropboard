@@ -205,3 +205,27 @@ describe("buildSpec with a calendar", () => {
     expect(dropped.map((d) => d.reason)).toEqual(["team is not a date column"]);
   });
 });
+
+describe("buildSpec with a state map", () => {
+  const t = {
+    rowCount: 100,
+    columns: [
+      { name: "state", type: "string" as const, nullCount: 0, distinct: 20 },
+      { name: "sales", type: "number" as const, nullCount: 0, distinct: 80 },
+    ],
+  };
+  it("builds a US map from a text column and an optional number, and drops the wrong shapes", () => {
+    const { spec, dropped } = buildSpec(t, {
+      title: "x",
+      charts: [
+        { type: "statemap", title: "", query: "", columns: ["state", "sales"] },
+        { type: "statemap", title: "", query: "", columns: ["sales"] },
+        { type: "statemap", title: "", query: "", columns: ["state", "state"] },
+        { type: "kpi", title: "k", query: "SELECT 1 AS value", columns: [] },
+      ],
+    });
+    expect(spec.charts.map((c) => c.type)).toEqual(["regions", "kpi"]);
+    expect(spec.charts[0]).toMatchObject({ map: "us", title: "sales by state" });
+    expect(dropped.map((d) => d.reason)).toEqual(["sales is not a text column", "state is not a number column"]);
+  });
+});
