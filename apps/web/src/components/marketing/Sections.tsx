@@ -174,12 +174,12 @@ export function FeatureRows() {
         cta={{ label: "Try it now", href: "/#upload" }}
         points={[
           ["Charts chosen for your columns", "Totals, trends over time, breakdowns and a data preview, ready in seconds."],
-          ["Handles big files", "In our tests a 44 MB CSV with 1.4 million rows showed its first numbers in about 3 seconds."],
+          ["Handles big files", "In our tests a 61 MB CSV with 1.4 million rows showed its first charts in about 5 seconds on a laptop."],
           ["Excel, CSV and JSON", "Open .xlsx, .csv, .json and .ndjson exports from any tool."],
         ]}
         tone="sand"
         tilt="-rotate-1"
-        chip="1.4M rows in about 3 seconds"
+        chip="1.4M rows in about 5 seconds"
         chipClass="bottom-6 right-6 rotate-3"
         visual={<MockDashboard />}
       />
@@ -288,7 +288,7 @@ export function Perks() {
           <Grain className="-z-10 opacity-40" />
           <p className="text-sm font-medium tracking-wide opacity-75">Fast</p>
           <Stat>
-            <span className="block text-7xl">~3s</span>
+            <span className="block text-7xl">~5s</span>
           </Stat>
           <p className="mt-2 text-sm">1.4M rows in our tests. Dashboards appear in seconds.</p>
         </div>

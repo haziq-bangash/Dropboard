@@ -94,7 +94,7 @@ test("Why Dropboard is a bento of six distinct cards with serif stats", async ({
   await page.goto("/");
   const perks = page.locator("#privacy").getByTestId("perk");
   await expect(perks).toHaveCount(6);
-  for (const text of ["rows uploaded", "~3s", "Any spreadsheet", "Built for stores and ops", "Safe sharing", "Free to start"]) {
+  for (const text of ["rows uploaded", "~5s", "Any spreadsheet", "Built for stores and ops", "Safe sharing", "Free to start"]) {
     await expect(page.locator("#privacy").getByText(text).first()).toBeVisible();
   }
   // the roadmap items are honestly marked as not available yet
