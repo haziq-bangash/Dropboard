@@ -1,6 +1,7 @@
-import { detectCoordinates, detectPlaceColumn, mapDuckDbType, q, type Range, type TableProfile } from "@dropboard/engine";
+import { CITY_NAME_HINT, detectCityColumn, detectCoordinates, detectPlaceColumn, MAX_CITIES, mapDuckDbType, q, type Range, type TableProfile } from "@dropboard/engine";
 import { DuckDBDataProtocol } from "@duckdb/duckdb-wasm";
 import { getDb, runQuery } from "./duckdb";
+import { loadCities } from "./cities";
 
 export const MAX_FILE_BYTES = 200 * 1024 * 1024;
 
@@ -97,5 +98,23 @@ export async function profileTable(): Promise<TableProfile> {
     if (countries && states) break;
   }
 
-  return { rowCount: n, columns, ...(coordinates ? { coordinates } : {}), ...(countries ? { countries } : {}), ...(states ? { states } : {}) };
+  // a column named like a place, with more values than a country list allows, might be cities: the list is fetched only then
+  let cities: string | undefined;
+  const maybeCities = columns.filter((c) => c.type === "string" && c.distinct >= 2 && c.distinct <= MAX_CITIES && c.name !== countries && c.name !== states && CITY_NAME_HINT.test(c.name)).slice(0, 4);
+  if (maybeCities.length) {
+    try {
+      const index = await loadCities();
+      for (const c of maybeCities) {
+        const values = (await runQuery(`SELECT DISTINCT ${q(c.name)} AS v FROM data WHERE ${q(c.name)} IS NOT NULL LIMIT ${MAX_CITIES}`)).map((v) => v.v);
+        if (detectCityColumn(c.name, values, c.distinct, index)) {
+          cities = c.name;
+          break;
+        }
+      }
+    } catch {
+      // without the list there is no city map, and everything else still works
+    }
+  }
+
+  return { rowCount: n, columns, ...(coordinates ? { coordinates } : {}), ...(countries ? { countries } : {}), ...(states ? { states } : {}), ...(cities ? { cities } : {}) };
 }
