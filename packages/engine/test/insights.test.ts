@@ -233,3 +233,68 @@ describe("a short, varied list", () => {
     expect(findInsights({ rowCount: 300, numeric: columns }, { perKind: 10, limit: 4 })).toHaveLength(4);
   });
 });
+
+describe("headline, figure and next step", () => {
+  // every kind shows up in the planted table (plus a concentration added here)
+  const input = plantedTable(5);
+  input.contributions = [{ column: "region", measure: "revenue", parts: [{ label: "South", value: 700 }, { label: "North", value: 120 }, { label: "East", value: 100 }, { label: "West", value: 80 }] }];
+  const found = findInsights(input, { limit: 50, perKind: 10 });
+  const of = (kind: Finding["kind"]) => found.find((f) => f.kind === kind)!;
+
+  it("exists for every kind, and is built from the finding's own numbers", () => {
+    expect(of("trend").headline).toBe("revenue fell " + /\d+%/.exec(of("trend").sentence)![0]);
+    expect(of("trend").figure).toEqual({ value: "-" + /\d+%/.exec(of("trend").sentence)![0], label: "from start to end" });
+
+    expect(of("change").headline).toMatch(/^signups stepped up around week 6\d$/);
+    expect(of("change").figure.value).toMatch(/^\+\d+%$/);
+    expect(of("change").figure.label).toMatch(/^[\d.]+ to [\d.]+$/);
+
+    const link = found.find((f) => f.kind === "correlation" && f.columns.includes("ad_spend") && f.columns.includes("orders"))!;
+    expect(link.headline).toBe("ad_spend and orders move together");
+    expect(link.figure.value).toMatch(/^r = 0\.\d\d$/);
+
+    expect(of("dominance").headline).toBe("South dominates region");
+    expect(of("dominance").figure).toEqual({ value: "70%", label: "of all rows" });
+
+    expect(of("concentration").headline).toBe("South accounts for most of revenue");
+    expect(of("concentration").figure).toEqual({ value: "70%", label: "of revenue" });
+
+    expect(of("outlier").headline).toBe("One refund value stands apart");
+    expect(of("outlier").figure).toEqual({ value: "9000", label: "the most extreme value" });
+
+    expect(found.find((f) => f.kind === "missing" && f.columns[0] === "phone")!.headline).toBe("phone has gaps");
+    expect(found.find((f) => f.kind === "missing" && f.columns[0] === "phone")!.figure).toEqual({ value: "36%", label: "of rows are empty" });
+  });
+
+  it("uses the other wording for the opposite direction", () => {
+    const down = findInsights({
+      rowCount: 300,
+      numeric: [
+        { column: "price", values: driverLike(1) },
+        { column: "demand", values: driverLike(-1) },
+      ],
+    });
+    expect(down[0].headline).toBe("price and demand move in opposite directions");
+    expect(down[0].figure.value).toMatch(/^r = -0\.\d\d$/);
+  });
+
+  it("keeps every headline short, every suggestion a plain sentence, and promises no cause", () => {
+    for (const f of found) {
+      expect(f.headline.length, f.headline).toBeLessThanOrEqual(60);
+      expect(f.headline, f.headline).not.toMatch(/undefined|NaN|null|\.$/);
+      expect(f.figure.value, f.sentence).not.toMatch(/undefined|NaN|null/);
+      expect(f.figure.value.length).toBeGreaterThan(0);
+      expect(f.figure.label.length).toBeGreaterThan(0);
+      expect(f.next.endsWith("."), f.next).toBe(true);
+      // it may say "a relationship is not a cause", but never claim one
+      expect(f.next, f.next).not.toMatch(/\b(because|proves?|caused by|leads to|results in)\b/i);
+    }
+  });
+});
+
+/** Two columns driven by one hidden series: sign +1 moves with it, -1 against it. */
+function driverLike(sign: 1 | -1) {
+  const r = seeded(8);
+  const base = seeded(9);
+  return range(300).map(() => sign * base.normal() * 10 + r.normal() * 2);
+}
