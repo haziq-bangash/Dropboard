@@ -1,5 +1,6 @@
 import { seriesAnomalies } from "./anomaly/series";
 import { clamp01, fmt, observedChange, pct, pctFine } from "./format";
+import { qualityFindings, type QualityInput } from "./quality";
 import { panelChecks, panelTrendCandidates, strongestTrends } from "./panelInsights";
 import { latestChange, seasonality } from "./stats/season";
 import { benjaminiHochberg, changePoint, dominance, mannKendall, mean, median, outliers, pearson, type Trend } from "./stats/tests";
@@ -14,7 +15,7 @@ import { benjaminiHochberg, changePoint, dominance, mannKendall, mean, median, o
  *   3. Findings come back ranked, with a plain sentence and the numbers behind it.
  */
 
-export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "concentration" | "missing" | "seasonal" | "latest" | "duplicates" | "leader" | "standout" | "entitytrend" | "jump" | "rankshift" | "unusualrows" | "contextual";
+export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "concentration" | "missing" | "seasonal" | "latest" | "duplicates" | "leader" | "standout" | "entitytrend" | "jump" | "rankshift" | "unusualrows" | "contextual" | "quality";
 
 /** The rows or points behind a finding, for a person to look at. They stay in the browser: nothing here is ever sent to a model. */
 export interface FindingDetails {
@@ -88,6 +89,8 @@ export interface InsightInput {
     considered: string[];
     top: { id: number; source: "joint" | "isolated"; score: number; reasons: { measure: string; side: "high" | "low"; z: number }[]; row: Record<string, unknown> }[];
   };
+  /** Checks on the values themselves: spellings, placeholders, numbers as text, impossible dates, empty periods, repeated keys. */
+  quality?: QualityInput;
   /** How many rows are exact copies of an earlier row. */
   duplicates?: { rows: number };
 }
@@ -197,6 +200,12 @@ function describe(f: RawFinding): Pick<Finding, "headline" | "figure" | "next"> 
         next: "Check whether these are mistakes (a typo, an extra zero) or real events worth a closer look.",
       };
     }
+    case "quality":
+      return {
+        headline: `${e.issues} ${Number(e.issues) === 1 ? "problem" : "problems"} in the data`,
+        figure: { value: String(e.issues), label: Number(e.issues) === 1 ? "problem to fix" : "problems to fix" },
+        next: "Fix these in your file first and upload it again: each one changes what a total, a chart or an average means.",
+      };
     case "unusualrows":
       return {
         headline: `${fmt(Number(e.flagged))} rows stand out`,
@@ -512,6 +521,8 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
     // a lone extreme value is already described here, with the row it is in
     found = found.filter((x) => x.kind !== "outlier");
   }
+
+  found.push(...qualityFindings(input.quality, input.rowCount));
 
   // ---- points that break their own trend and season ----
   const contextual: RawFinding[] = [];

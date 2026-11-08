@@ -1,4 +1,5 @@
 import { ecod } from "./anomaly/ecod";
+import { gatherQuality } from "./quality";
 import type { InsightInput, SeriesInput } from "./insights";
 import { aggregate, isCategory, isMeasure, label } from "./suggest";
 import { q, type TableProfile } from "./profile";
@@ -49,6 +50,8 @@ export async function gatherInsightInput(profile: TableProfile, run: RunSql): Pr
     rowCount,
     missing: columns.map((c) => ({ column: c.name, nullCount: c.nullCount })),
   };
+
+  let qualitySeries: { column: string; x: number[]; unit: string; labels?: string[] } | undefined;
 
   // ---- rows that repeat an earlier row exactly (about half a second at a million rows, so very large files skip it) ----
   if (rowCount >= 2 && rowCount <= MAX_DUPLICATE_ROWS) {
@@ -218,6 +221,25 @@ export async function gatherInsightInput(profile: TableProfile, run: RunSql): Pr
     }
     if (contributions.length) input.contributions = contributions;
   }
+
+  // ---- which periods of the time axis have rows at all (needs no measure), for the check on empty periods ----
+  if (time && time.kind !== "year") {
+    const d = timeExpression(time.column, time.kind);
+    const present = q(time.column.name);
+    const [range] = await run(`SELECT CAST(epoch_ms(CAST(min(${d}) AS TIMESTAMP)) AS DOUBLE) AS lo, CAST(epoch_ms(CAST(max(${d}) AS TIMESTAMP)) AS DOUBLE) AS hi FROM data WHERE ${present} IS NOT NULL`);
+    const days = (Number(range?.hi) - Number(range?.lo)) / 86_400_000;
+    // the finest step that still leaves a readable number of periods, as for the series
+    const unit: Unit = days / 30 >= 24 ? "month" : days >= 120 ? "week" : "day";
+    if (Number.isFinite(days) && days >= MIN_POINTS && days / (unit === "month" ? 30 : unit === "week" ? 7 : 1) <= MAX_POINTS) {
+      const xs = await run(`SELECT CAST(epoch_ms(CAST(date_trunc('${unit}', ${d}) AS TIMESTAMP)) AS DOUBLE) AS x FROM data WHERE ${present} IS NOT NULL GROUP BY 1 ORDER BY 1`);
+      const x = xs.map((r) => Number(r.x)).filter(Number.isFinite);
+      qualitySeries = { column: time.column.name, x, unit, labels: x.map((v) => labelFor(v, unit)) };
+    }
+  }
+
+  // ---- checks on the values themselves ----
+  const quality = await gatherQuality(profile, run, qualitySeries);
+  if (quality) input.quality = quality;
 
   return input;
 }

@@ -108,9 +108,17 @@ export function understandColumns(profile: TableProfile): Understood[] {
 }
 
 /** The column to draw things over: a date column, or failing that a year column. The one with the most distinct values wins. */
+/** +1 for a name that says when things happened, -1 for one that says when something else followed (shipping, due, ending). */
+const clockScore = (name: string) => {
+  const n = words(name);
+  if (/(^|\s)(ship|shipped|shipping|due|end|ended|expiry|expires|expire|delivery|delivered|closed|close|resolved|renewal|updated|modified|birth|dob|next)(\s|$)/.test(n)) return -1;
+  if (/(^|\s)(order|ordered|created|signup|sale|sold|transaction|visit|date|day|time|timestamp|week|month|period|start|started|opened|booked)(\s|$)/.test(n)) return 1;
+  return 0;
+};
+
 export function timeColumn(profile: TableProfile): { column: ColumnProfile; kind: "date" | "year" } | null {
   const rows = profile.rowCount;
-  const dates = profile.columns.filter((c) => c.type === "date" && c.distinct > 1).sort((a, b) => b.distinct - a.distinct);
+  const dates = profile.columns.filter((c) => c.type === "date" && c.distinct > 1).sort((a, b) => clockScore(b.name) - clockScore(a.name) || b.distinct - a.distinct);
   if (dates[0]) return { column: dates[0], kind: "date" };
   const years = profile.columns.filter((c) => isYearColumn(c, rows)).sort((a, b) => b.distinct - a.distinct);
   return years[0] ? { column: years[0], kind: "year" } : null;

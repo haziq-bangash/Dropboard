@@ -15,11 +15,13 @@ export interface Dataset {
   roles: Record<string, Role>;
   /** The time column, if the table has one, and whether the table is one row per entity per period. */
   time?: string;
-  panel?: { entity: string; time: string };
+  panel?: { entity: string; time: string; repeated?: number };
   /** Charts that must be present, by type. */
   charts?: string[];
   /** Anomalies planted in the data: the kind of finding that must appear, and words its sentence must contain. Tables without this must produce none. */
   anomalies?: { kind: "unusualrows" | "contextual"; mentions: string }[];
+  /** Problems planted in the data: the issue codes of the data-quality findings that must appear. Tables without this must have none. */
+  quality?: string[];
 }
 
 const csv = (header: string[], rows: (string | number | boolean | null)[][]) =>
@@ -276,6 +278,51 @@ function monthlySales(): Dataset {
   };
 }
 
+/** Orders exported from a messy system: spellings, placeholders, a text number column, wrong dates, and two months missing. */
+function dirtyOrders(): Dataset {
+  const r = seeded(31);
+  const rows: (string | number)[][] = [];
+  let id = 1;
+  for (let d = 0; d < 1095; d++) {
+    const date = new Date(Date.UTC(2021, 0, 1 + d));
+    // February and March 2022 were never exported
+    if (date.getUTCFullYear() === 2022 && (date.getUTCMonth() === 1 || date.getUTCMonth() === 2)) continue;
+    for (let k = 0; k < 6; k++) {
+      const status = pick(r, ["Shipped", "Shipped", "Shipped", "Pending", "Cancelled"]);
+      const spelled = r.uniform() < 0.12 && status === "Shipped" ? "SHIPPED" : status;
+      const revenue = r.uniform() < 0.05 ? "N/A" : String(Math.round((20 + r.uniform() * 400) * 100) / 100);
+      const ship = r.uniform() < 0.02 ? "2099-01-01" : r.uniform() < 0.01 ? "1899-12-31" : iso(new Date(date.getTime() + 3 * 86_400_000));
+      rows.push([id++, iso(date), spelled, revenue, ship, pick(r, ["North", "South", "East", "West"])]);
+    }
+  }
+  return {
+    id: "dirty-orders",
+    title: "Orders from a messy export",
+    csv: csv(["order_id", "order_date", "status", "revenue", "ship_date", "region"], rows),
+    rows: rows.length,
+    roles: { order_id: "id", order_date: "time", region: "category" },
+    time: "order_date",
+    quality: ["casevariants", "placeholder", "numberstext", "futuredates", "ancientdates", "gaps"],
+  };
+}
+
+/** Companies by year where some company-years were entered twice. */
+function dirtyPanel(): Dataset {
+  const base = finance();
+  const lines = base.csv.trimEnd().split("\n");
+  // repeat six company-years, a few lines apart
+  for (const at of [5, 20, 33, 47, 60, 75]) lines.push(lines[at]);
+  return {
+    ...base,
+    id: "dirty-panel",
+    panel: { entity: "Company", time: "Year", repeated: 6 },
+    title: "Company financials with repeated rows",
+    csv: lines.join("\n") + "\n",
+    rows: lines.length - 1,
+    quality: ["repeatedkeys"],
+  };
+}
+
 function tiny(): Dataset {
   return { id: "edge-tiny", title: "Five rows", csv: csv(["item", "qty", "note"], [["a", 1, "x"], ["b", 2, "y"], ["c", 3, "z"], ["d", 4, "w"], ["e", 5, "v"]]), rows: 5, roles: {} };
 }
@@ -300,4 +347,4 @@ function sparse(): Dataset {
   };
 }
 
-export const DATASETS: Dataset[] = [finance(), retail(), retailWithErrors(), monthlySales(), hr(), saas(), web(), survey(), sensors(), marketing(), realEstate(), education(), healthcare(), sports(), tiny(), oneColumn(), allText(), sparse()];
+export const DATASETS: Dataset[] = [finance(), retail(), retailWithErrors(), monthlySales(), dirtyOrders(), dirtyPanel(), hr(), saas(), web(), survey(), sensors(), marketing(), realEstate(), education(), healthcare(), sports(), tiny(), oneColumn(), allText(), sparse()];
