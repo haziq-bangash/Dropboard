@@ -52,7 +52,7 @@ const list = (items: string[]) => (items.length <= 2 ? items.join(" and ") : `${
  * A sentence for a screen reader that says what a chart shows. `known` says whether a value is a place the picture can
  * draw; a city map needs it, since the city list lives outside the engine, and without it every value counts as drawn.
  */
-export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y" | "map">, rows: Row[], known?: (value: unknown) => boolean): string {
+export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y" | "map" | "group">, rows: Row[], known?: (value: unknown) => boolean): string {
   const head = `${KIND[spec.type]}: ${spec.title}.`;
   if (spec.type === "table") return `${head} ${rows.length} row${rows.length === 1 ? "" : "s"} shown.`;
 
@@ -143,6 +143,29 @@ export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y" 
     const targets = new Set(flows.map((f) => f.to)).size;
     const top = [...flows].sort((a, b) => b.v - a.v).slice(0, 3).map((f) => `${f.from} to ${f.to} ${said(f.v)}`);
     return `${head} ${flows.length} flow${flows.length === 1 ? "" : "s"} from ${sources} start${sources === 1 ? "" : "s"} to ${targets} end${targets === 1 ? "" : "s"}. Largest: ${list(top)}.`;
+  }
+
+  if ((spec.type === "line" || spec.type === "area") && spec.group) {
+    const g = spec.group;
+    const lines = new Map<string, { x: unknown; y: number }[]>();
+    for (const r of rows) {
+      const v = Number(r[spec.y?.[0] ?? "y"]);
+      if (!Number.isFinite(v)) continue;
+      const key = name(r[g]);
+      if (!lines.has(key)) lines.set(key, []);
+      lines.get(key)!.push({ x: r[spec.x ?? "x"], y: v });
+    }
+    if (!lines.size) return `${head} No data.`;
+    const xs = [...new Set(rows.map((r) => name(r[spec.x ?? "x"])))];
+    const ends = [...lines].map(([k, pts]) => ({ k, first: pts[0].y, last: pts[pts.length - 1].y, n: pts.length })).sort((a, b) => b.last - a.last);
+    const top = ends.slice(0, 3).map((l) => `${l.k} ${said(l.last)}`);
+    const moves = ends.filter((l) => l.n >= 2 && l.first > 0).map((l) => ({ k: l.k, change: l.last / l.first - 1 }));
+    const rise = moves.length ? moves.reduce((m, l) => (l.change > m.change ? l : m)) : null;
+    const fall = moves.length ? moves.reduce((m, l) => (l.change < m.change ? l : m)) : null;
+    const span = xs.length > 1 ? ` over ${xs.length} periods from ${xs[0]} to ${xs[xs.length - 1]}` : "";
+    const change = (l: { k: string; change: number }) => `${l.k} ${l.change >= 0 ? "up" : "down"} ${Math.round(Math.abs(l.change) * 100)}%`;
+    const moved = rise && fall && rise.k !== fall.k ? ` Biggest rise: ${change(rise)}. Biggest fall: ${change(fall)}.` : rise && rise.change > 0 ? ` Biggest rise: ${change(rise)}.` : "";
+    return `${head} ${lines.size} line${lines.size === 1 ? "" : "s"}${span}. Highest at the end: ${list(top)}.${moved}`;
   }
 
   const xKey = spec.x ?? "x";
