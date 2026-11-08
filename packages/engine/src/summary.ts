@@ -1,5 +1,5 @@
 import type { ChartSpec } from "@dropboard/spec";
-import { countryCode, usStateCode } from "./places";
+import { countryCode, usRegionCode } from "./places";
 
 /**
  * A plain sentence or two describing what a chart shows, for people who cannot see it (a screen reader reads it in place
@@ -184,9 +184,17 @@ export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y" 
     case "regions": {
       // only values that match a country or state are shaded, so only those are counted as shaded
       const us = spec.map === "us";
-      const matches = us ? usStateCode : countryCode;
-      const top = points.filter((p) => matches(p.x) !== null).sort((a, b) => b.y - a.y);
-      const left = points.length - top.length;
+      const matches = us ? usRegionCode : countryCode;
+      // several ZIP prefixes in one state are one shaded state
+      const folded = new Map<string, number>();
+      let unmatchedCount = 0;
+      for (const p of points) {
+        const code = matches(p.x);
+        if (code === null) unmatchedCount++;
+        else folded.set(code, (folded.get(code) ?? 0) + p.y);
+      }
+      const top = [...folded].map(([x, y]) => ({ x, y })).sort((a, b) => b.y - a.y);
+      const left = unmatchedCount;
       const unmatched = left > 0 ? ` ${left} other value${left === 1 ? " does" : "s do"} not match a ${us ? "state" : "country"} and ${left === 1 ? "is" : "are"} not shown.` : "";
       if (top.length === 0) return `${head} No value matches a ${us ? "state" : "country"}, so nothing is shaded.`;
       const shown = top.slice(0, 5).map((p) => `${name(p.x)} ${said(p.y)}`);

@@ -1,6 +1,6 @@
 "use client";
 
-import { chartSummary, countryCode, minMaxDownsample, removeChart, usStateCode, type CityIndex } from "@dropboard/engine";
+import { chartSummary, countryCode, minMaxDownsample, removeChart, usRegionCode, type CityIndex } from "@dropboard/engine";
 import type { ChartSpec, DashboardSpec } from "@dropboard/spec";
 import * as echarts from "echarts";
 import { useQuery } from "@tanstack/react-query";
@@ -284,7 +284,7 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo, cityIndex?: CityIndex)
       const us = spec.map === "us";
       const totals = new Map<string, number>();
       for (const r of rows) {
-        const code = us ? usStateCode(r[x]) : countryCode(r[x]);
+        const code = us ? usRegionCode(r[x]) : countryCode(r[x]);
         const v = Number(r[y]);
         if (code && Number.isFinite(v)) totals.set(code, (totals.get(code) ?? 0) + v);
       }

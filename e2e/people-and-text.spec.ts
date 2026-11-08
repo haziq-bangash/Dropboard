@@ -81,3 +81,19 @@ test("a column of comments gets a chart of its common words and a finding that s
   await expect(finding).toContainText("delivery");
   await expect(finding).toContainText("Free text");
 });
+
+test("a column of ZIP codes, kept as numbers that lost their leading zero, opens as a shaded map of states", async ({ page }) => {
+  test.setTimeout(90_000);
+  // 02134 is Boston, held as the number 2134; each state has several different ZIP codes
+  const zips: [number, string][] = [[2134, "MA"], [2108, "MA"], [10001, "NY"], [10027, "NY"], [11201, "NY"], [90210, "CA"], [94103, "CA"], [60601, "IL"], [33101, "FL"], [98101, "WA"], [77001, "TX"], [78701, "TX"]];
+  const rows = ["customer_zip,sales,day"];
+  for (let i = 0; i < 240; i++) rows.push(`${zips[i % zips.length][0]},${50 + (i % 17) * 3},2024-0${1 + (i % 9)}-1${i % 9}`);
+  await page.goto("/");
+  await page.setInputFiles('input[type="file"]', { name: "zips.csv", mimeType: "text/csv", buffer: Buffer.from(rows.join("\n") + "\n") });
+  await expect(page.getByTestId("kpi-value").first()).not.toHaveText("", { timeout: 30_000 });
+  const map = page.getByRole("img", { name: /^Region map: sales by state, from customer_zip/ });
+  await expect(map).toBeVisible({ timeout: 30_000 });
+  // Massachusetts, New York, California, Illinois, Florida, Washington and Texas
+  await expect(map).toHaveAttribute("aria-label", /7 places shaded, highest first: .+\./);
+  await expect(map.locator("canvas").first()).toBeVisible();
+});

@@ -3,6 +3,8 @@
  * Pure functions on column names and a few sample values, so the profiler can run them without reading every row.
  */
 
+import { zipState } from "./zip3";
+
 export type PlaceKind = "country" | "us-state";
 
 export interface PlaceMatch {
@@ -80,6 +82,24 @@ export const countryCode = (value: unknown): string | null => (typeof value === 
 
 /** The two-letter code for a US state name or abbreviation, or null. */
 export const usStateCode = (value: unknown): string | null => (typeof value === "string" ? (US_STATES.get(clean(value)) ?? null) : null);
+
+/** The state for a value in a US map column: a state's name or code, or a ZIP code (or its first three digits). */
+export const usRegionCode = (value: unknown): string | null => usStateCode(value) ?? zipState(value);
+
+/** Column names that say a column holds postal codes. */
+export const ZIP_NAME = /(^|[^a-z])(zip|zipcode|zip code|postal|postcode|post code)([^a-z]|$)/i;
+
+/**
+ * Is this a column of US ZIP codes? It has to be named like one, and nearly every value has to be five digits (or ZIP+4) whose first three
+ * digits are a real prefix: a column of five-digit product codes does not get a map.
+ */
+export function detectZipColumn(column: string, samples: unknown[]): boolean {
+  if (!ZIP_NAME.test(column)) return false;
+  const present = samples.filter((v) => (typeof v === "string" && v.trim() !== "") || typeof v === "number");
+  if (present.length < 2) return false;
+  const full = present.filter((v) => /^\d{3,5}(-\d{4})?$/.test(String(v).trim()) && zipState(v) !== null);
+  return full.length / present.length >= PLACE_MIN_SHARE;
+}
 
 const share = (values: unknown[], find: (v: unknown) => string | null) => {
   const present = values.filter((v) => typeof v === "string" && v.trim() !== "");

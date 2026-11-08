@@ -27,6 +27,8 @@ export interface TableProfile {
   countries?: string;
   /** A column of US states (names or abbreviations), when there is one */
   states?: string;
+  /** A column of US ZIP codes, when there is one and no column of states: drawn as a map of states, from the first three digits */
+  zips?: string;
   /** Set when the table is one row per entity per period (a company by year): which columns, found by testing that they identify a row. */
   panel?: { entity: string; time: string; /** Rows beyond the first for an entity and period that appear more than once. */ repeated?: number };
   /** Set when the file was too big to hold, so the table is a random sample: how many rows it holds, and how many the file has. */

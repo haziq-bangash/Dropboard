@@ -23,3 +23,4 @@ export * from "./cohort";
 export * from "./text";
 export * from "./anomaly/discord";
 export * from "./templates";
+export * from "./zip3";

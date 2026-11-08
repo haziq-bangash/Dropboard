@@ -185,6 +185,22 @@ export function regionsChart(column: string, measure?: ColumnProfile, map: "worl
   };
 }
 
+/** ZIP codes on a map of the United States: grouped by their first three digits, each drawn in the state most of that prefix lies in. */
+export function zipRegionsChart(column: string, measure?: ColumnProfile): Omit<ChartSpec, "id" | "layout"> {
+  const col = q(column);
+  const value = measure ? `${aggregate(measure)}(${q(measure.name)})` : "count(*)";
+  // ZIP+4 loses its last four digits, and a number that lost its leading zeros gets them back
+  const prefix = `substr(lpad(regexp_replace(CAST(${col} AS VARCHAR), '-.*$', ''), 5, '0'), 1, 3)`;
+  return {
+    type: "regions",
+    title: measure ? `${label(measure)} by state, from ${column}` : `Rows by state, from ${column}`,
+    query: `SELECT ${prefix} AS x, ${value} AS y FROM data WHERE ${col} IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 1000`,
+    x: "x",
+    y: ["y"],
+    map: "us",
+  };
+}
+
 /** Most lines drawn on one chart: more than this cannot be told apart. */
 const PANEL_LINES = 8;
 
@@ -466,6 +482,7 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
   if (profile.coordinates) add(mapChart(profile.coordinates.lat, profile.coordinates.lon));
 
   if (profile.states) add(regionsChart(profile.states, measures[0], "us"));
+  else if (profile.zips) add(zipRegionsChart(profile.zips, measures[0]));
   else if (profile.countries) add(regionsChart(profile.countries, measures[0]));
   if (profile.cities) add(citiesChart(profile.cities, measures[0]));
 
