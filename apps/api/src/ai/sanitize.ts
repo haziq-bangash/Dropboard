@@ -52,6 +52,13 @@ function fromColumns(table: AiTable, c: AiChartInput): Built | string {
       if ((find(names[0])?.distinct ?? 0) > HEATMAP_MAX_SIDE) return "a box plot needs a column with few distinct values";
       return boxplotChart(names[0], names[1]);
     }
+    case "statemap": {
+      const e = need(1);
+      if (e) return e;
+      if (!isType(names[0], "string")) return `${names[0]} is not a text column`;
+      if (names[1] !== undefined && !isType(names[1], "number")) return `${names[1]} is not a number column`;
+      return regionsChart(names[0], names[1] ? profile(names[1]) : undefined, "us");
+    }
     case "calendar": {
       const e = need(1);
       if (e) return e;

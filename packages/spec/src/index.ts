@@ -10,6 +10,8 @@ export const ChartSpec = z.object({
   query: z.string().max(4000),
   x: z.string().optional(),
   y: z.array(z.string()).optional(),
+  // a region map draws countries on a world map (the default) or US states on a map of the United States
+  map: z.enum(["world", "us"]).optional(),
   layout: z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() }),
 });
 

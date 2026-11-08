@@ -16,6 +16,8 @@ export interface TableProfile {
   coordinates?: { lat: string; lon: string };
   /** A column of countries, when there is one. Other kinds of place are recognised but not drawn yet. */
   countries?: string;
+  /** A column of US states (names or abbreviations), when there is one */
+  states?: string;
 }
 
 /** Map a DuckDB type name (e.g. "BIGINT", "DECIMAL(18,3)", "TIMESTAMP WITH TIME ZONE") to our simple types. */

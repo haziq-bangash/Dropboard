@@ -1,4 +1,4 @@
-import { applyPrivacyFloor, boxplotChart, calendarChart, chartSummary, guardSql, heatmapChart, histogramChart, STARTERS, suggestDashboard } from "@dropboard/engine";
+import { applyPrivacyFloor, boxplotChart, calendarChart, chartSummary, guardSql, heatmapChart, histogramChart, regionsChart, STARTERS, suggestDashboard } from "@dropboard/engine";
 import { describe, expect, it } from "vitest";
 import { createSql } from "../eval/duckdb";
 
@@ -154,5 +154,26 @@ describe("the data preview is always kept", () => {
     const types = suggestDashboard("Orders", sql.profile()).charts.map((c) => c.type);
     expect(types.length).toBe(11);
     expect(types.at(-1)).toBe("table");
+  });
+});
+
+describe("US state maps", () => {
+  const states = ["Texas", "CA", "New York", "FL", "Illinois", "WA", "Ohio", "GA", "Alaska", "HI", "Colorado", "AZ"];
+  const csv = ["state,sales,day"].concat(states.flatMap((s, i) => [0, 1, 2, 3].map((k) => `${s},${(i + 1) * 10 + k},2025-01-0${k + 1}`))).join("\n") + "\n";
+
+  it("shades states for a column of states, and prefers it to a country map", async () => {
+    const sql = await createSql();
+    sql.load(csv);
+    const profile = { ...sql.profile(), states: "state", countries: "state" };
+    const charts = suggestDashboard("States", profile).charts.filter((c) => c.type === "regions");
+    expect(charts).toHaveLength(1);
+    expect(charts[0]).toMatchObject({ map: "us", title: "sales by state" });
+    const rows = rowsOf(sql, charts[0].query);
+    expect(rows).toHaveLength(12);
+  });
+
+  it("leaves the map kind out for a country map", () => {
+    expect(regionsChart("country")).not.toHaveProperty("map");
+    expect(regionsChart("state", undefined, "us")).toHaveProperty("map", "us");
   });
 });

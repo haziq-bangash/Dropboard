@@ -117,8 +117,11 @@ export function heatmapChart(a: string, b: string, measure?: ColumnProfile): Omi
   };
 }
 
-/** A world map with each country shaded by a measure (or by how many rows it has). The names are read by the renderer. */
-export function regionsChart(column: string, measure?: ColumnProfile): Omit<ChartSpec, "id" | "layout"> {
+/**
+ * A map with each country (or, with `map: "us"`, each US state) shaded by a measure or by how many rows it has.
+ * The names are read by the renderer, which accepts names, codes and common spellings.
+ */
+export function regionsChart(column: string, measure?: ColumnProfile, map: "world" | "us" = "world"): Omit<ChartSpec, "id" | "layout"> {
   const col = q(column);
   const value = measure ? `${aggregate(measure)}(${q(measure.name)})` : "count(*)";
   return {
@@ -127,6 +130,7 @@ export function regionsChart(column: string, measure?: ColumnProfile): Omit<Char
     query: `SELECT ${col} AS x, ${value} AS y FROM data WHERE ${col} IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 300`,
     x: "x",
     y: ["y"],
+    ...(map === "us" ? { map } : {}),
   };
 }
 
@@ -176,7 +180,8 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
   // Places: a latitude and longitude pair becomes a map of where the rows are
   if (profile.coordinates) add(mapChart(profile.coordinates.lat, profile.coordinates.lon));
 
-  if (profile.countries) add(regionsChart(profile.countries, measures[0]));
+  if (profile.states) add(regionsChart(profile.states, measures[0], "us"));
+  else if (profile.countries) add(regionsChart(profile.countries, measures[0]));
 
   // Category breakdowns
   for (const cat of categories.slice(0, 2)) {
