@@ -90,7 +90,7 @@ export function ShareArt() {
       <div className="flex w-[88%] flex-col gap-2">
         <div className="flex items-center gap-2 rounded-full bg-background py-1.5 pl-3 pr-1.5 shadow-lg">
           <Lock className="size-3.5 shrink-0 text-muted-foreground" />
-          <span className="truncate text-xs text-foreground">dropboard.app/s/k3J9x2Qa</span>
+          <span className="truncate text-xs text-foreground">dropboard.de/s/k3J9x2Qa</span>
           <span className="ml-auto flex size-6 shrink-0 items-center justify-center rounded-full bg-muted">
             <Copy className="size-3" />
           </span>

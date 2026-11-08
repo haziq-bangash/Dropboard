@@ -71,7 +71,7 @@ export function MockShare() {
       <CardContent className="flex flex-col gap-3">
         <p className="font-medium">Publish dashboard</p>
         <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-          <span className="flex-1 truncate">dropboard.app/s/k3J9x2Qa7Lp</span>
+          <span className="flex-1 truncate">dropboard.de/s/k3J9x2Qa7Lp</span>
           <Copy className="size-4" />
         </div>
         <div className="flex items-center justify-between rounded-lg border p-3 text-sm">
