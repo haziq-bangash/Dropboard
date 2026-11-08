@@ -54,10 +54,11 @@ export function histogramChart(measure: string): Omit<ChartSpec, "id" | "layout"
   return {
     type: "histogram",
     title: `How ${measure} is spread out`,
+    // count each row into its bin in one pass, then lay the twenty bins out so an empty one still shows as a gap
     query:
-      `WITH r AS (SELECT min(${m}) AS lo, greatest(max(${m}) - min(${m}), 0.000000001) / ${HISTOGRAM_BINS} AS w FROM data WHERE ${m} IS NOT NULL) ` +
-      `SELECT lo + t.i * w AS x, w AS w, count(data.${m}) AS y FROM r CROSS JOIN range(${HISTOGRAM_BINS}) AS t(i) ` +
-      `LEFT JOIN data ON data.${m} IS NOT NULL AND least(floor((data.${m} - lo) / w), ${HISTOGRAM_BINS - 1}) = t.i GROUP BY t.i, lo, w ORDER BY t.i`,
+      `WITH r AS (SELECT min(${m}) AS lo, greatest(max(${m}) - min(${m}), 0.000000001) / ${HISTOGRAM_BINS} AS w FROM data WHERE ${m} IS NOT NULL), ` +
+      `b AS (SELECT CAST(least(floor((${m} - lo) / w), ${HISTOGRAM_BINS - 1}) AS INTEGER) AS i, count(*) AS n FROM data, r WHERE ${m} IS NOT NULL GROUP BY 1) ` +
+      `SELECT lo + t.i * w AS x, w AS w, CAST(coalesce(b.n, 0) AS BIGINT) AS y FROM r CROSS JOIN range(${HISTOGRAM_BINS}) AS t(i) LEFT JOIN b ON b.i = t.i ORDER BY t.i`,
     x: "x",
     y: ["y"],
   };

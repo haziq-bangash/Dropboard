@@ -23,6 +23,19 @@ describe("histogram and heatmap on real data", () => {
     expect(chartSummary(spec, bins)).toMatch(/^Histogram: How revenue is spread out\. 20 bins from .+ to .+\. The most rows, .+ of .+, fall between .+ and .+\.$/);
   });
 
+  it("counts each bin exactly as a direct count would, including the empty ones", async () => {
+    const sql = await createSql();
+    sql.load(STARTERS.find((s) => s.id === "ecommerce-orders")!.csv());
+    const bins = rowsOf(sql, histogramChart("revenue").query);
+    const direct = rowsOf(
+      sql,
+      "WITH r AS (SELECT min(revenue) lo, (max(revenue) - min(revenue)) / 20 w FROM data) SELECT t.i AS i, (SELECT count(*) FROM data, r WHERE least(floor((revenue - lo) / w), 19) = t.i) AS n FROM range(20) t(i) ORDER BY 1",
+    );
+    expect(bins.map((b) => Number(b.y))).toEqual(direct.map((d) => Number(d.n)));
+    // this sample is skewed, so some bins at the right are empty and must still be present
+    expect(bins.some((b) => Number(b.y) === 0)).toBe(true);
+  });
+
   it("still gives twenty bins when every value is the same, with all rows in the first", async () => {
     const sql = await createSql();
     sql.load("a,b\n5,1\n5,2\n5,3\n");
