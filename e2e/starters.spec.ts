@@ -221,6 +221,20 @@ test("a dashboard fits a phone: nothing scrolls sideways and every chart is insi
     expect(b.left).toBeGreaterThanOrEqual(0);
     expect(b.right).toBeLessThanOrEqual(391);
   }
+
+  // present mode on a phone: the controls stay on screen and a chart still fits
+  await page.getByRole("button", { name: "Present", exact: true }).click();
+  const present = page.getByTestId("present");
+  await expect(present).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  const next = present.getByRole("button", { name: "Next chart" });
+  const nextBox = (await next.boundingBox())!;
+  expect(nextBox.x + nextBox.width).toBeLessThanOrEqual(390);
+  expect(nextBox.y + nextBox.height).toBeLessThanOrEqual(844);
+  const slide = (await present.getByRole("img").first().boundingBox())!;
+  expect(slide.x).toBeGreaterThanOrEqual(0);
+  expect(slide.x + slide.width).toBeLessThanOrEqual(390);
+  await page.keyboard.press("Escape");
 });
 
 test("a chart can be saved as a PNG image, on the owner's page and on a shared link", async ({ page, browser }) => {
@@ -254,5 +268,63 @@ test("a chart can be saved as a PNG image, on the owner's page and on a shared l
   await view.goto(url);
   await expect(view.getByRole("img", { name: /^Bar chart: revenue by region/ })).toBeVisible({ timeout: 30_000 });
   await savePng(view);
+  await stranger.close();
+});
+
+test("present mode walks through the charts full screen with the keyboard, on the owner's page and a shared link", async ({ page, browser }) => {
+  await signUp(page);
+  await page.goto("/app/new");
+  await page.getByTestId("starter").filter({ hasText: "Online store orders" }).click();
+  await expect(page).toHaveURL(/\/app\/p\//, { timeout: 30_000 });
+  await expect(page.getByTestId("kpi-value").first()).not.toHaveText("", { timeout: 30_000 });
+
+  const walk = async (target: typeof page) => {
+    await target.getByRole("button", { name: "Present", exact: true }).click();
+    const present = target.getByTestId("present");
+    await expect(present).toBeVisible();
+    const count = target.getByTestId("present-count");
+    await expect(count).toHaveText(/^1 of \d+$/);
+    const total = Number((await count.innerText()).match(/of (\d+)/)![1]);
+    expect(total).toBeGreaterThan(5);
+    // the first slide is the headline numbers
+    await expect(present.getByTestId("kpi")).toHaveCount(3);
+    await expect(present.getByRole("button", { name: "Previous chart" })).toHaveAttribute("aria-disabled", "true");
+
+    await target.keyboard.press("ArrowRight");
+    await expect(count).toHaveText(`2 of ${total}`);
+    // a chart, drawn large
+    const chart = present.getByRole("img").first();
+    await expect(chart).toBeVisible();
+    const box = (await chart.boundingBox())!;
+    expect(box.height).toBeGreaterThan(380);
+    expect(box.width).toBeGreaterThan(600);
+
+    await target.keyboard.press("End");
+    await expect(count).toHaveText(`${total} of ${total}`);
+    await expect(present.getByRole("button", { name: "Next chart" })).toHaveAttribute("aria-disabled", "true");
+    await target.keyboard.press("ArrowLeft");
+    await expect(count).toHaveText(`${total - 1} of ${total}`);
+    await target.keyboard.press("Home");
+    await expect(count).toHaveText(`1 of ${total}`);
+    // the table of rows is not a slide
+    for (let i = 1; i < total; i++) {
+      await target.keyboard.press("ArrowRight");
+      await expect(present.getByRole("region", { name: /table that scrolls/ })).toHaveCount(0);
+    }
+
+    await target.keyboard.press("Escape");
+    await expect(present).toHaveCount(0);
+  };
+  await walk(page);
+
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Create link" }).click();
+  const url = await dialog.getByTestId("share-link").inputValue();
+  const stranger = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const view = await stranger.newPage();
+  await view.goto(url);
+  await expect(view.getByRole("img", { name: /^Bar chart: revenue by region/ })).toBeVisible({ timeout: 30_000 });
+  await walk(view);
   await stranger.close();
 });
