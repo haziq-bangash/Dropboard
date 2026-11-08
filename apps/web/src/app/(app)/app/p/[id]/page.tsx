@@ -17,6 +17,7 @@ import { Dashboard } from "@/components/Dashboard";
 import { PublishButton } from "@/components/PublishButton";
 import { DropZone } from "@/components/app/DropZone";
 import { InsightsPanel } from "@/components/app/InsightsPanel";
+import { StoryPanel } from "@/components/app/StoryPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -209,6 +210,7 @@ export default function ProjectPage() {
           <TabsList variant="line">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="insights">Insights</TabsTrigger>
+            <TabsTrigger value="story">Story</TabsTrigger>
           </TabsList>
           <TabsContent value="dashboard" className="flex flex-col gap-6 pt-4">
             <AiPanel
@@ -225,6 +227,9 @@ export default function ProjectPage() {
           </TabsContent>
           <TabsContent value="insights" className="pt-4">
             <InsightsPanel profile={data.profile} dataKey={data.loadId} />
+          </TabsContent>
+          <TabsContent value="story" className="pt-4">
+            <StoryPanel profile={data.profile} dataKey={data.loadId} />
           </TabsContent>
         </Tabs>
       )}
