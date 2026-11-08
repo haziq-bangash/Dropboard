@@ -14,6 +14,8 @@ export interface TableProfile {
   columns: ColumnProfile[];
   /** A latitude and longitude pair found in the columns, when there is one */
   coordinates?: { lat: string; lon: string };
+  /** A column of countries, when there is one. Other kinds of place are recognised but not drawn yet. */
+  countries?: string;
 }
 
 /** Map a DuckDB type name (e.g. "BIGINT", "DECIMAL(18,3)", "TIMESTAMP WITH TIME ZONE") to our simple types. */

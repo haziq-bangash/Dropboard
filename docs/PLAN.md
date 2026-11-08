@@ -66,6 +66,7 @@ Findings are computed in the browser from the data, so they are free to run and 
   - **Choosing a chart.** The suggester and ranker gain geography-aware rules: a place column plus a measure gives a choropleth, a latitude and longitude pair gives a cluster map, two categories plus a measure give a heatmap, a date plus a weekday or hour gives a calendar view. Pilot can pick among these through the same chart schema and the SQL guard.
   - **Samples.** Add a sample with locations (deliveries or store visits with coordinates and regions) so the maps show up in the starters.
   - **Exit:** a file with latitude and longitude opens with a cluster map; a file with country or state names opens with a choropleth; a published map holds no individual coordinates; a 50 MB file with coordinates still draws in under 5 seconds.
+- **Progress (Nov 2026).** Shipped: the coordinate map (v0.4.2), and a country-shaded region map with country shapes from Natural Earth 110m (public domain, 50 KB gzipped, served from `apps/web/public/geo/world.json`). Still to do: US states, cities and postal codes, heatmap, histogram, treemap, box plot, calendar heatmap, funnel, Sankey and flow map, and a hand-correction menu for detected place columns.
 
 ### Phase 6: Sources (v0.6.0)
 - **Paste and drag:** paste copied cells or a table from a page.

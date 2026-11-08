@@ -13,6 +13,7 @@ const KIND: Record<ChartSpec["type"], string> = {
   pie: "Pie chart",
   scatter: "Scatter plot",
   map: "Map",
+  regions: "Region map",
   kpi: "Headline number",
   table: "Table",
 };
@@ -58,6 +59,13 @@ export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y">
       const shown = top.slice(0, 5).map((p) => `${name(p.x)} ${said(p.y)}`);
       const more = top.length - shown.length;
       return `${head} ${top.length} bar${top.length === 1 ? "" : "s"}, highest first: ${list(shown)}${more > 0 ? `, and ${more} more` : ""}.`;
+    }
+
+    case "regions": {
+      const top = [...points].sort((a, b) => b.y - a.y);
+      const shown = top.slice(0, 5).map((p) => `${name(p.x)} ${said(p.y)}`);
+      const more = top.length - shown.length;
+      return `${head} ${top.length} place${top.length === 1 ? "" : "s"} shaded, highest first: ${list(shown)}${more > 0 ? `, and ${more} more` : ""}.`;
     }
 
     case "pie": {

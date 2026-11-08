@@ -35,9 +35,24 @@ describe("the map chart", () => {
     for (const b of published) expect(Number(b.n)).toBeGreaterThanOrEqual(MAP_MIN_ROWS);
   });
 
+  it("shades countries when a column holds them, adding up each country's rows", async () => {
+    const sql = await createSql();
+    const starter = STARTERS.find((s) => s.id === "delivery-drops")!;
+    sql.load(starter.csv());
+    const profile = { ...sql.profile(), countries: "country" };
+    const chart = suggestDashboard("Deliveries", profile).charts.find((c) => c.type === "regions")!;
+    expect(chart).toBeDefined();
+    expect(chart.title).toBe("Average delivery_minutes by country");
+    const guarded = guardSql(chart.query);
+    expect(guarded.ok).toBe(true);
+    const r = sql.run(guarded.ok ? guarded.sql : "");
+    expect(r.rows).toHaveLength(8);
+    expect(r.columns).toEqual(["x", "y"]);
+  });
+
   it("is not suggested without coordinates, and the floor leaves other charts alone", () => {
     const sql = { rowCount: 100, columns: [{ name: "revenue", type: "number" as const, nullCount: 0, distinct: 90 }] };
-    expect(suggestDashboard("No places", sql).charts.some((c) => c.type === "map")).toBe(false);
+    expect(suggestDashboard("No places", sql).charts.some((c) => c.type === "map" || c.type === "regions")).toBe(false);
     const rows = [{ n: 1 }, { n: 9 }];
     expect(applyPrivacyFloor({ type: "bar" }, rows)).toEqual(rows);
     expect(applyPrivacyFloor({ type: "map" }, rows)).toEqual([{ n: 9 }]);

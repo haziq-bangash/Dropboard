@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { chartSummary, said } from "../src/summary";
 
-const spec = (type: "bar" | "line" | "area" | "pie" | "scatter" | "kpi" | "table", title = "Revenue") => ({ type, title, x: "x", y: ["y"] });
+const spec = (type: "bar" | "line" | "area" | "pie" | "scatter" | "map" | "regions" | "kpi" | "table", title = "Revenue") => ({ type, title, x: "x", y: ["y"] });
 
 describe("said", () => {
   it("reads numbers the way people say them", () => {
@@ -59,6 +59,21 @@ describe("chartSummary", () => {
   it("describes a scatter plot by how many points and the range of each axis", () => {
     const rows = [{ x: 1, y: 10 }, { x: 5, y: 40 }, { x: 3, y: 25 }];
     expect(chartSummary(spec("scatter", "Spend vs revenue"), rows)).toBe("Scatter plot: Spend vs revenue. 3 points. Across them x runs from 1 to 5 and y from 10 to 40.");
+  });
+
+  it("describes a map of bins by the area it covers and where it is busiest", () => {
+    const rows = [{ x: 13.4, y: 52.5, n: 40 }, { x: 4.9, y: 52.4, n: 10 }, { x: 12.5, y: 41.9, n: 25 }];
+    expect(chartSummary(spec("map", "Where the rows are"), rows)).toBe(
+      "Map: Where the rows are. 3 areas with rows. Latitude runs from 41.9 to 52.5 and longitude from 4.9 to 13.4. Busiest area, near 52.5 latitude and 13.4 longitude, holds 40 of 75 rows.",
+    );
+    expect(chartSummary(spec("map", "Empty"), [])).toBe("Map: Empty. No data.");
+    expect(chartSummary(spec("map", "One"), [{ x: 1, y: 2, n: 5 }])).toContain("1 area with rows");
+  });
+
+  it("describes a region map as places shaded, highest first", () => {
+    const rows = [{ x: "France", y: 5 }, { x: "Spain", y: 9 }, { x: "Italy", y: 7 }];
+    expect(chartSummary(spec("regions", "Rows by country"), rows)).toBe("Region map: Rows by country. 3 places shaded, highest first: Spain 9, Italy 7 and France 5.");
+    expect(chartSummary(spec("regions", "Nothing"), [])).toBe("Region map: Nothing. No data.");
   });
 
   it("reads a headline number and a table", () => {

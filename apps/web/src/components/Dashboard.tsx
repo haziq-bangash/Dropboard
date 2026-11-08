@@ -1,6 +1,6 @@
 "use client";
 
-import { chartSummary } from "@dropboard/engine";
+import { chartSummary, countryCode } from "@dropboard/engine";
 import type { ChartSpec, DashboardSpec } from "@dropboard/spec";
 import * as echarts from "echarts";
 import { useQuery } from "@tanstack/react-query";
@@ -34,7 +34,32 @@ const fmt = (v: unknown) =>
     ? v.toLocaleString(undefined, { maximumFractionDigits: 2 })
     : String(v ?? "");
 
-function toOption(spec: ChartSpec, rows: Rows): echarts.EChartsCoreOption {
+type Geo = { features: { properties: { name: string; label: string }; geometry: { coordinates: unknown } }[] };
+
+/** Country shapes from Natural Earth (public domain), fetched once, only when a region map is on the page. */
+async function loadWorld(): Promise<Geo> {
+  const res = await fetch("/geo/world.json");
+  if (!res.ok) throw new Error("Could not load the map shapes.");
+  const world = await res.json();
+  echarts.registerMap("world", world);
+  return world;
+}
+
+/** The box around some countries, so a map of one region fills the chart. Skipped when it would wrap the whole globe. */
+function boundsOf(geo: Geo, codes: Set<string>): [[number, number], [number, number]] | undefined {
+  let minX = 180, maxX = -180, minY = 90, maxY = -90;
+  const walk = (c: unknown): void => {
+    if (Array.isArray(c) && typeof c[0] === "number") {
+      const [x, y] = c as number[];
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+    } else if (Array.isArray(c)) c.forEach(walk);
+  };
+  for (const f of geo.features) if (codes.has(f.properties.name)) walk(f.geometry.coordinates);
+  if (maxX < minX || maxX - minX > 300) return undefined;
+  return [[minX - 2, maxY + 2], [maxX + 2, minY - 2]];
+}
+
+function toOption(spec: ChartSpec, rows: Rows, geo?: Geo): echarts.EChartsCoreOption {
   const x = spec.x ?? "x";
   const y = spec.y?.[0] ?? "y";
   const axis = {
@@ -124,6 +149,44 @@ function toOption(spec: ChartSpec, rows: Rows): echarts.EChartsCoreOption {
         ],
       };
     }
+    case "regions": {
+      // Rows name countries however the file spells them; turn each into a country code and add up repeats.
+      const totals = new Map<string, number>();
+      for (const r of rows) {
+        const code = countryCode(r[x]);
+        const v = Number(r[y]);
+        if (code && Number.isFinite(v)) totals.set(code, (totals.get(code) ?? 0) + v);
+      }
+      const values = [...totals.values()];
+      const labels = new Map((geo?.features ?? []).map((f) => [f.properties.name, f.properties.label]));
+      return {
+        color: COLORS,
+        tooltip: { trigger: "item", formatter: (p: { name: string; value: unknown }) => `${labels.get(p.name) ?? p.name}: ${p.value == null || Number.isNaN(p.value) ? "no data" : fmt(p.value)}` },
+        visualMap: {
+          min: Math.min(0, ...values),
+          max: Math.max(1, ...values),
+          orient: "horizontal",
+          left: 8,
+          bottom: 4,
+          itemWidth: 12,
+          itemHeight: 90,
+          text: [fmt(Math.max(1, ...values)), "0"],
+          textStyle: { color: MUTED },
+          inRange: { color: ["#E3ECED", "#3E8E94", "#075056"] },
+        },
+        series: [
+          {
+            type: "map",
+            map: "world",
+            roam: false,
+            boundingCoords: geo ? boundsOf(geo, new Set(totals.keys())) : undefined,
+            itemStyle: { areaColor: "#F1F3F4", borderColor: "#FFFFFF", borderWidth: 0.6 },
+            emphasis: { label: { show: false }, itemStyle: { areaColor: "#FF5B04" } },
+            data: [...totals].map(([name, value]) => ({ name, value })),
+          },
+        ],
+      };
+    }
     case "pie":
       return {
         ...base,
@@ -140,20 +203,20 @@ function toOption(spec: ChartSpec, rows: Rows): echarts.EChartsCoreOption {
   }
 }
 
-function Chart({ spec, rows }: { spec: ChartSpec; rows: Rows }) {
+function Chart({ spec, rows, geo }: { spec: ChartSpec; rows: Rows; geo?: Geo }) {
   const ref = useRef<HTMLDivElement>(null);
   // ECharts owns a canvas outside React: create it, resize it with the window, and dispose it. Nothing else fits here.
   useEffect(() => {
     if (!ref.current) return;
     const chart = echarts.init(ref.current);
-    chart.setOption(toOption(spec, rows));
+    chart.setOption(toOption(spec, rows, geo));
     const onResize = () => chart.resize();
     window.addEventListener("resize", onResize);
     return () => {
       window.removeEventListener("resize", onResize);
       chart.dispose();
     };
-  }, [spec, rows]);
+  }, [spec, rows, geo]);
   // the picture is a canvas, which a screen reader cannot read: give it a sentence built from the same rows
   return <div ref={ref} className="h-64 w-full" role="img" aria-label={chartSummary(spec, rows)} />;
 }
@@ -204,10 +267,12 @@ function ChartCard({
     retry: false,
     refetchOnWindowFocus: false,
   });
+  // a region map also needs the country shapes, loaded once and shared by every such chart
+  const world = useQuery({ queryKey: ["geo", "world"], queryFn: loadWorld, enabled: spec.type === "regions", staleTime: Infinity, retry: false, refetchOnWindowFocus: false });
   const rows: Rows | null = query.data ?? null;
-  const error = query.error
-    ? query.error instanceof Error
-      ? query.error.message
+  const error = (query.error ?? world.error)
+    ? query.error instanceof Error || world.error instanceof Error
+      ? ((query.error ?? world.error) as Error).message
       : "Could not load this chart."
     : null;
 
@@ -246,12 +311,12 @@ function ChartCard({
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
-        ) : !rows ? (
+        ) : !rows || (spec.type === "regions" && !world.data) ? (
           <Skeleton className="h-64 w-full" />
         ) : spec.type === "table" ? (
           <Table rows={rows} />
         ) : (
-          <Chart spec={spec} rows={rows} />
+          <Chart spec={spec} rows={rows} geo={world.data} />
         )}
       </CardContent>
     </Card>

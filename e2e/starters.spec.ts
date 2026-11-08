@@ -94,7 +94,7 @@ test("every chart has a text description for screen readers, built from its own 
   expect(count).toBeGreaterThanOrEqual(3);
   for (let i = 0; i < count; i++) {
     const label = (await charts.nth(i).getAttribute("aria-label"))!;
-    expect(label, label).toMatch(/^(Bar chart|Line chart|Area chart|Pie chart|Scatter plot|Map): .+\./);
+    expect(label, label).toMatch(/^(Bar chart|Line chart|Area chart|Pie chart|Scatter plot|Map|Region map): .+\./);
     expect(label, label).not.toMatch(/undefined|NaN|null/);
   }
   // the bar chart of revenue by region reads out the regions, biggest first
@@ -118,6 +118,12 @@ test("a file with latitude and longitude opens with a map, and a published map h
   const areasOwn = Number(own.match(/(\d+) areas? with rows/)![1]);
   expect(areasOwn).toBeGreaterThan(5);
 
+  // the country column becomes a shaded map of the countries, drawn from shapes that are fetched once
+  const regions = page.getByRole("img", { name: /^Region map: Average delivery_minutes by country/ });
+  await expect(regions).toBeVisible({ timeout: 30_000 });
+  expect(await regions.getAttribute("aria-label")).toMatch(/8 places shaded, highest first: .+\./);
+  await expect(regions.locator("canvas")).toBeVisible();
+
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "Create link" }).click();
@@ -135,5 +141,7 @@ test("a file with latitude and longitude opens with a map, and a published map h
   // sparse bins are left out of what a stranger sees, so the published map has fewer areas than the owner's
   expect(areasShared).toBeLessThan(areasOwn);
   expect(areasShared).toBeGreaterThan(0);
+  // a stranger sees the shaded countries too, from the published numbers and no data of their own
+  await expect(view.getByRole("img", { name: /^Region map: Average delivery_minutes by country.*8 places shaded/ })).toBeVisible();
   await stranger.close();
 });
