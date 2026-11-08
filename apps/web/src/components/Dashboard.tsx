@@ -1,5 +1,6 @@
 "use client";
 
+import { chartSummary } from "@dropboard/engine";
 import type { ChartSpec, DashboardSpec } from "@dropboard/spec";
 import * as echarts from "echarts";
 import { useQuery } from "@tanstack/react-query";
@@ -130,7 +131,8 @@ function Chart({ spec, rows }: { spec: ChartSpec; rows: Rows }) {
       chart.dispose();
     };
   }, [spec, rows]);
-  return <div ref={ref} className="h-64 w-full" />;
+  // the picture is a canvas, which a screen reader cannot read: give it a sentence built from the same rows
+  return <div ref={ref} className="h-64 w-full" role="img" aria-label={chartSummary(spec, rows)} />;
 }
 
 export function Table({ rows }: { rows: Rows }) {
