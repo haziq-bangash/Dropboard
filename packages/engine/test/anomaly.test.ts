@@ -139,12 +139,29 @@ describe("unusual points in a series", () => {
 
   it("holds up when many points are anomalies: ten percent of the points spiked", () => {
     const { y, phases } = seasonal(4);
-    const bad = new Set([5, 14, 22, 31, 40, 47, 58]);
+    // spread unevenly, so they are surprises and not a rhythm
+    const bad = new Set([6, 17, 25, 30, 44, 53, 67]);
     for (const i of bad) y[i] *= 1.9;
     const found = new Set(seriesAnomalies(y, { season: { phases, period: 12 } }).map((f) => f.index));
     const hits = [...bad].filter((i) => found.has(i)).length;
     expect(hits).toBeGreaterThanOrEqual(6);
     expect([...found].filter((i) => !bad.has(i)).length).toBeLessThanOrEqual(1);
+  });
+
+  it("does not call a rhythm an anomaly: a spike in the first week of every month, in weekly data", () => {
+    const r = seeded(11);
+    const weeks = range(104);
+    // rent on the first of the month: every fourth or fifth week carries about eight times the usual
+    const y = weeks.map((i) => (Math.floor((i * 7) / 30.4) !== Math.floor(((i - 1) * 7) / 30.4) ? 1600 : 200) * (1 + r.normal() * 0.04));
+    expect(seriesAnomalies(y)).toEqual([]);
+  });
+
+  it("still reports a few irregular spikes next to such a rhythm only if they are not part of it", () => {
+    const { y, phases } = seasonal(7);
+    y[10] *= 2.2;
+    y[45] *= 0.3;
+    const found = seriesAnomalies(y, { season: { phases, period: 12 } }).map((f) => f.index).sort((a, b) => a - b);
+    expect(found).toEqual([10, 45]);
   });
 
   it("ignores series that are too short or perfectly flat, and a tiny wobble that is not meaningful", () => {
