@@ -75,7 +75,7 @@ export function AiPanel({
               <Input
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
-                placeholder="Optional: what should the dashboard focus on? e.g. revenue by region"
+                placeholder="What should it focus on? e.g. revenue by region"
                 aria-label="Dashboard instruction"
                 maxLength={500}
               />
@@ -107,7 +107,7 @@ export function AiPanel({
               <Input
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
-                placeholder="Ask about your data, e.g. which region grew fastest?"
+                placeholder="Ask a question, e.g. which region grew fastest?"
                 aria-label="Question about your data"
                 maxLength={500}
               />

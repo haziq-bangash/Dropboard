@@ -102,7 +102,8 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo): echarts.EChartsCoreOp
     case "area":
       return {
         ...base,
-        xAxis: { ...axis, type: "time" },
+        // on a narrow screen the month names would run together: let the chart drop the ones that do not fit
+        xAxis: { ...axis, type: "time", axisLabel: { ...axis.axisLabel, hideOverlap: true } },
         yAxis: { ...axis, type: "value" },
         series: [
           {
