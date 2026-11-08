@@ -18,6 +18,8 @@ export interface TableProfile {
   countries?: string;
   /** A column of US states (names or abbreviations), when there is one */
   states?: string;
+  /** Set when the file was too big to hold, so the table is a random sample: how many rows it holds, and how many the file has. */
+  sample?: { rows: number; of: number };
   /** A column of cities, when there is one (needs a column name that points at places, and the city list) */
   cities?: string;
 }

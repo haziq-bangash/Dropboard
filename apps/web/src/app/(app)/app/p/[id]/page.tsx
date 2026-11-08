@@ -21,6 +21,7 @@ import { StoryPanel } from "@/components/app/StoryPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AddChartMenu } from "@/components/app/AddChartMenu";
 import { PlacesMenu } from "@/components/app/PlacesMenu";
+import { SampleNotice } from "@/components/SampleNotice";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -208,6 +209,8 @@ export default function ProjectPage() {
           onFile={(file) => attach.mutate(file)}
         />
       ) : (
+        <>
+        {data.profile.sample && <SampleNotice sample={data.profile.sample} />}
         <Tabs defaultValue="dashboard">
           <TabsList className="h-10 rounded-full p-1">
             <TabsTrigger value="dashboard" className="rounded-full px-4">Dashboard</TabsTrigger>
@@ -247,6 +250,7 @@ export default function ProjectPage() {
             <StoryPanel profile={data.profile} dataKey={data.loadId} />
           </TabsContent>
         </Tabs>
+        </>
       )}
 
       <PublishedLinks
