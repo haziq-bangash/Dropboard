@@ -1,0 +1,1 @@
+Dropboard: turn any spreadsheet into a dashboard. A dashboard of revenue charts built from a spreadsheet.
