@@ -15,6 +15,7 @@ const COLUMNS: { title: string; links: [string, string][] }[] = [
   {
     title: "Trust",
     links: [
+      ["Trust center", "/trust"],
       ["Privacy by design", "/#privacy"],
       ["Safe sharing", "/#privacy"],
     ],
@@ -26,6 +27,14 @@ const COLUMNS: { title: string; links: [string, string][] }[] = [
       ["Create account", "/login"],
     ],
   },
+];
+
+/** The small print, along the bottom. */
+const LEGAL: [string, string][] = [
+  ["Privacy", "/privacy"],
+  ["Terms", "/terms"],
+  ["Trust center", "/trust"],
+  ["Licence", "https://github.com/haziq-bangash/Dropboard/blob/main/LICENSE"],
 ];
 
 export function Footer() {
@@ -64,8 +73,18 @@ export function Footer() {
         </div>
 
         <div className="mt-14 flex flex-wrap items-center justify-between gap-3 border-t border-foreground/15 pt-5 text-sm text-muted-foreground">
-          <p>© {new Date().getFullYear()} Dropboard. All rights reserved.</p>
-          <p>Your rows never leave your browser.</p>
+          <p>© {new Date().getFullYear()} Dropboard</p>
+          <nav aria-label="Legal">
+            <ul className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              {LEGAL.map(([label, href]) => (
+                <li key={label}>
+                  <Link href={href} className="transition-colors hover:text-foreground">
+                    {label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
         </div>
       </div>
 

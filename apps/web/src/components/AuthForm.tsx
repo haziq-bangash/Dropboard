@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowRight, Lock, Mail, MailCheck } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -186,6 +187,12 @@ export function AuthForm() {
           {busy ? "Please wait…" : mode === "in" ? "Sign in" : mode === "up" ? "Sign up" : "Send reset link"}
           {!busy && <ArrowRight />}
         </Button>
+        {mode === "up" && (
+          <p className="text-center text-xs text-muted-foreground" data-testid="agree">
+            By signing up you agree to the <Link href="/terms" className="underline underline-offset-4">terms of use</Link> and the{" "}
+            <Link href="/privacy" className="underline underline-offset-4">privacy policy</Link>.
+          </p>
+        )}
         {mode === "forgot" ? (
           <Button type="button" variant="link" onClick={() => go("in")}>
             Back to sign in
