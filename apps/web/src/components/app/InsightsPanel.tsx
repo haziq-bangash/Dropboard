@@ -1,0 +1,201 @@
+"use client";
+
+import type { Finding, FindingKind, TableProfile } from "@dropboard/engine";
+import {
+  CircleAlert,
+  CircleDashed,
+  Flag,
+  GitCompareArrows,
+  PieChart,
+  TrendingDown,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useInsights } from "@/lib/insights";
+
+const KIND: Record<FindingKind, { label: string; icon: LucideIcon }> = {
+  trend: { label: "Trend", icon: TrendingUp },
+  change: { label: "Step change", icon: Flag },
+  outlier: { label: "Outlier", icon: CircleAlert },
+  correlation: { label: "Relationship", icon: GitCompareArrows },
+  dominance: { label: "Dominant category", icon: PieChart },
+  concentration: { label: "Share of a total", icon: PieChart },
+  missing: { label: "Missing values", icon: CircleDashed },
+};
+
+/** The numbers behind a finding, in plain words, so a claim can be traced. */
+function evidenceLines(f: Finding): string[] {
+  const e = f.evidence;
+  const lines: string[] = [];
+  if (f.p !== null)
+    lines.push(
+      f.p < 0.001
+        ? "Very unlikely to be chance (p below 0.001)"
+        : `Unlikely to be chance (p = ${f.p.toPrecision(2)})`,
+    );
+  else
+    lines.push(
+      "Reported because the effect is large and clear, not from a chance test",
+    );
+  if (f.kind === "trend")
+    lines.push(
+      `Based on ${e.points} points; the fitted line moves ${e.noiseUnits} times the usual ups and downs`,
+    );
+  if (f.kind === "change")
+    lines.push(
+      `The level moved ${e.shiftInNoiseUnits} times the usual ups and downs, around ${e.at}`,
+    );
+  if (f.kind === "correlation")
+    lines.push(`Correlation ${e.r} across ${e.rows} rows`);
+  if (f.kind === "outlier")
+    lines.push(
+      `${e.count} value(s), ${Number(e.share) * 100 < 0.1 ? "under 0.1" : (Number(e.share) * 100).toFixed(1)}% of the rows`,
+    );
+  if (f.kind === "dominance" || f.kind === "concentration") {
+    // "times even" is the share divided by what an even split would give, so an even split is share / times
+    lines.push(
+      `${(Number(e.share) * 100).toFixed(0)}% held by one value, against ${((Number(e.share) / Number(e.timesEven)) * 100).toFixed(0)}% each in an even split`,
+    );
+  }
+  return lines;
+}
+
+function Tile({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <Card size="sm">
+      <CardContent>
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="mt-1 text-2xl font-semibold tracking-tight">{value}</p>
+        {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+export function InsightsPanel({
+  profile,
+  dataKey,
+}: {
+  profile: TableProfile;
+  dataKey: string;
+}) {
+  const insights = useInsights(profile, dataKey);
+  const cells = profile.rowCount * profile.columns.length;
+  const empty = profile.columns.reduce((s, c) => s + c.nullCount, 0);
+  const numeric = profile.columns.filter((c) => c.type === "number").length;
+
+  return (
+    <div className="flex flex-col gap-6" data-testid="insights">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Tile label="Rows" value={profile.rowCount.toLocaleString()} />
+        <Tile
+          label="Columns"
+          value={String(profile.columns.length)}
+          hint={`${numeric} numeric`}
+        />
+        <Tile
+          label="Completeness"
+          value={
+            cells ? `${Math.round((1 - empty / cells) * 1000) / 10}%` : "n/a"
+          }
+          hint="cells with a value"
+        />
+        <Tile
+          label="Findings"
+          value={insights.data ? String(insights.data.findings.length) : "…"}
+          hint={insights.data ? `found in ${insights.data.ms} ms` : "looking"}
+        />
+      </div>
+
+      <section aria-labelledby="findings-heading">
+        <h2
+          id="findings-heading"
+          className="text-lg font-semibold tracking-tight"
+        >
+          What stands out
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Worked out in your browser from summaries of your data. Each finding
+          is checked against chance and has to be big enough to matter, so a
+          quiet list is a fair answer.
+        </p>
+
+        {insights.isPending ? (
+          <div className="mt-4 grid gap-3">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-20 rounded-xl" />
+            ))}
+          </div>
+        ) : insights.error ? (
+          <Alert variant="destructive" className="mt-4">
+            <AlertDescription>
+              Could not look through this data. Try loading the file again.
+            </AlertDescription>
+          </Alert>
+        ) : insights.data.findings.length === 0 ? (
+          <Card className="mt-4" data-testid="no-findings">
+            <CardContent>
+              <p className="font-medium">Nothing stands out</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                No trend, relationship, step, outlier or lopsided category in
+                this data was both clear and large enough to report. That is a
+                result too: the numbers look steady and unrelated.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <ol className="mt-4 grid gap-3">
+            {insights.data.findings.map((f) => {
+              const { label, icon: Icon } =
+                f.kind === "trend" && Number(f.evidence.relativeChange) < 0
+                  ? { label: "Trend", icon: TrendingDown }
+                  : KIND[f.kind];
+              return (
+                <li
+                  key={`${f.kind}-${f.columns.join("-")}`}
+                  data-testid="finding"
+                >
+                  <Card>
+                    <CardContent className="flex gap-4">
+                      <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-secondary/60 text-brand-text">
+                        <Icon className="size-5" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <Badge variant="secondary" className="mb-1.5">
+                          {label}
+                        </Badge>
+                        <p className="text-base">{f.sentence}</p>
+                        <details className="mt-2 text-sm text-muted-foreground">
+                          <summary className="cursor-pointer select-none underline-offset-4 hover:underline">
+                            How we know
+                          </summary>
+                          <ul className="mt-1.5 list-disc pl-5">
+                            {evidenceLines(f).map((line) => (
+                              <li key={line}>{line}</li>
+                            ))}
+                          </ul>
+                        </details>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </section>
+    </div>
+  );
+}
