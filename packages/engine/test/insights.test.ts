@@ -171,3 +171,65 @@ describe("edge cases", () => {
     expect(found.filter((f) => f.kind === "correlation")).toEqual([]);
   });
 });
+
+describe("where a total comes from", () => {
+  const split = (parts: [string, number][]) => ({ rowCount: 100, contributions: [{ column: "category", measure: "amount", parts: parts.map(([label, value]) => ({ label, value })) }] });
+
+  it("says when one category holds most of a total", () => {
+    const found = findInsights(split([["Rent", 5400], ["Groceries", 1200], ["Transport", 900], ["Dining", 500]]));
+    expect(found).toHaveLength(1);
+    expect(found[0].kind).toBe("concentration");
+    expect(found[0].columns).toEqual(["category", "amount"]);
+    expect(found[0].sentence).toBe("Rent accounts for 68% of amount, about 2.7 times an even share across category.");
+    expect(found[0].p).toBeNull();
+  });
+
+  it("says nothing about an even split, or one that is only a little uneven", () => {
+    expect(findInsights(split([["a", 100], ["b", 100], ["c", 100], ["d", 100]]))).toEqual([]);
+    expect(findInsights(split([["a", 150], ["b", 120], ["c", 110], ["d", 120]]))).toEqual([]);
+  });
+
+  it("needs at least three groups, a positive total, and no negative parts", () => {
+    expect(findInsights(split([["a", 900], ["b", 100]]))).toEqual([]); // two groups: a share means little
+    expect(findInsights(split([["a", 0], ["b", 0], ["c", 0]]))).toEqual([]);
+    expect(findInsights(split([["a", 900], ["b", -400], ["c", 100]]))).toEqual([]); // shares of a net total are not shares
+  });
+});
+
+describe("outliers that are really a skewed or structured column", () => {
+  it("does not call 3% of rows outliers", () => {
+    const r = seeded(31);
+    const values = range(500).map((i) => (i < 15 ? 400 + r.normal() * 10 : 40 + r.normal() * 4));
+    expect(findInsights({ rowCount: 500, numeric: [{ column: "rent", values }] }).filter((f) => f.kind === "outlier")).toEqual([]);
+  });
+
+  it("still reports a handful of truly isolated ones", () => {
+    const r = seeded(32);
+    const values = range(1000).map((i) => (i < 3 ? 5000 : 40 + r.normal() * 4));
+    const found = findInsights({ rowCount: 1000, numeric: [{ column: "refund", values }] });
+    expect(found.filter((f) => f.kind === "outlier")).toHaveLength(1);
+    expect(found[0].sentence).toContain("3 values in refund");
+  });
+});
+
+describe("a short, varied list", () => {
+  // six columns that all move with one hidden driver: every pair is a strong correlation
+  const driver = (() => {
+    const r = seeded(41);
+    return range(300).map(() => r.normal());
+  })();
+  const columns = range(6).map((k) => {
+    const r = seeded(100 + k);
+    return { column: `m${k}`, values: driver.map((d) => d * (1 + k * 0.1) + r.normal() * 0.3) };
+  });
+
+  it("does not return six correlations in a row", () => {
+    const found = findInsights({ rowCount: 300, numeric: columns });
+    expect(found.filter((f) => f.kind === "correlation")).toHaveLength(3);
+  });
+
+  it("lets the cap be changed, and the overall limit still applies", () => {
+    expect(findInsights({ rowCount: 300, numeric: columns }, { perKind: 10, limit: 20 }).filter((f) => f.kind === "correlation").length).toBeGreaterThan(3);
+    expect(findInsights({ rowCount: 300, numeric: columns }, { perKind: 10, limit: 4 })).toHaveLength(4);
+  });
+});
