@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { createAiFromEnv } from "./ai/providers";
 import { createApp } from "./app";
 import { createAuth } from "./auth";
+import { billingFromEnv } from "./billing/stripe";
 import { createMailerFromEnv } from "./mail/mailer";
 import { createPrisma } from "./db";
 
@@ -14,6 +15,8 @@ function buildApp() {
     const ai = createAiFromEnv();
     const mailer = createMailerFromEnv();
     if (!mailer) console.warn("No mail provider configured (see MAIL_PROVIDER): password reset and email confirmation are off");
+    const billing = billingFromEnv();
+    console.log(billing ? `Billing enabled: ${Object.keys(billing.prices).join(", ")}` : "Billing is off (no Stripe keys): everyone is on the free plan");
     if (ai) console.log(`AI enabled: ${ai.provider}/${ai.model}`);
     else console.warn("No AI provider configured (see AI_PROVIDER): AI routes disabled");
     return createApp({
@@ -22,6 +25,7 @@ function buildApp() {
       mailer,
       ai,
       aiDailyLimit: Number(process.env.AI_DAILY_LIMIT) || undefined,
+      billing,
     });
   }
   // Not configured yet: stay up so health checks pass, but refuse API traffic clearly.

@@ -16,7 +16,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 interface Options {
   prisma: PrismaClient;
   ai?: AiService;
-  dailyLimit?: number;
+  /** Pilot requests a day: one number for everyone, or worked out per person (from their plan). */
+  dailyLimit?: number | ((userId: string) => Promise<number>);
   requireUser: MiddlewareHandler<AppEnv>;
 }
 
@@ -25,7 +26,8 @@ export function registerAiRoutes(app: Hono<AppEnv>, { prisma, ai, dailyLimit = D
     const used = await prisma.aiGeneration.count({
       where: { userId, cached: false, createdAt: { gt: new Date(Date.now() - DAY_MS) } },
     });
-    return Math.max(0, dailyLimit - used);
+    const allowed = typeof dailyLimit === "function" ? await dailyLimit(userId) : dailyLimit;
+    return Math.max(0, allowed - used);
   }
 
   const log = (userId: string, kind: string, cached: boolean, usage?: AiUsage) =>

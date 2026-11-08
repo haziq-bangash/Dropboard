@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { authClient } from "@/lib/auth-client";
+import { useProjectList } from "@/lib/queries";
 import { collectResults } from "@/lib/results";
 
 async function post<T>(path: string, body: unknown): Promise<T> {
@@ -44,6 +45,9 @@ export function PublishButton({ spec, projectId, onPublished }: { spec: Dashboar
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expires, setExpires] = useState("never");
+  // an expiry date is one of the paid plans' link controls
+  const controls = useProjectList(Boolean(session)).data?.limits.linkControls === true;
 
   if (!session) {
     return (
@@ -69,6 +73,7 @@ export function PublishButton({ spec, projectId, onPublished }: { spec: Dashboar
       const { slug } = await post<{ slug: string }>(`/api/projects/${id}/share`, {
         results,
         password: protect ? password : undefined,
+        expiresInDays: controls && expires !== "never" ? Number(expires) : undefined,
       });
       setLink(`${location.origin}/s/${slug}`);
       onPublished?.();
@@ -160,6 +165,34 @@ export function PublishButton({ spec, projectId, onPublished }: { spec: Dashboar
                       {reveal ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                     </button>
                   </div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2 rounded-lg border p-3">
+                <div className="flex items-center justify-between gap-4">
+                  <Label htmlFor="expiry" className="text-sm font-medium">
+                    Link expires
+                  </Label>
+                  <select
+                    id="expiry"
+                    value={controls ? expires : "never"}
+                    disabled={!controls}
+                    onChange={(e) => setExpires(e.target.value)}
+                    className="h-9 rounded-md border bg-background px-2 text-sm disabled:opacity-60"
+                  >
+                    <option value="never">Never</option>
+                    <option value="7">In 7 days</option>
+                    <option value="30">In 30 days</option>
+                    <option value="90">In 90 days</option>
+                  </select>
+                </div>
+                {!controls && (
+                  <p className="text-sm text-muted-foreground" data-testid="expiry-locked">
+                    Expiry dates are part of Pro.{" "}
+                    <Link href="/pricing" target="_blank" className="underline underline-offset-4">
+                      See the plans
+                    </Link>
+                  </p>
                 )}
               </div>
 

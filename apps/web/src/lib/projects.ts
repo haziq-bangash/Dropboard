@@ -14,6 +14,10 @@ export interface ProjectSummary {
 export interface Limits {
   projects: { used: number; max: number };
   publishedLinks: { used: number; max: number };
+  /** What the plan includes beyond counts. Missing from an older server, which is the same as not included. */
+  plan?: "free" | "pro" | "team";
+  exports?: boolean;
+  linkControls?: boolean;
 }
 
 export interface ProjectDetail {
@@ -23,7 +27,7 @@ export interface ProjectDetail {
   sourceName: string | null;
   rowCount: number | null;
   updatedAt: string;
-  shares: { slug: string; createdAt: string; passwordProtected: boolean }[];
+  shares: { slug: string; createdAt: string; passwordProtected: boolean; views?: number; expiresAt?: string | null }[];
 }
 
 /** An API error with the server's message, and `code: "limit_reached"` when a plan cap was hit. */

@@ -66,6 +66,10 @@ export function registerProjectRoutes(
       limits: {
         projects: { used: items.length, max: limits.projects },
         publishedLinks: { used: links, max: limits.publishedLinks },
+        // what the plan includes beyond counts, so the page can offer or withhold exports and link controls
+        plan: limits.plan,
+        exports: limits.exports,
+        linkControls: limits.linkControls,
       },
     });
   });
@@ -90,7 +94,7 @@ export function registerProjectRoutes(
       include: {
         shares: {
           where: { revokedAt: null },
-          select: { slug: true, createdAt: true, passwordHash: true },
+          select: { slug: true, createdAt: true, passwordHash: true, views: true, expiresAt: true },
           orderBy: { createdAt: "desc" },
         },
       },
@@ -99,7 +103,7 @@ export function registerProjectRoutes(
     const { shares, ...project } = item;
     return c.json({
       ...project,
-      shares: shares.map((s) => ({ slug: s.slug, createdAt: s.createdAt, passwordProtected: Boolean(s.passwordHash) })),
+      shares: shares.map((s) => ({ slug: s.slug, createdAt: s.createdAt, passwordProtected: Boolean(s.passwordHash), views: s.views, expiresAt: s.expiresAt })),
     });
   });
 
@@ -168,7 +172,11 @@ export function registerProjectRoutes(
         return c.json(limitReached("published links", limits.publishedLinks), 402);
       }
 
-      const { results, password } = c.req.valid("json");
+      const { results, password, expiresInDays } = c.req.valid("json");
+      // an expiry date is one of the paid plans' link controls
+      if (expiresInDays && !limits.linkControls) {
+        return c.json({ error: "Link expiry dates are part of Pro.", code: "upgrade_required" }, 402);
+      }
       // The raw-row preview table never leaves the browser, whatever the client sends
       const full = DashboardSpec.parse(project.spec);
       const spec = { ...full, charts: full.charts.filter((ch) => ch.type !== "table") };
@@ -185,6 +193,7 @@ export function registerProjectRoutes(
           passwordHash: password ? await hashPassword(password) : null,
           spec: json(spec),
           results: json(results),
+          expiresAt: expiresInDays ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000) : null,
         },
       });
       return c.json({ slug }, 201);
@@ -196,8 +205,10 @@ export function registerProjectRoutes(
     const gate = viewerRequests.take(clientKey(c));
     if (!gate.ok) return tooManyRequests(c, gate.retryAfterSeconds);
 
-    const share = await prisma.share.findUnique({ where: { slug: c.req.param("slug") } });
+    const share = await prisma.share.findUnique({ where: { slug: c.req.param("slug") }, include: { dashboard: { select: { ownerId: true } } } });
     if (!share || share.revokedAt) return c.json({ error: "not found" }, 404);
+    // an expired link says so, before it asks for a password
+    if (share.expiresAt && share.expiresAt.getTime() <= Date.now()) return c.json({ error: "This link has expired.", expired: true }, 410);
 
     if (share.passwordHash) {
       const supplied = c.req.header("x-share-password");
@@ -211,7 +222,9 @@ export function registerProjectRoutes(
       }
     }
     c.header("cache-control", "private, no-store");
-    return c.json({ spec: share.spec, results: share.results, createdAt: share.createdAt });
+    // counted once the person is let in; the badge follows the owner's plan as it is now, so it comes back if they stop paying
+    const [ownerLimits] = await Promise.all([limitsFor(share.dashboard.ownerId), prisma.share.update({ where: { id: share.id }, data: { views: { increment: 1 } } })]);
+    return c.json({ spec: share.spec, results: share.results, createdAt: share.createdAt, badge: !ownerLimits.noBadge });
   });
 
   app.delete("/api/shares/:slug", requireUser, async (c) => {

@@ -66,3 +66,30 @@ export function ordersWithBigCustomers(): string {
   }
   return rows.join("\n") + "\n";
 }
+
+/**
+ * Put an account on a paid plan, as Stripe's message would after a checkout. A test cannot pay, and the API reads limits from this
+ * table, so writing the row is the same as the webhook having done it. Also expires a link on demand.
+ */
+export async function withDatabase<T>(work: (query: (sql: string, params?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>) => Promise<T>): Promise<T> {
+  const { createRequire } = await import("node:module");
+  const path = await import("node:path");
+  const { Client } = createRequire(path.join(process.cwd(), "apps/api/package.json"))("pg") as typeof import("pg");
+  const client = new Client({ connectionString: process.env.DATABASE_URL ?? "postgres://dropboard:dropboard@localhost:5432/dropboard" });
+  await client.connect();
+  try {
+    return await work((sql, params) => client.query(sql, params as unknown[]));
+  } finally {
+    await client.end();
+  }
+}
+
+export async function grantPlan(email: string, plan: "pro" | "team" = "pro") {
+  await withDatabase((q) =>
+    q(
+      `INSERT INTO subscription ("userId", "stripeCustomerId", plan, status, "cancelAtPeriodEnd", "updatedAt")
+       SELECT id, $2, $3, 'active', false, now() FROM "user" WHERE email = $1`,
+      [email, `cus_e2e_${Date.now()}_${Math.floor(Math.random() * 1e6)}`, plan],
+    ),
+  );
+}

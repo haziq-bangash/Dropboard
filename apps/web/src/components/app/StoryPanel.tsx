@@ -4,6 +4,8 @@ import type { TableProfile } from "@dropboard/engine";
 import { applyNarration } from "@dropboard/engine";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
+import { useState } from "react";
+import { UpgradeDialog } from "@/components/app/UpgradeDialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { narrateStory } from "@/lib/ai";
@@ -15,8 +17,9 @@ import { EmptyTile } from "@/components/marketing/bento";
 import { KIND } from "@/components/app/InsightsPanel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { imageName } from "@/lib/image-name";
-import { renderStoryImage, type StoryImage } from "@/lib/story-image";
-import { Download } from "lucide-react";
+import { pdfFromJpeg } from "@/lib/pdf";
+import { renderStoryImage, renderStoryJpeg, type StoryImage } from "@/lib/story-image";
+import { Download, FileText } from "lucide-react";
 import { useInsights } from "@/lib/insights";
 
 /**
@@ -27,14 +30,35 @@ import { useInsights } from "@/lib/insights";
 export function StoryPanel({
   profile,
   dataKey,
+  exports,
 }: {
   profile: TableProfile;
   dataKey: string;
+  /** The story as a PDF is an export: it works on a plan with exports, and explains the plans otherwise. Left out, there is no button. */
+  exports?: "allowed" | "locked";
 }) {
+  const [upgrade, setUpgrade] = useState(false);
   const insights = useInsights(profile, dataKey);
   const { data: session } = authClient.useSession();
   const narrate = useMutation({ mutationFn: narrateStory });
   // the story as one picture, drawn here from the text on the page and saved to the device
+  const fontsNow = () => {
+    const headline = document.querySelector('[data-testid="story-headline"]');
+    return { serif: headline ? getComputedStyle(headline).fontFamily : "serif", sans: getComputedStyle(document.body).fontFamily };
+  };
+  // the same story, as one page of a PDF
+  const savePdf = useMutation({
+    mutationFn: async (story: StoryImage) => {
+      const jpeg = await renderStoryJpeg(story, fontsNow());
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(new Blob([pdfFromJpeg(jpeg.bytes, jpeg.width, jpeg.height, story.headline) as BlobPart], { type: "application/pdf" }));
+      link.download = imageName(`story ${story.headline}`).replace(/.png$/, ".pdf");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(link.href), 30_000);
+    },
+  });
   const save = useMutation({
     mutationFn: async (story: StoryImage) => {
       const headline = document.querySelector('[data-testid="story-headline"]');
@@ -100,6 +124,17 @@ export function StoryPanel({
   const italicFrom = Math.max(1, words.length - Math.max(1, Math.ceil(words.length / 3)));
   // what the story is made of, as small outlined tags
   const kinds = [...new Set([lead, ...rest.slice(0, 4)].map((f) => (f.kind === "trend" && Number(f.evidence.relativeChange) < 0 ? "Trend" : KIND[f.kind].label)))];
+  // what is drawn, as one picture or one PDF page
+  const story: StoryImage = {
+    headline: lead.headline,
+    italicFrom,
+    subline: `${profile.rowCount.toLocaleString()} rows and ${profile.columns.length} columns, read in your browser.`,
+    tags: kinds,
+    figures: figures.map((f) => ({ value: f.figure.value, label: f.figure.label, headline: f.headline })),
+    lead: lead.sentence,
+    chapters: chapters.map((f) => ({ headline: f.headline, sentence: f.sentence })),
+    footer: "Made with Dropboard. It describes patterns in this data; it does not explain them.",
+  };
   // each key figure sits on its own shape
   const shapes = ["bg-secondary", "rounded-t-[6rem] bg-[#CFE8E1]", "rounded-3xl bg-[#FFD59A]"];
 
@@ -132,21 +167,23 @@ export function StoryPanel({
             className="mt-5 rounded-full"
             data-testid="story-save"
             disabled={save.isPending}
-            onClick={() =>
-              save.mutate({
-                headline: lead.headline,
-                italicFrom,
-                subline: `${profile.rowCount.toLocaleString()} rows and ${profile.columns.length} columns, read in your browser.`,
-                tags: kinds,
-                figures: figures.map((f) => ({ value: f.figure.value, label: f.figure.label, headline: f.headline })),
-                lead: lead.sentence,
-                chapters: chapters.map((f) => ({ headline: f.headline, sentence: f.sentence })),
-                footer: "Made with Dropboard. It describes patterns in this data; it does not explain them.",
-              })
-            }
+            onClick={() => save.mutate(story)}
           >
             <Download className="size-4" aria-hidden="true" /> {save.isPending ? "Drawing…" : "Save as image"}
           </Button>
+          {exports && (
+            <Button
+              variant="outline"
+              className="ml-2 mt-5 rounded-full"
+              data-testid="story-pdf"
+              disabled={savePdf.isPending}
+              onClick={() => (exports === "allowed" ? savePdf.mutate(story) : setUpgrade(true))}
+            >
+              <FileText className="size-4" aria-hidden="true" /> {savePdf.isPending ? "Drawing…" : "Save as PDF"}
+            </Button>
+          )}
+          {exports === "locked" && <UpgradeDialog open={upgrade} onOpenChange={setUpgrade} what="Saving the story as a PDF" />}
+          {savePdf.error && <p role="alert" className="mt-2 text-sm text-destructive">The PDF could not be saved. Try again.</p>}
           {save.error && <p role="alert" className="mt-2 text-sm text-destructive">The picture could not be saved. Try again.</p>}
         </div>
         <StoryCollage />

@@ -22,9 +22,10 @@ export function PasswordGate({ slug }: { slug: string }) {
   const [data, setData] = useState<{
     spec: DashboardSpec;
     results: ShareResults;
+    badge?: boolean;
   } | null>(null);
 
-  if (data) return <SnapshotView spec={data.spec} results={data.results} />;
+  if (data) return <SnapshotView spec={data.spec} results={data.results} badge={data.badge} />;
 
   return (
     <Card className="mx-auto mt-10 w-full max-w-sm">
@@ -48,7 +49,7 @@ export function PasswordGate({ slug }: { slug: string }) {
             });
             setBusy(false);
             if (res.ok) setData(await res.json());
-            else if (res.status === 404)
+            else if (res.status === 404 || res.status === 410)
               setError("This link is no longer available.");
             else if (res.status === 429)
               setError("Too many tries. Please wait a minute and try again.");

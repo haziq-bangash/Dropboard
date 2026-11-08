@@ -6,7 +6,7 @@ import * as echarts from "echarts";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ChevronLeft, ChevronRight, Download, Presentation, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, FileSpreadsheet, Presentation, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { loadCities } from "@/lib/cities";
 import { Grain } from "@/components/art/Grain";
@@ -22,6 +22,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { UpgradeDialog } from "@/components/app/UpgradeDialog";
+import { rowsToCsv } from "@/lib/csv";
 import { imageName } from "@/lib/image-name";
 import type { RowSource, Rows } from "@/lib/results";
 
@@ -525,6 +527,15 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo, cityIndex?: CityIndex)
 }
 
 /** Save the chart inside `card` as a PNG, drawn at twice the size on a white page so it reads well when shared. */
+/** Save a chart's rows as a CSV file that opens in a spreadsheet. */
+function saveCsv(rows: Rows, title: string) {
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([rowsToCsv(rows)], { type: "text/csv;charset=utf-8" }));
+  link.download = imageName(title).replace(/.png$/, ".csv");
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 30_000);
+}
+
 function saveImage(card: HTMLElement | null, title: string) {
   const dom = card?.querySelector<HTMLElement>('[role="img"]');
   const chart = dom ? echarts.getInstanceByDom(dom) : undefined;
@@ -590,6 +601,7 @@ function ChartCard({
   tall,
   onRemove,
   kpiTone = "yellow",
+  exports,
 }: {
   spec: ChartSpec;
   source: RowSource;
@@ -600,7 +612,10 @@ function ChartCard({
   onRemove?: () => void;
   /** The tile colour, for a headline number */
   kpiTone?: keyof typeof TONES;
+  /** Show a button to save the chart's data as CSV: it works on a plan with exports, and explains the plans otherwise. Left out, there is no button. */
+  exports?: "allowed" | "locked";
 }) {
+  const [upgrade, setUpgrade] = useState(false);
   // Keyed by which rows are loaded, so the same SQL on a different file is never answered from the old rows
   const query = useQuery({
     queryKey: ["chart-rows", dataKey, spec.id, spec.query],
@@ -646,8 +661,19 @@ function ChartCard({
     >
       <CardHeader>
         <CardTitle className="font-serif text-xl font-normal tracking-normal">{spec.title}</CardTitle>
-        {(onRemove || (spec.type !== "table" && rows && !error)) && (
+        {(onRemove || exports || (spec.type !== "table" && rows && !error)) && (
           <CardAction className="flex items-center gap-1">
+            {exports && rows && !error && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Save the data behind ${spec.title} as CSV`}
+                data-testid="save-csv"
+                onClick={() => (exports === "allowed" ? saveCsv(rows, spec.title) : setUpgrade(true))}
+              >
+                <FileSpreadsheet />
+              </Button>
+            )}
             {spec.type !== "table" && rows && !error && (
               <Button variant="ghost" size="icon-sm" aria-label={`Save ${spec.title} as an image`} onClick={() => saveImage(cardRef.current, spec.title)}>
                 <Download />
@@ -674,6 +700,7 @@ function ChartCard({
           <Chart spec={spec} rows={rows} geo={world.data} cities={cityList.data} tall={tall} />
         )}
       </CardContent>
+      {exports === "locked" && <UpgradeDialog open={upgrade} onOpenChange={setUpgrade} what="Saving a chart's data as CSV" />}
     </Card>
   );
 }
@@ -759,6 +786,7 @@ export function Dashboard({
   dataKey,
   showTitle = true,
   onSpec,
+  exports,
 }: {
   spec: DashboardSpec;
   source: RowSource;
@@ -767,6 +795,8 @@ export function Dashboard({
   showTitle?: boolean;
   /** When given (the owner's page), charts get a remove button and the change is passed here to be saved */
   onSpec?: (spec: DashboardSpec) => void;
+  /** Offer saving each chart's data as CSV (owner's page only). */
+  exports?: "allowed" | "locked";
 }) {
   const kpis = spec.charts.filter((c) => c.type === "kpi");
   const rest = spec.charts.filter((c) => c.type !== "kpi");
@@ -790,6 +820,7 @@ export function Dashboard({
             spec={c}
             source={source}
             dataKey={dataKey}
+            exports={exports}
             onRemove={onSpec && spec.charts.length > 1 ? () => onSpec(removeChart(spec, c.id)) : undefined}
           />
         ))}

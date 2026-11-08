@@ -114,6 +114,13 @@ Findings are computed in the browser from the data, so they are free to run and 
 - **Share-link controls:** expiry dates, password, revoke, and a per-link view count.
 - **Exit:** test-mode subscription upgrades limits instantly, downgrade and cancel behave correctly, webhooks replay safely.
 
+**Phase 8 as built (billing and plans):**
+- Plans live in one table (apps/api/src/plans.ts): Free 3 projects, 3 links, 10 Pilot questions a day; Pro 9 euros a month, 50/50/200, no badge, CSV and PDF export, link expiry and view counts; Team 29 euros a month, 200/200/500 (shared workspaces are planned, not built).
+- Stripe Checkout and the customer portal, with a webhook that checks the signature on the raw body, ignores repeats, and reads the current subscription from Stripe so out-of-order messages cannot undo a newer state. Only test keys are accepted outside production. Billing is switched off, and the pricing page says so, until STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and STRIPE_PRICE_PRO are set (STRIPE_PRICE_TEAM and STRIPE_AUTOMATIC_TAX=1 are optional).
+- Enforced in the API: project, link and Pilot limits per plan; link expiry and views; the badge is decided when a link is opened, from the owner's plan at that moment, so a downgrade brings it back.
+- Exports built: CSV of a chart's data (spreadsheet formulas neutralised) and the story as a PDF. Not built yet: PPTX and dashboard PDF, hosted data in GCS, team workspaces.
+- Before billing goes live: an imprint with a postal address, and Stripe named as a processor (done in the privacy page).
+
 ### Phase 9: Growth (v0.9.0 onward)
 - **Templates and SEO pages:** Shopify, Stripe, GA4, generic sales and finance, each with a landing page, sample file and a dashboard that opens on it; social share images once a final domain exists.
 - **Connectors with scheduled refresh:** Shopify, Stripe, GA4, Google Sheets (signed in), via Cloud Scheduler and Cloud Run jobs; tokens encrypted at rest.

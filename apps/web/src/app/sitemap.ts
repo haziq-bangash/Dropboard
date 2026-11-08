@@ -5,6 +5,7 @@ import { SITE_URL } from "@/lib/brand";
 export default function sitemap(): MetadataRoute.Sitemap {
   const pages: [string, number][] = [
     ["/", 1],
+    ["/pricing", 0.8],
     ["/trust", 0.7],
     ["/privacy", 0.4],
     ["/terms", 0.4],

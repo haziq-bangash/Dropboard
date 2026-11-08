@@ -50,6 +50,7 @@ import {
   useKept,
   useProject,
   useProjectData,
+  useProjectList,
   useProjectMutations,
 } from "@/lib/queries";
 import { liveSource } from "@/lib/results";
@@ -94,6 +95,9 @@ export default function ProjectPage() {
     Boolean(project),
   );
   const kept = useKept(userId, id).data ?? false;
+  // what the plan includes: exports and link controls (the list that carries the limits is already loaded by the sidebar)
+  const limits = useProjectList().data?.limits;
+  const exportsMode = limits ? (limits.exports ? "allowed" : "locked") : undefined;
   const actions = useProjectMutations(userId);
   const device = useKeepOnDevice(userId, id);
   const attach = useMutation({
@@ -241,6 +245,7 @@ export default function ProjectPage() {
               source={liveSource}
               dataKey={data.loadId}
               showTitle={false}
+              exports={exportsMode}
               onSpec={(spec) => actions.saveSpec.mutate({ id, spec })}
             />
           </TabsContent>
@@ -248,7 +253,7 @@ export default function ProjectPage() {
             <InsightsPanel profile={data.profile} dataKey={data.loadId} />
           </TabsContent>
           <TabsContent value="story" className="pt-4">
-            <StoryPanel profile={data.profile} dataKey={data.loadId} />
+            <StoryPanel profile={data.profile} dataKey={data.loadId} exports={exportsMode} />
           </TabsContent>
         </Tabs>
         </>
@@ -256,6 +261,7 @@ export default function ProjectPage() {
 
       <PublishedLinks
         shares={project.shares}
+        controls={limits?.linkControls === true}
         onRevoke={(slug) => actions.revokeLink.mutate({ projectId: id, slug })}
       />
     </div>
@@ -373,9 +379,12 @@ function AttachPanel({
 function PublishedLinks({
   shares,
   onRevoke,
+  controls,
 }: {
   shares: ProjectDetail["shares"];
   onRevoke: (slug: string) => void;
+  /** The plan includes view counts and expiry dates. */
+  controls: boolean;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
   if (!shares.length) return null;
@@ -408,6 +417,12 @@ function PublishedLinks({
               {s.passwordProtected && (
                 <span className="text-xs text-muted-foreground">
                   Password protected
+                </span>
+              )}
+              {controls && (
+                <span className="text-xs text-muted-foreground" data-testid="link-views">
+                  {(s.views ?? 0).toLocaleString()} {s.views === 1 ? "view" : "views"}
+                  {s.expiresAt ? (new Date(s.expiresAt).getTime() <= Date.now() ? " · expired" : ` · expires ${new Date(s.expiresAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`) : ""}
                 </span>
               )}
               <Button

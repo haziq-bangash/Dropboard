@@ -21,6 +21,7 @@ model User {
   sessions   Session[]
   accounts   Account[]
   dashboards Dashboard[]
+  subscription Subscription?
 
   @@map("user")
 }
@@ -105,6 +106,10 @@ model Share {
   results      Json
   createdAt    DateTime  @default(now())
   revokedAt    DateTime?
+  // After this the link shows "expired" (a paid plan's link control). Null means it does not expire.
+  expiresAt    DateTime?
+  // How many times the link was opened by someone with access (a paid plan's link control).
+  views        Int       @default(0)
 
   @@index([dashboardId])
   @@map("share")
@@ -135,4 +140,33 @@ model AiGeneration {
 
   @@index([userId, createdAt])
   @@map("ai_generation")
+}
+
+// ---- Billing ----
+
+// One row per person who has been through checkout. The plan is what the limits are read from; Stripe is the source of truth and
+// the webhook keeps this in step with it.
+model Subscription {
+  userId               String    @id
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String    @unique
+  stripeSubscriptionId String?   @unique
+  // "pro" or "team". A person who is not paying has no row, or a canceled one.
+  plan                 String
+  // Stripe's own status: active, trialing, past_due, canceled, unpaid, incomplete...
+  status               String
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+  updatedAt            DateTime  @updatedAt
+
+  @@map("subscription")
+}
+
+// Stripe sends an event more than once now and then. Each id is recorded with the work it caused, so a repeat does nothing.
+model StripeEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now())
+
+  @@map("stripe_event")
 }
