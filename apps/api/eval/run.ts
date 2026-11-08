@@ -4,11 +4,13 @@
  *   set -a; . ./.env.staging.local; set +a        (keys are read from the environment and never printed or saved)
  *   pnpm --filter @dropboard/api exec tsx eval/run.ts --models anthropic:claude-haiku-5-5,openai:gpt-5.4-mini --trials 2
  *
+ * Add `--rescore eval/results/<run>.json` to score a saved run again with the current rules, without calling any model.
+ *
  * Each model gets every question about a sample dataset (it sees only column names, types and counts, exactly like the
  * real service), and its SQL is run through the same guard the server uses, then scored against the gold answers.
  * Each model is also asked to design a dashboard per dataset, and every chart is run to see whether it works.
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { guardSql, STARTERS } from "@dropboard/engine";
 import type { AiTable } from "@dropboard/spec";
 import { buildSpec } from "../src/ai/sanitize";
@@ -32,6 +34,7 @@ const MODELS = arg("models", "anthropic:claude-haiku-5-5,openai:gpt-5.4-mini,xai
 const TRIALS = Number(arg("trials", "2"));
 const CONCURRENCY = Number(arg("concurrency", "4"));
 const SKIP_GENERATE = process.argv.includes("--skip-generate");
+const RESCORE = arg("rescore", "");
 
 // ---- small helpers ----
 async function pool<T>(items: T[], size: number, work: (item: T) => Promise<void>) {
@@ -85,12 +88,15 @@ async function main() {
     sql.load(s.csv());
     tables.set(s.id, sql.profile());
   }
-  const services = new Map(MODELS.map((m) => [`${m.provider}/${m.model}`, service(m.provider, m.model)]));
-  console.log(`Models: ${[...services.keys()].join(", ")} | ${QUESTIONS.length} questions x ${TRIALS} trials | concurrency ${CONCURRENCY}`);
+  // a saved run is scored again from what the models said then; no model is called
+  const saved = RESCORE ? (JSON.parse(readFileSync(RESCORE, "utf8")) as { models: string[]; asks: (AskCall & { score?: unknown })[]; gens: (GenCall & { score?: unknown })[] }) : null;
+  const services = saved ? new Map<string, AiService>() : new Map(MODELS.map((m) => [`${m.provider}/${m.model}`, service(m.provider, m.model)]));
+  const modelNames: string[] = saved ? saved.models : [...services.keys()];
+  console.log(saved ? `Rescoring ${RESCORE}` : `Models: ${modelNames.join(", ")} | ${QUESTIONS.length} questions x ${TRIALS} trials | concurrency ${CONCURRENCY}`);
 
   // ---- 1. ask every model every question ----
-  const asks: AskCall[] = [];
-  const askJobs = [...services.keys()].flatMap((model) => QUESTIONS.flatMap((question) => Array.from({ length: TRIALS }, (_, trial) => ({ model, question, trial }))));
+  const asks: AskCall[] = saved ? saved.asks.map(({ score: _s, ...c }) => ({ ...c, question: QUESTIONS.find((q) => q.id === c.question.id)! })) : [];
+  const askJobs = saved ? [] : modelNames.flatMap((model) => QUESTIONS.flatMap((question) => Array.from({ length: TRIALS }, (_, trial) => ({ model, question, trial }))));
   let done = 0;
   await pool(askJobs, CONCURRENCY, async ({ model, question, trial }) => {
     const t0 = Date.now();
@@ -109,9 +115,9 @@ async function main() {
   });
 
   // ---- 2. ask every model to design a dashboard per dataset ----
-  const gens: GenCall[] = [];
-  if (!SKIP_GENERATE) {
-    const genJobs = [...services.keys()].flatMap((model) => STARTERS.flatMap((s) => Array.from({ length: TRIALS }, (_, trial) => ({ model, dataset: s.id, trial }))));
+  const gens: GenCall[] = saved ? saved.gens.map(({ score: _s, ...c }) => c) : [];
+  if (!SKIP_GENERATE && !saved) {
+    const genJobs = modelNames.flatMap((model) => STARTERS.flatMap((s) => Array.from({ length: TRIALS }, (_, trial) => ({ model, dataset: s.id, trial }))));
     await pool(genJobs, CONCURRENCY, async ({ model, dataset, trial }) => {
       const t0 = Date.now();
       const call: GenCall = { model, dataset, trial, ms: 0, inputTokens: 0, outputTokens: 0 };
@@ -132,7 +138,7 @@ async function main() {
 
   // ---- 3. score, one dataset at a time (they share the table name `data`) ----
   const gold = new Map<string, Result[]>();
-  const askScores = new Map<AskCall, { outcome: "correct" | "wrong" | "guard" | "sqlerror" | "provider"; reason: string }>();
+  const askScores = new Map<AskCall, { outcome: "correct" | "listed" | "wrong" | "guard" | "sqlerror" | "provider"; reason: string }>();
   const genScores = new Map<GenCall, { returned: number; valid: number; kinds: number; hasKpi: boolean; problems: string[] }>();
   for (const s of STARTERS) {
     sql.load(s.csv());
@@ -154,8 +160,16 @@ async function main() {
         askScores.set(call, { outcome: "sqlerror", reason: (e as Error).message.replace(/\s+/g, " ").slice(0, 140) });
         continue;
       }
-      const v = compareAny(gold.get(call.question.id)!, got, call.question.scales);
-      askScores.set(call, { outcome: v.ok ? "correct" : "wrong", reason: v.reason });
+      const goldResults = gold.get(call.question.id)!;
+      const v = compareAny(goldResults, got, call.question.scales);
+      if (v.ok) {
+        askScores.set(call, { outcome: "correct", reason: v.reason });
+      } else if (goldResults.every((g) => g.rows.length === 1) && got.rows.length > 1 && compareAny(goldResults, { columns: got.columns, rows: [got.rows[0]] }, call.question.scales).ok) {
+        // "which one is highest?" answered with every group, the right one first: a person would accept that
+        askScores.set(call, { outcome: "listed", reason: "right answer first in a longer list" });
+      } else {
+        askScores.set(call, { outcome: "wrong", reason: v.reason });
+      }
     }
     for (const call of gens.filter((c) => c.dataset === s.id)) {
       const problems: string[] = [];
@@ -189,21 +203,21 @@ async function main() {
 
   // ---- 4. report ----
   const lines: string[] = [];
-  lines.push(`# Pilot provider evaluation`, "", `${QUESTIONS.length} questions x ${TRIALS} trials per model, over four sample datasets. Run ${new Date().toISOString().slice(0, 10)}.`, "");
-  lines.push("## Questions (model writes SQL, browser runs it)", "", "| Model | Correct | Wrong answer | Rejected by guard | SQL error | Provider error | Median time | Tokens in / out per question |", "|---|---|---|---|---|---|---|---|");
+  lines.push(`# Pilot provider evaluation`, "", `${QUESTIONS.length} questions x ${saved ? Math.max(1, Math.round(asks.length / Math.max(1, modelNames.length) / QUESTIONS.length)) : TRIALS} trials per model, over four sample datasets. Run ${new Date().toISOString().slice(0, 10)}.`, "");
+  lines.push("## Questions (model writes SQL, browser runs it)", "", "| Model | Exactly right | Right answer first in a longer list | Wrong answer | Rejected by guard | SQL error | Provider error | Median time | Tokens in / out per question |", "|---|---|---|---|---|---|---|---|---|");
   const summary: Record<string, unknown> = {};
-  for (const model of services.keys()) {
+  for (const model of modelNames) {
     const mine = asks.filter((c) => c.model === model);
     const count = (o: string) => mine.filter((c) => askScores.get(c)!.outcome === o).length;
     const ok = mine.filter((c) => !c.error);
     lines.push(
-      `| ${model} | **${pct(count("correct"), mine.length)}** (${count("correct")}/${mine.length}) | ${count("wrong")} | ${count("guard")} | ${count("sqlerror")} | ${count("provider")} | ${(median(ok.map((c) => c.ms)) / 1000).toFixed(1)} s | ${Math.round(mean(ok.map((c) => c.inputTokens)))} / ${Math.round(mean(ok.map((c) => c.outputTokens)))} |`,
+      `| ${model} | **${pct(count("correct"), mine.length)}** (${count("correct")}/${mine.length}) | ${count("listed")} (usable: ${pct(count("correct") + count("listed"), mine.length)}) | ${count("wrong")} | ${count("guard")} | ${count("sqlerror")} | ${count("provider")} | ${(median(ok.map((c) => c.ms)) / 1000).toFixed(1)} s | ${Math.round(mean(ok.map((c) => c.inputTokens)))} / ${Math.round(mean(ok.map((c) => c.outputTokens)))} |`,
     );
     summary[model] = { correct: count("correct"), total: mine.length };
   }
   if (!SKIP_GENERATE) {
     lines.push("", "## Dashboards (model designs, server checks every chart)", "", "| Model | Charts returned | Charts that work | Fully working dashboards | Has a headline number | Median time | Tokens in / out |", "|---|---|---|---|---|---|---|");
-    for (const model of services.keys()) {
+    for (const model of modelNames) {
       const mine = gens.filter((c) => c.model === model);
       const scored = mine.map((c) => genScores.get(c)!);
       const returned = scored.reduce((s, x) => s + x.returned, 0);
@@ -216,7 +230,7 @@ async function main() {
     }
   }
   lines.push("", "## What went wrong (a sample per model)", "");
-  for (const model of services.keys()) {
+  for (const model of modelNames) {
     const bad = asks.filter((c) => c.model === model && askScores.get(c)!.outcome !== "correct").slice(0, 6);
     lines.push(`### ${model}`, "");
     if (!bad.length) lines.push("Nothing: every answer was right.", "");
@@ -231,7 +245,7 @@ async function main() {
   // raw answers for digging into, without any keys: only questions, SQL, scores and timings
   writeFileSync(
     `eval/results/${stamp}.json`,
-    JSON.stringify({ models: [...services.keys()], asks: asks.map((c) => ({ ...c, score: askScores.get(c) })), gens: gens.map((c) => ({ ...c, score: genScores.get(c) })) }, null, 2),
+    JSON.stringify({ models: [...modelNames], asks: asks.map((c) => ({ ...c, score: askScores.get(c) })), gens: gens.map((c) => ({ ...c, score: genScores.get(c) })) }, null, 2),
   );
   console.log("\n" + lines.join("\n"));
   console.log(`\nSaved eval/results/${stamp}.md and .json`);
