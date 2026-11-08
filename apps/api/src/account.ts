@@ -1,6 +1,6 @@
 import type { Hono, MiddlewareHandler } from "hono";
 import type { PrismaClient } from "./generated/prisma/client";
-import { limitsFor as defaultLimitsFor, type LimitsFor } from "./plans";
+import { limitsFor as defaultLimitsFor, PLANS, type LimitsFor } from "./plans";
 import type { AppEnv } from "./types";
 
 interface Deps {
@@ -25,7 +25,8 @@ export function registerAccountRoutes(app: Hono<AppEnv>, { prisma, requireUser, 
       prisma.user.findUnique({ where: { id: userId }, select: { createdAt: true, accounts: { select: { providerId: true } } } }),
     ]);
     return c.json({
-      plan: "Free",
+      plan: PLANS[limits.plan].name,
+      planId: limits.plan,
       memberSince: user?.createdAt ?? null,
       // which ways of signing in this account has, so the page offers a password form only where it applies
       signInMethods: [...new Set((user?.accounts ?? []).map((a) => a.providerId))],

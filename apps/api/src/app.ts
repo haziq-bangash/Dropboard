@@ -6,7 +6,9 @@ import type { Mailer } from "./mail/mailer";
 import { allowedOrigins, googleEnabled, type Auth } from "./auth";
 import { registerAiRoutes } from "./ai/routes";
 import type { AiService } from "./ai/service";
-import type { LimitsFor } from "./plans";
+import { createLimitsFor, type LimitsFor } from "./plans";
+import { registerBillingRoutes } from "./billing/routes";
+import type { BillingConfig } from "./billing/stripe";
 import { registerAccountRoutes } from "./account";
 import { registerProjectRoutes } from "./projects";
 import type { AppEnv } from "./types";
@@ -23,10 +25,14 @@ export interface Deps {
   /** Plan limits per user; defaults to the free plan. */
   limitsFor?: LimitsFor;
   shareLimits?: { requestsPerMinute: number; wrongPasswordsPerMinute: number };
+  /** Stripe, when it is configured. Without it there are no paid plans to buy. */
+  billing?: BillingConfig;
 }
 
-export function createApp({ prisma, auth, ai, aiDailyLimit, mailer, limitsFor, shareLimits }: Deps) {
+export function createApp({ prisma, auth, ai, aiDailyLimit, mailer, limitsFor, shareLimits, billing }: Deps) {
   const app = new Hono<AppEnv>();
+  // everyone's limits come from their plan, which comes from their subscription
+  const limits: LimitsFor = limitsFor ?? createLimitsFor(prisma);
 
   app.use("*", secureHeaders());
   const origins = allowedOrigins();
@@ -49,10 +55,12 @@ export function createApp({ prisma, auth, ai, aiDailyLimit, mailer, limitsFor, s
     await next();
   });
 
-  registerAiRoutes(app, { prisma, ai, dailyLimit: aiDailyLimit, requireUser });
+  // one number for everyone when AI_DAILY_LIMIT is set, otherwise each person's plan decides
+  registerAiRoutes(app, { prisma, ai, dailyLimit: aiDailyLimit ?? (async (userId) => (await limits(userId)).pilotPerDay), requireUser });
 
-  registerProjectRoutes(app, { prisma, requireUser, limitsFor, shareLimits });
-  registerAccountRoutes(app, { prisma, requireUser, limitsFor, aiDailyLimit });
+  registerProjectRoutes(app, { prisma, requireUser, limitsFor: limits, shareLimits });
+  registerAccountRoutes(app, { prisma, requireUser, limitsFor: limits, aiDailyLimit });
+  registerBillingRoutes(app, { prisma, requireUser, billing });
 
   return app;
 }

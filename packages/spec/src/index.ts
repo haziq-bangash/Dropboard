@@ -39,6 +39,8 @@ export const ShareResults = z.record(z.string(), z.array(z.record(z.string(), Ce
 export const PublishInput = z.object({
   results: ShareResults,
   password: z.string().min(4).max(128).optional(),
+  // the link stops working after this many days (a paid plan's link control)
+  expiresInDays: z.number().int().min(1).max(365).optional(),
 });
 
 export type ShareResults = z.infer<typeof ShareResults>;
