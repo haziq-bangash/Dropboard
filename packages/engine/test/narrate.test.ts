@@ -60,3 +60,20 @@ describe("checkNarration", () => {
     expect(out[0].headline).toBe("{label} leads");
   });
 });
+
+describe("applyNarration", () => {
+  const items = [{ id: "f0", headline: "{label} leads", sentence: "{label} makes up 41% of region.", next: "Check reliance." }];
+  it("puts real text back, leaves other findings and every figure alone", async () => {
+    const { applyNarration } = await import("../src/narrate");
+    const out = applyNarration([dominance, outlier], items);
+    expect(out[0].headline).toBe("North leads");
+    expect(out[0].sentence).toBe("North makes up 41% of region.");
+    expect(out[0].figure).toEqual(dominance.figure);
+    expect(out[1]).toBe(outlier);
+  });
+  it("keeps the plain wording when a placeholder cannot be filled", async () => {
+    const { applyNarration } = await import("../src/narrate");
+    const out = applyNarration([outlier], [{ id: "f0", headline: "{label}", sentence: "x", next: "y" }]);
+    expect(out[0]).toBe(outlier);
+  });
+});

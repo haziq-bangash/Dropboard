@@ -111,3 +111,20 @@ export function checkNarration(sent: NarrateFinding[], items: NarratedItem[]): N
   }
   return kept;
 }
+
+/**
+ * Lay a model's checked text over the plain findings, putting the real label, date or value back. A finding whose text
+ * is missing, or has a placeholder that cannot be filled, keeps its plain wording. Figures never change.
+ */
+export function applyNarration(findings: Finding[], items: NarratedItem[], show?: (n: number) => string): Finding[] {
+  const byId = new Map(items.map((i) => [i.id, i]));
+  return findings.map((f, i) => {
+    const item = byId.get(`f${i}`);
+    if (!item) return f;
+    const headline = fillTokens(item.headline, f.evidence, show);
+    const sentence = fillTokens(item.sentence, f.evidence, show);
+    const next = fillTokens(item.next, f.evidence, show);
+    if (headline === null || sentence === null || next === null) return f;
+    return { ...f, headline, sentence, next };
+  });
+}

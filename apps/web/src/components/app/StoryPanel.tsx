@@ -1,7 +1,14 @@
 "use client";
 
 import type { TableProfile } from "@dropboard/engine";
+import { applyNarration } from "@dropboard/engine";
+import { useMutation } from "@tanstack/react-query";
+import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { narrateStory } from "@/lib/ai";
+import { ASSISTANT } from "@/lib/brand";
+import { authClient } from "@/lib/auth-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useInsights } from "@/lib/insights";
@@ -19,6 +26,8 @@ export function StoryPanel({
   dataKey: string;
 }) {
   const insights = useInsights(profile, dataKey);
+  const { data: session } = authClient.useSession();
+  const narrate = useMutation({ mutationFn: narrateStory });
 
   if (insights.isPending) {
     return (
@@ -42,8 +51,9 @@ export function StoryPanel({
     );
   }
 
-  const findings = insights.data.findings;
-  if (findings.length === 0) {
+  const plain = insights.data.findings;
+  const findings = narrate.data ? applyNarration(plain, narrate.data.items, (n) => n.toLocaleString(undefined, { maximumSignificantDigits: 4 })) : plain;
+  if (plain.length === 0) {
     return (
       <div className="mx-auto max-w-3xl" data-testid="story">
         <Card data-testid="no-story">
@@ -87,6 +97,34 @@ export function StoryPanel({
           columns, read in your browser.
         </p>
       </header>
+
+      <section aria-label={`Write this story with ${ASSISTANT}`} className="flex flex-col gap-2 rounded-lg border p-4 text-sm">
+        {session ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="outline" disabled={narrate.isPending} onClick={() => narrate.mutate(plain)}>
+              {narrate.isPending ? "Writing…" : narrate.data ? `Write it again with ${ASSISTANT}` : `Write this with ${ASSISTANT}`}
+            </Button>
+            {narrate.data && (
+              <span className="text-muted-foreground">
+                {narrate.data.remaining} request{narrate.data.remaining === 1 ? "" : "s"} left today.
+              </span>
+            )}
+          </div>
+        ) : (
+          <p>
+            <Link href="/login" className="underline underline-offset-4">Sign in</Link> to have {ASSISTANT} write this story in its own words.
+          </p>
+        )}
+        <p className="text-muted-foreground">
+          {ASSISTANT} gets only the numbers behind each finding and your column names. Category names, dates and individual values are swapped for
+          placeholders before anything is sent, and put back here in your browser. It never sees rows.
+        </p>
+        {narrate.error && (
+          <Alert variant="destructive">
+            <AlertDescription>{narrate.error instanceof Error ? narrate.error.message : "Something went wrong."}</AlertDescription>
+          </Alert>
+        )}
+      </section>
 
       <section
         aria-label="Key figures"
@@ -137,9 +175,10 @@ export function StoryPanel({
       ))}
 
       <footer className="border-t pt-4 text-sm text-muted-foreground">
-        Written by fixed rules from the findings on the Insights tab, so it
-        reads the same every time. It describes patterns in this data; it does
-        not explain them.
+        {narrate.data
+          ? `The wording was written by ${ASSISTANT} from the numbers in the findings, and every number in it was checked against them. The figures above come straight from the data.`
+          : "Written by fixed rules from the findings on the Insights tab, so it reads the same every time."}{" "}
+        It describes patterns in this data; it does not explain them.
       </footer>
     </article>
   );
