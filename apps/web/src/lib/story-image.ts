@@ -262,7 +262,9 @@ function layout(ctx: Ctx, s: StoryImage, f: StoryFonts, paint: boolean): number 
 
 /** Draw the story and return it as a PNG. Fonts are waited for first, so the picture uses the page's own type and not a fallback. */
 export async function renderStoryImage(story: StoryImage, fonts: StoryFonts): Promise<Blob> {
-  await Promise.all([document.fonts.load(`88px ${fonts.serif}`), document.fonts.load(`italic 88px ${fonts.serif}`), document.fonts.load(`24px ${fonts.sans}`), document.fonts.load(`600 22px ${fonts.sans}`)]);
+  // a font that cannot be loaded must not stop the picture: after a few seconds the fallback type is used
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  await Promise.race([wait(4000), Promise.all([document.fonts.load(`88px ${fonts.serif}`), document.fonts.load(`italic 88px ${fonts.serif}`), document.fonts.load(`24px ${fonts.sans}`), document.fonts.load(`600 22px ${fonts.sans}`)]).catch(() => undefined)]);
   const measure = document.createElement("canvas").getContext("2d");
   if (!measure) throw new Error("This browser cannot draw the picture.");
   const height = Math.ceil(layout(measure, story, fonts, false));

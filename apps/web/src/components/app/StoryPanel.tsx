@@ -43,8 +43,11 @@ export function StoryPanel({
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
       link.download = imageName(`story ${story.headline}`);
+      document.body.appendChild(link);
       link.click();
-      URL.revokeObjectURL(link.href);
+      link.remove();
+      // the browser reads the file after the click, so the address is kept for a while before it is let go
+      setTimeout(() => URL.revokeObjectURL(link.href), 30_000);
     },
   });
 
