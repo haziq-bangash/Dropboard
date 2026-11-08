@@ -134,12 +134,64 @@ export function regionsChart(column: string, measure?: ColumnProfile, map: "worl
   };
 }
 
+const total = (measure?: ColumnProfile) => (measure ? `${aggregate(measure)}(${q(measure.name)})` : "count(*)");
+
 /**
- * Drop the bins on a map, and the groups in a box plot, that hold too few rows to publish: a box over one or two rows
- * would show the values themselves. Other charts are returned as they are.
+ * Tiles sized by a measure (or by how many rows), one per value of a category. With a second text column each tile is
+ * split into its parts, so a total can be read down two levels. x is the category, child the second level, y the size.
+ */
+export function treemapChart(category: string, measure?: ColumnProfile, child?: string): Omit<ChartSpec, "id" | "layout"> {
+  const v = total(measure);
+  const c = q(category);
+  const what = measure ? label(measure) : "Rows";
+  return {
+    type: "treemap",
+    title: child ? `${what} by ${category} and ${child}` : `${what} by ${category}`,
+    query: child
+      ? `SELECT ${c} AS x, ${q(child)} AS child, ${v} AS y FROM data WHERE ${c} IS NOT NULL AND ${q(child)} IS NOT NULL GROUP BY 1, 2 HAVING ${v} > 0 ORDER BY 3 DESC LIMIT 200`
+      : `SELECT ${c} AS x, ${v} AS y FROM data WHERE ${c} IS NOT NULL GROUP BY 1 HAVING ${v} > 0 ORDER BY 2 DESC LIMIT 40`,
+    x: "x",
+    y: ["y"],
+  };
+}
+
+/** Stages from the biggest to the smallest, drawn as a narrowing funnel: each value of a stage column with its size. */
+export function funnelChart(stage: string, measure?: ColumnProfile): Omit<ChartSpec, "id" | "layout"> {
+  const v = total(measure);
+  const c = q(stage);
+  return {
+    type: "funnel",
+    title: `${measure ? label(measure) : "Rows"} by ${stage}`,
+    query: `SELECT ${c} AS x, ${v} AS y FROM data WHERE ${c} IS NOT NULL GROUP BY 1 HAVING ${v} > 0 ORDER BY 2 DESC LIMIT 12`,
+    x: "x",
+    y: ["y"],
+  };
+}
+
+/**
+ * Where things go from one category to another: bands from each value of one column to each value of another, as wide
+ * as the measure (or the count of rows). x is where it starts, target where it ends, y the size and n the rows behind it,
+ * so a band over a handful of rows can be left out of a published copy.
+ */
+export function sankeyChart(from: string, to: string, measure?: ColumnProfile): Omit<ChartSpec, "id" | "layout"> {
+  const v = total(measure);
+  const a = q(from);
+  const b = q(to);
+  return {
+    type: "sankey",
+    title: `${measure ? label(measure) : "Rows"} from ${from} to ${to}`,
+    query: `SELECT ${a} AS x, ${b} AS target, ${v} AS y, count(*) AS n FROM data WHERE ${a} IS NOT NULL AND ${b} IS NOT NULL GROUP BY 1, 2 HAVING ${v} > 0 ORDER BY 3 DESC LIMIT 60`,
+    x: "x",
+    y: ["y"],
+  };
+}
+
+/**
+ * Drop the bins on a map, the groups in a box plot and the bands in a flow diagram that hold too few rows to publish: a
+ * box or a band over one or two rows would show the values themselves. Other charts are returned as they are.
  */
 export function applyPrivacyFloor<T extends Record<string, unknown>>(chart: Pick<ChartSpec, "type">, rows: T[]): T[] {
-  return chart.type === "map" || chart.type === "boxplot" ? rows.filter((r) => Number(r.n) >= MAP_MIN_ROWS) : rows;
+  return chart.type === "map" || chart.type === "boxplot" || chart.type === "sankey" ? rows.filter((r) => Number(r.n) >= MAP_MIN_ROWS) : rows;
 }
 
 export function suggestDashboard(title: string, profile: TableProfile): DashboardSpec {

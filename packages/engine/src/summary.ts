@@ -19,6 +19,9 @@ const KIND: Record<ChartSpec["type"], string> = {
   heatmap: "Heatmap",
   boxplot: "Box plot",
   calendar: "Calendar",
+  treemap: "Treemap",
+  funnel: "Funnel",
+  sankey: "Flow diagram",
   kpi: "Headline number",
   table: "Table",
 };
@@ -90,6 +93,38 @@ export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y" 
     const top = bins.reduce((m, b) => (b.n > m.n ? b : m));
     const end = (b: { from: number; width: number }) => (Number.isFinite(b.width) ? b.from + b.width : b.from);
     return `${head} ${bins.length} bins from ${said(bins[0].from)} to ${said(end(bins[bins.length - 1]))}. The most rows, ${said(top.n)} of ${said(total)}, fall between ${said(top.from)} and ${said(end(top))}.`;
+  }
+
+  if (spec.type === "treemap") {
+    const tiles = rows.map((r) => ({ x: name(r.x), child: r.child === undefined ? null : name(r.child), v: Number(r.y) })).filter((t) => Number.isFinite(t.v) && t.v > 0);
+    if (!tiles.length) return `${head} No data.`;
+    const all = tiles.reduce((s, t) => s + t.v, 0);
+    const parents = new Map<string, number>();
+    for (const t of tiles) parents.set(t.x, (parents.get(t.x) ?? 0) + t.v);
+    const top = [...parents].sort((a, b) => b[1] - a[1]);
+    const shown = top.slice(0, 4).map(([k, v]) => `${k} ${Math.round((v / all) * 100)}%`);
+    const more = top.length - shown.length;
+    const parts = tiles[0].child === null ? "" : ` Split into ${tiles.length} parts; the largest is ${tiles.reduce((m, t) => (t.v > m.v ? t : m)).child} under ${tiles.reduce((m, t) => (t.v > m.v ? t : m)).x}.`;
+    return `${head} ${top.length} group${top.length === 1 ? "" : "s"}, largest first: ${list(shown)}${more > 0 ? `, and ${more} more` : ""}.${parts}`;
+  }
+
+  if (spec.type === "funnel") {
+    const stages = rows.map((r) => ({ x: name(r.x), v: Number(r.y) })).filter((s) => Number.isFinite(s.v) && s.v > 0).sort((a, b) => b.v - a.v);
+    if (!stages.length) return `${head} No data.`;
+    const first = stages[0];
+    if (stages.length === 1) return `${head} One stage, ${first.x}, ${said(first.v)}.`;
+    const rest = stages.slice(1, 5).map((s) => `${s.x} ${said(s.v)} (${Math.round((s.v / first.v) * 100)}% of the first)`);
+    const more = stages.length - 1 - rest.length;
+    return `${head} ${stages.length} stages, widest first. ${first.x} ${said(first.v)}, then ${list(rest)}${more > 0 ? `, and ${more} more` : ""}.`;
+  }
+
+  if (spec.type === "sankey") {
+    const flows = rows.map((r) => ({ from: name(r.x), to: name(r.target), v: Number(r.y) })).filter((f) => Number.isFinite(f.v) && f.v > 0);
+    if (!flows.length) return `${head} No data.`;
+    const sources = new Set(flows.map((f) => f.from)).size;
+    const targets = new Set(flows.map((f) => f.to)).size;
+    const top = [...flows].sort((a, b) => b.v - a.v).slice(0, 3).map((f) => `${f.from} to ${f.to} ${said(f.v)}`);
+    return `${head} ${flows.length} flow${flows.length === 1 ? "" : "s"} from ${sources} start${sources === 1 ? "" : "s"} to ${targets} end${targets === 1 ? "" : "s"}. Largest: ${list(top)}.`;
   }
 
   const xKey = spec.x ?? "x";
