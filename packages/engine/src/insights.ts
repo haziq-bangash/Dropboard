@@ -1,3 +1,4 @@
+import { latestChange, seasonality } from "./stats/season";
 import { benjaminiHochberg, changePoint, dominance, mannKendall, mean, median, outliers, pearson, type Trend } from "./stats/tests";
 
 /**
@@ -10,7 +11,7 @@ import { benjaminiHochberg, changePoint, dominance, mannKendall, mean, median, o
  *   3. Findings come back ranked, with a plain sentence and the numbers behind it.
  */
 
-export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "concentration" | "missing";
+export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "concentration" | "missing" | "seasonal" | "latest" | "duplicates";
 
 export interface Finding {
   kind: FindingKind;
@@ -42,6 +43,8 @@ export interface SeriesInput {
   y: number[];
   /** What to call each x in a sentence, same length as x. */
   labels?: string[];
+  /** The step between points, when x is a time. Lets the engine look for a yearly or weekly pattern and for the latest move. */
+  unit?: "day" | "week" | "month";
 }
 
 export interface InsightInput {
@@ -56,6 +59,8 @@ export interface InsightInput {
   contributions?: { column: string; measure: string; parts: { label: string; value: number }[] }[];
   /** Columns and how many rows are empty. */
   missing?: { column: string; nullCount: number }[];
+  /** How many rows are exact copies of an earlier row. */
+  duplicates?: { rows: number };
 }
 
 export interface InsightOptions {
@@ -78,6 +83,11 @@ export const FLOORS = {
   concentrationShare: 0.4, // one category holds at least 40% of a total
   concentrationTimes: 2, // and at least twice an even share
   missingShare: 0.2,
+  seasonStrength: 0.5, // the repeating pattern explains at least half of what is left after the trend
+  seasonAmplitude: 0.15, // and its high and low points are at least 15% of the typical level apart
+  latestChange: 0.1, // the latest period moved at least 10% from the one before
+  latestZ: 3, // and at least 3 robust spreads more than a usual move
+  duplicateShare: 0.02, // at least 2% of rows are copies
   changeShift: 4, // noise units
   changeRelative: 0.1, // and the level moves at least 10%
 } as const;
@@ -90,6 +100,8 @@ const fmt = (n: number) => {
   if (a >= 100) return String(Math.round(n));
   return String(Number(n.toPrecision(3)));
 };
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const pct = (x: number) => `${Math.round(Math.abs(x) * 100)}%`;
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 /** Fold how unlikely the result is by chance into the ranking, without letting it overrule how big the effect is. */
@@ -146,6 +158,30 @@ function describe(f: RawFinding): Pick<Finding, "headline" | "figure" | "next"> 
         next: "Check whether these are mistakes (a typo, an extra zero) or real events worth a closer look.",
       };
     }
+    case "seasonal": {
+      const yearly = Number(e.period) === 12;
+      return {
+        headline: `${a} follows a ${yearly ? "yearly" : "weekly"} pattern`,
+        figure: { value: pct(Number(e.amplitude)), label: `between the highest and lowest ${yearly ? "month" : "day"}` },
+        next: yearly
+          ? "Compare each month with the same month last year, not with the month before, and plan around the high and low months."
+          : "Compare each day with the same weekday, not with the day before, and plan staffing and stock around the pattern.",
+      };
+    }
+    case "latest": {
+      const change = Number(e.change);
+      return {
+        headline: `${a} ${change > 0 ? "jumped" : "fell"} ${pct(change)} in the latest period`,
+        figure: { value: `${change >= 0 ? "+" : "-"}${pct(change)}`, label: "since the period before" },
+        next: "Check whether the latest period is complete and whether something changed just then, before reading it as a trend.",
+      };
+    }
+    case "duplicates":
+      return {
+        headline: `${fmt(Number(e.duplicateRows))} rows are copies`,
+        figure: { value: pct(Number(e.share)), label: "of rows repeat an earlier row" },
+        next: "Check whether these are the same record entered twice or separate events that look alike, since totals and counts include every copy.",
+      };
     case "missing":
       return {
         headline: `${a} has gaps`,
@@ -186,6 +222,41 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
     candidates.push(c);
     trendFor.set(s.column, c);
     trendStats.set(s.column, m);
+  }
+
+  // ---- a repeating yearly or weekly pattern, and an unusual latest move ----
+  for (const s of input.series ?? []) {
+    if (!s.unit) continue;
+    const period = s.unit === "month" ? 12 : s.unit === "day" ? 7 : 0;
+    const phases = s.x.map((t) => (s.unit === "month" ? new Date(t).getUTCMonth() : new Date(t).getUTCDay()));
+    const season = period ? seasonality(s.y, phases, period) : null;
+    if (season) {
+      const names = period === 12 ? MONTH_NAMES : DAY_NAMES;
+      candidates.push({
+        kind: "seasonal",
+        columns: [s.column],
+        sentence: `${s.column} follows a ${period === 12 ? "yearly" : "weekly"} pattern: highest ${period === 12 ? "in" : "on"} ${names[season.peak]}, lowest ${period === 12 ? "in" : "on"} ${names[season.low]}, about ${pct(season.amplitude)} apart.`,
+        p: season.p,
+        strength: clamp01(season.strength) * clamp01(season.amplitude) * confidence(season.p),
+        evidence: { period, strength: Number(season.strength.toFixed(2)), amplitude: Number(season.amplitude.toFixed(3)), peak: names[season.peak], low: names[season.low] },
+        tested: true,
+        passesFloor: season.strength >= FLOORS.seasonStrength && Math.abs(season.amplitude) >= FLOORS.seasonAmplitude,
+      });
+    }
+    const last = s.unit === "day" ? null : latestChange(s.y);
+    if (last) {
+      const where = s.labels?.[s.y.length - 1] ?? "the latest period";
+      candidates.push({
+        kind: "latest",
+        columns: [s.column],
+        sentence: `${s.column} ${last.relativeChange > 0 ? "rose" : "fell"} ${pct(last.relativeChange)} in ${where}, much more than it usually moves from one period to the next.`,
+        p: last.p,
+        strength: clamp01(Math.abs(last.relativeChange)) * confidence(last.p) * 0.8,
+        evidence: { change: Number(last.relativeChange.toFixed(3)), z: Number(last.z.toFixed(1)), previous: Number(fmt(last.previous)), latest: Number(fmt(last.latest)), at: where },
+        tested: true,
+        passesFloor: Math.abs(last.relativeChange) >= FLOORS.latestChange && Math.abs(last.z) >= FLOORS.latestZ,
+      });
+    }
   }
 
   // ---- everything below tests one hypothesis per item; collect p-values for the single correction ----
@@ -308,6 +379,23 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
       evidence: { emptyRows: m.nullCount, share: Number(share.toFixed(3)) },
     });
   }
+
+  const copies = input.duplicates?.rows ?? 0;
+  const copyShare = input.rowCount ? copies / input.rowCount : 0;
+  if (copies >= 2 && copyShare >= FLOORS.duplicateShare) {
+    found.push({
+      kind: "duplicates",
+      columns: [],
+      sentence: `${fmt(copies)} rows (${pct(copyShare)}) are exact copies of another row.`,
+      p: null,
+      strength: copyShare * 0.6,
+      evidence: { duplicateRows: copies, share: Number(copyShare.toFixed(3)) },
+    });
+  }
+
+  // a yearly or weekly pattern already explains why the latest period is high or low, so the pattern is said instead
+  const seasonal = new Set(found.filter((x) => x.kind === "seasonal").map((x) => x.columns[0]));
+  found = found.filter((x) => !(x.kind === "latest" && seasonal.has(x.columns[0])));
 
   // strongest first, but never more than `perKind` of one kind
   const perKind = options.perKind ?? 3;
