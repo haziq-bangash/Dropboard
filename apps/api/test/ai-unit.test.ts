@@ -96,3 +96,73 @@ describe("buildSpec", () => {
     expect(() => buildSpec(table, { title: "x", charts: [chart("kpi", "DELETE FROM data")] })).toThrow(AiBadOutput);
   });
 });
+
+describe("buildSpec with charts described by columns", () => {
+  const places = {
+    rowCount: 500,
+    columns: [
+      { name: "country", type: "string" as const, nullCount: 0, distinct: 12 },
+      { name: "channel", type: "string" as const, nullCount: 0, distinct: 4 },
+      { name: "lat", type: "number" as const, nullCount: 0, distinct: 400 },
+      { name: "lng", type: "number" as const, nullCount: 0, distinct: 400 },
+      { name: "revenue", type: "number" as const, nullCount: 0, distinct: 300 },
+      { name: "notes", type: "string" as const, nullCount: 0, distinct: 480 },
+    ],
+  };
+  const chart = (type: "kpi" | "bar", query: string, title = "t") => ({ type, title, query });
+  const special = (type: "histogram" | "heatmap" | "map" | "regions", columns: string[], title = "") => ({ type, title, query: "", columns });
+
+  it("builds the query on the server, so the model only names columns", () => {
+    const { spec, dropped } = buildSpec(places, {
+      title: "Places",
+      charts: [
+        special("histogram", ["revenue"], "Spread of revenue"),
+        special("heatmap", ["country", "channel", "revenue"]),
+        special("map", ["lat", "lng"]),
+        special("regions", ["country", "revenue"]),
+      ],
+    });
+    expect(dropped).toEqual([]);
+    expect(spec.charts.map((c) => c.type)).toEqual(["histogram", "heatmap", "map", "regions"]);
+    expect(spec.charts[0].title).toBe("Spread of revenue");
+    // an empty title falls back to the builder's own
+    expect(spec.charts[1].title).toBe("revenue by country and channel");
+    expect(spec.charts[2].query).toContain('"lat"');
+    for (const c of spec.charts) expect(c).toMatchObject({ x: "x", y: ["y"] });
+  });
+
+  it("drops a chart with an unknown column, a wrong type, too few columns, or too many categories", () => {
+    const { spec, dropped } = buildSpec(places, {
+      title: "x",
+      charts: [
+        chart("kpi", "SELECT count(*) AS value FROM data"),
+        special("histogram", ["nope"]),
+        special("histogram", ["country"]),
+        special("heatmap", ["country"]),
+        special("heatmap", ["country", "notes"]),
+        special("map", ["lat", "country"]),
+        special("regions", ["revenue"]),
+        special("regions", []),
+      ],
+    });
+    expect(spec.charts).toHaveLength(1);
+    expect(dropped.map((d) => d.reason)).toEqual([
+      "no column called nope",
+      "country is not a number column",
+      "heatmap needs 2 column names",
+      "a heatmap needs columns with few distinct values",
+      "a map needs a latitude and a longitude number column",
+      "revenue is not a text column",
+      "regions needs 1 column name",
+    ]);
+  });
+
+  it("never lets a column name that is not in the table reach a query", () => {
+    const { dropped } = buildSpec(places, {
+      title: "x",
+      charts: [chart("kpi", "SELECT 1 AS value"), special("histogram", ['revenue") FROM data; DROP TABLE data; --'])],
+    });
+    expect(dropped).toHaveLength(1);
+    expect(dropped[0].reason).toMatch(/^no column called/);
+  });
+});
