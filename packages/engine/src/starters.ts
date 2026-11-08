@@ -147,6 +147,39 @@ function supportTickets() {
   return toCsv(["created_date", "resolution_hours", "first_response_minutes", "satisfaction", "priority", "channel", "category"], rows);
 }
 
+function deliveries() {
+  const r = rng(71);
+  // city centres, picked so every coordinate is positive and the clusters are far enough apart to read
+  const cities = [
+    ["Berlin", 52.52, 13.4, 5],
+    ["Vienna", 48.21, 16.37, 3],
+    ["Prague", 50.08, 14.44, 3],
+    ["Warsaw", 52.23, 21.01, 4],
+    ["Budapest", 47.5, 19.04, 3],
+    ["Rome", 41.9, 12.5, 4],
+    ["Amsterdam", 52.37, 4.9, 4],
+    ["Zurich", 47.38, 8.54, 2],
+  ] as const;
+  const statuses = [["Delivered", 17], ["Late", 3], ["Failed", 1]] as const;
+  const vehicles = [["Van", 6], ["Bike", 4], ["Scooter", 3]] as const;
+  const rows: (string | number)[][] = [];
+  const start = day(2025, 0, 1);
+  for (let d = 0; d < 180; d++) {
+    const date = addDays(start, d * 2);
+    for (let i = 0; i < 3; i++) {
+      const [city, lat, lon] = r.weighted(cities.map((c) => [c, c[3]] as const));
+      const vehicle = r.weighted(vehicles);
+      const km = round(r.between(0.8, 14), 1);
+      const status = r.weighted(statuses);
+      const minutes = Math.round(km * (vehicle === "Bike" ? 4.5 : vehicle === "Scooter" ? 3.5 : 3) * r.between(0.8, 1.4) * (status === "Late" ? 1.8 : 1) + r.between(6, 14));
+      // most drops fall within a few kilometres of the centre, with the odd one further out
+      const spread = r.next() < 0.1 ? 0.35 : 0.08;
+      rows.push([iso(date), minutes, round(lat + r.between(-spread, spread), 4), round(lon + r.between(-spread, spread) * 1.5, 4), km, city, vehicle, status]);
+    }
+  }
+  return toCsv(["delivered_date", "delivery_minutes", "latitude", "longitude", "distance_km", "city", "vehicle", "status"], rows);
+}
+
 const count = (csv: () => string) => csv().trimEnd().split("\n").length - 1;
 
 export const STARTERS: Starter[] = [
@@ -185,5 +218,14 @@ export const STARTERS: Starter[] = [
     shows: "Response and resolution times, what drives satisfaction",
     csv: supportTickets,
     rows: count(supportTickets),
+  },
+  {
+    id: "delivery-drops",
+    title: "Delivery drops",
+    description: "Half a year of deliveries across eight European cities, with where each one landed.",
+    fileName: "delivery-drops.csv",
+    shows: "A map of where the rows are, delivery times by city and vehicle",
+    csv: deliveries,
+    rows: count(deliveries),
   },
 ];

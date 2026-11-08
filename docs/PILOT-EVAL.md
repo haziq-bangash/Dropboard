@@ -11,6 +11,7 @@ pnpm --filter @dropboard/api exec tsx eval/run.ts --rescore eval/results/<run>.j
 ## How it works
 
 - **Questions.** 42 questions over the four sample datasets, 12 of them harder (shares of a total, medians, ratios, date filters, gaps between statistics). Each has gold SQL, with several forms where a question can be answered more than one way (a month as a date, a number or a name). A test checks that every gold query runs, and that no "which is highest?" question has a tied answer.
+- **Added since the results below.** A fifth sample (delivery drops, with coordinates) brought nine more questions, so the set is now 51. The numbers below are from the first 42 and have not been re-run with the new ones.
 - **What the model sees.** Only column names, types and counts, exactly like the real service. Never a row.
 - **Scoring.** The model's SQL goes through the same guard as the server, runs in DuckDB (the engine the browser uses), and is compared with the gold answer. Extra columns, column order and row order do not count against it. A "which is highest?" answered with every group, the right one first, is counted separately as *usable*.
 - **Dashboards.** Each model designs a dashboard per dataset. Every chart is run, and counts as working only if it returns rows with the columns the renderer binds to.
