@@ -28,6 +28,38 @@ describe("the evaluation question set", () => {
     }
   }, 60_000);
 
+  it("has no question whose right answer is a tie, because a model would be marked wrong for a fair tie-break", async () => {
+    // for every "which one is highest/lowest?" question: the best and the runner-up must differ clearly
+    const sql = await createSql();
+    const cases: [string, string, string][] = [
+      ["ecommerce-orders", "e2", "SELECT sum(revenue) m FROM data GROUP BY region ORDER BY 1 DESC LIMIT 2"],
+      ["ecommerce-orders", "e6", "SELECT avg(quantity) m FROM data GROUP BY category ORDER BY 1 DESC LIMIT 2"],
+      ["ecommerce-orders", "e9", "SELECT sum(revenue) m FROM data GROUP BY order_date ORDER BY 1 DESC LIMIT 2"],
+      ["ecommerce-orders", "e10", "SELECT sum(revenue) / count(*) m FROM data GROUP BY region ORDER BY 1 DESC LIMIT 2"],
+      ["ecommerce-orders", "e12", "SELECT sum(revenue) m FROM data GROUP BY category ORDER BY 1 DESC LIMIT 4"],
+      ["household-spending", "h2", "SELECT sum(amount) m FROM data GROUP BY category ORDER BY 1 DESC LIMIT 2"],
+      ["household-spending", "h6", "SELECT sum(amount) m FROM data GROUP BY date_trunc('month', date) ORDER BY 1 DESC LIMIT 2"],
+      ["marketing-performance", "m3", "SELECT sum(revenue) / sum(spend) m FROM data GROUP BY channel ORDER BY 1 DESC LIMIT 2"],
+      ["marketing-performance", "m6", "SELECT sum(revenue) m FROM data GROUP BY objective ORDER BY 1 DESC LIMIT 2"],
+      ["marketing-performance", "m8", "SELECT sum(revenue) m FROM data GROUP BY week_start ORDER BY 1 DESC LIMIT 2"],
+      ["marketing-performance", "m9", "SELECT sum(conversions) * 1.0 / sum(clicks) m FROM data GROUP BY channel ORDER BY 1 DESC LIMIT 2"],
+      ["support-tickets", "s3", "SELECT avg(satisfaction) m FROM data GROUP BY channel ORDER BY 1 ASC LIMIT 2"],
+      ["support-tickets", "s5", "SELECT count(*) m FROM data GROUP BY category ORDER BY 1 ASC LIMIT 2"],
+      ["support-tickets", "s7", "SELECT count(*) m FROM data GROUP BY dayname(created_date) ORDER BY 1 DESC LIMIT 2"],
+      ["support-tickets", "s10", "SELECT abs(avg(resolution_hours) - median(resolution_hours)) m FROM data GROUP BY priority ORDER BY 1 DESC LIMIT 2"],
+    ];
+    let loaded = "";
+    for (const [dataset, id, query] of cases) {
+      if (dataset !== loaded) {
+        sql.load(STARTERS.find((s) => s.id === dataset)!.csv());
+        loaded = dataset;
+      }
+      const m = sql.run(query).rows.map((r) => Number(r[0]));
+      const cut = id === "e12" ? 2 : 0; // the top 3 must be separated from the 4th
+      expect(Math.abs(m[cut] - m[cut + 1]) / Math.max(Math.abs(m[cut]), 1e-9), `${id} has a clear winner`).toBeGreaterThan(0.005);
+    }
+  }, 60_000);
+
   it("asks questions that do not hand over the answer, and use the real column values", async () => {
     // a question that names a value ('App', 'Electronics') must name one that exists, or the gold answer is empty
     const sql = await createSql();

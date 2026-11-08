@@ -73,7 +73,7 @@ export const QUESTIONS: Question[] = [
   { dataset: "support-tickets", id: "s2", ask: "What is the average resolution time in hours for Urgent tickets?", gold: ["SELECT avg(resolution_hours) FROM data WHERE priority = 'Urgent'"] },
   { dataset: "support-tickets", id: "s3", ask: "Which channel has the lowest average satisfaction?", gold: ["SELECT channel FROM data GROUP BY 1 ORDER BY avg(satisfaction) ASC LIMIT 1"] },
   { dataset: "support-tickets", id: "s4", ask: "How many tickets are there for each priority?", gold: ["SELECT priority, count(*) FROM data GROUP BY 1"] },
-  { dataset: "support-tickets", id: "s5", ask: "Which category has the most tickets?", gold: ["SELECT category FROM data GROUP BY 1 ORDER BY count(*) DESC LIMIT 1"] },
+  { dataset: "support-tickets", id: "s5", ask: "Which category has the fewest tickets?", gold: ["SELECT category FROM data GROUP BY 1 ORDER BY count(*) ASC LIMIT 1"] },
   { dataset: "support-tickets", id: "s6", ask: "What is the average first response time in minutes for Chat?", gold: ["SELECT avg(first_response_minutes) FROM data WHERE channel = 'Chat'"] },
   {
     dataset: "support-tickets",
