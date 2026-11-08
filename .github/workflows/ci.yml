@@ -150,9 +150,8 @@ jobs:
           file: apps/${{ matrix.app }}/Dockerfile
           load: true
           tags: dropboard-${{ matrix.app }}:ci
-          # main's cache (written by deploys) is readable here, and this branch's own cache speeds up re-pushes
+          # main's cache (written by deploys) is read here. A pull request does not write its own: nothing else can reuse it, and it fills the cache allowance
           cache-from: type=gha,scope=${{ matrix.app }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
       - name: Smoke test and size budget
         run: |
           size=$(docker image inspect dropboard-${{ matrix.app }}:ci --format '{{.Size}}')
