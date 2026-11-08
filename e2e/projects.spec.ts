@@ -45,6 +45,8 @@ test("a dropped file becomes a saved project that is listed, renamed, duplicated
   await expect(page.getByText("Q4 sales (copy)")).toBeVisible();
   await expect(page.getByRole("progressbar", { name: "Projects" })).toHaveAttribute("aria-valuenow", "2");
 
+  // the menu used for duplicating must be gone before the next one opens, or both offer a Delete
+  await expect(page.getByRole("menu")).toHaveCount(0);
   await page.getByTestId("project-card").filter({ hasText: "(copy)" }).getByRole("button", { name: /Actions for/ }).click();
   await page.getByRole("menuitem", { name: "Delete" }).click();
   await page.getByRole("button", { name: "Delete project" }).click();

@@ -12,6 +12,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
+/** The colours the project tiles take in turn, as on the homepage. */
+const TILE_TONES = ["teal", "yellow", "grey", "orange"] as const;
+
 export default function Projects() {
   const { items, limits, error } = useProjects();
   const [message, setMessage] = useState<string | null>(null);
@@ -75,9 +78,9 @@ export default function Projects() {
             <StarterGrid />
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map((p) => (
-              <ProjectCard key={p.id} project={p} onError={setMessage} />
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {items.map((p, i) => (
+              <ProjectCard key={p.id} project={p} onError={setMessage} tone={TILE_TONES[i % TILE_TONES.length]} />
             ))}
           </div>
         )}
