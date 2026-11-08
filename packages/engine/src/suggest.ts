@@ -5,6 +5,30 @@ import { freeTextColumns, wordsChartQuery } from "./text";
 import { aggregateFor, looksLikeId, measureKind, timeColumn, timeExpression, valueKind } from "./understand";
 
 const MAX_CHARTS = 10;
+
+/** How much each kind of chart usually tells a reader, when nothing about the data says otherwise: the headline numbers, the story over time and the places first, the finer views of one measure last. */
+/** What each further chart of the same kind loses from its score. */
+const VARIETY = 12;
+
+const PRIORITY: Record<ChartSpec["type"], number> = {
+  kpi: 100,
+  line: 95,
+  area: 90,
+  regions: 86,
+  map: 86,
+  cities: 86,
+  bar: 80,
+  treemap: 70,
+  funnel: 70,
+  sankey: 70,
+  scatter: 52,
+  histogram: 62,
+  boxplot: 60,
+  heatmap: 58,
+  calendar: 66,
+  pie: 45,
+  table: 0,
+};
 const HISTOGRAM_BINS = 20;
 const HEATMAP_MAX_SIDE = 12;
 const MAX_CATEGORIES = 20;
@@ -335,11 +359,33 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
   const dates = columns.filter((c) => c.type === "date");
   const time = timeColumn(profile);
 
-  const charts: ChartSpec[] = [];
-  const add = (c: Omit<ChartSpec, "id" | "layout">) => {
-    // up to ten charts, and always one more place for the data preview, so a rich file never pushes it out
-    if (charts.length >= (c.type === "table" ? MAX_CHARTS + 1 : MAX_CHARTS)) return;
-    charts.push({ ...c, id: `c${charts.length + 1}`, layout: { x: 0, y: 0, w: 1, h: 1 } });
+  // Every chart that could be drawn is a candidate with a score for what it tells a reader, and the best ten are kept (always with the
+  // data preview as one more), shown in the order they were thought of. A rich file used to keep whichever came first.
+  const candidates: { chart: Omit<ChartSpec, "id" | "layout">; score: number }[] = [];
+  const add = (c: Omit<ChartSpec, "id" | "layout">, score: number = PRIORITY[c.type]) => {
+    candidates.push({ chart: c, score });
+  };
+  const charts = {
+    /** The chosen charts, numbered. */
+    pick(): ChartSpec[] {
+      const body = candidates.filter((x) => x.chart.type !== "table");
+      // a fourth bar chart says less than a first map: each further chart of a kind is worth a little less, so a rich file gets a variety
+      const seen = new Map<string, number>();
+      const worth = body.map((x) => {
+        const before = seen.get(x.chart.type) ?? 0;
+        seen.set(x.chart.type, before + 1);
+        return x.score - before * VARIETY;
+      });
+      const kept = new Set(
+        body
+          .map((x, i) => ({ x, i, worth: worth[i] }))
+          .sort((a, b) => b.worth - a.worth || a.i - b.i)
+          .slice(0, MAX_CHARTS)
+          .map(({ x }) => x),
+      );
+      const table = candidates.find((x) => x.chart.type === "table");
+      return [...body.filter((x) => kept.has(x)), ...(table ? [table] : [])].map((x, i) => ({ ...x.chart, id: `c${i + 1}`, layout: { x: 0, y: 0, w: 1, h: 1 } }));
+    },
   };
 
   // One row per entity per period (a company by year): each entity's own story, and who leads, in place of the totals of a plain table
@@ -385,7 +431,7 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
     }
     if (main.distinct > HISTOGRAM_BINS) add(histogramChart(main.name));
     add({ type: "table", title: "Data preview", query: "SELECT * FROM data LIMIT 100" });
-    return { version: 1, title, schema: columns.map((c) => ({ name: c.name, type: c.type })), charts };
+    return { version: 1, title, schema: columns.map((c) => ({ name: c.name, type: c.type })), charts: charts.pick() };
   }
 
   // KPIs: row count + totals of the first measures
@@ -414,7 +460,7 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
   }
 
   // Who comes back: each month's new people, and the share of them active in each month after
-  if (profile.customers) add(cohortChart(profile.customers.column, timeExpression(time!.column, time!.kind)));
+  if (profile.customers) add(cohortChart(profile.customers.column, timeExpression(time!.column, time!.kind)), 88);
 
   // Places: a latitude and longitude pair becomes a map of where the rows are
   if (profile.coordinates) add(mapChart(profile.coordinates.lat, profile.coordinates.lon));
@@ -452,7 +498,7 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
   // Free text: the words people use most
   const freeText = freeTextColumns(profile)[0];
   if (freeText) {
-    add({ type: "bar", title: `Most common words in ${freeText.name}`, query: wordsChartQuery(freeText.name, rows), x: "x", y: ["y"] });
+    add({ type: "bar", title: `Most common words in ${freeText.name}`, query: wordsChartQuery(freeText.name, rows), x: "x", y: ["y"] }, 78);
   }
 
   // How the main measure is spread out, when it takes enough different values to have a shape
@@ -473,13 +519,18 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
   // Share of rows for a small category
   const small = categories.find((c) => c.distinct <= 6);
   if (small) {
-    add({
-      type: "pie",
-      title: `Share of rows by ${small.name}`,
-      query: `SELECT ${q(small.name)} AS x, count(*) AS y FROM data GROUP BY 1 ORDER BY 2 DESC`,
-      x: "x",
-      y: ["y"],
-    });
+    // a share already read off a bar of the same column says nothing new
+    const shown = candidates.some((x) => x.chart.type === "bar" && x.chart.query.includes(`${q(small.name)} AS x`));
+    add(
+      {
+        type: "pie",
+        title: `Share of rows by ${small.name}`,
+        query: `SELECT ${q(small.name)} AS x, count(*) AS y FROM data GROUP BY 1 ORDER BY 2 DESC`,
+        x: "x",
+        y: ["y"],
+      },
+      shown ? 15 : PRIORITY.pie,
+    );
   }
 
   // Relationship between two measures
@@ -502,6 +553,6 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
     version: 1,
     title,
     schema: columns.map((c) => ({ name: c.name, type: c.type })),
-    charts,
+    charts: charts.pick(),
   };
 }
