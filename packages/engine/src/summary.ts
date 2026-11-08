@@ -16,6 +16,7 @@ const KIND: Record<ChartSpec["type"], string> = {
   regions: "Region map",
   histogram: "Histogram",
   heatmap: "Heatmap",
+  boxplot: "Box plot",
   kpi: "Headline number",
   table: "Table",
 };
@@ -56,6 +57,17 @@ export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y">
     const high = cells.reduce((m, c) => (c.v > m.v ? c : m));
     const low = cells.reduce((m, c) => (c.v < m.v ? c : m));
     return `${head} ${cells.length} combinations. Highest: ${name(high.x)} and ${name(high.y)}, ${said(high.v)}. Lowest: ${name(low.x)} and ${name(low.y)}, ${said(low.v)}.`;
+  }
+
+  if (spec.type === "boxplot") {
+    const groups = rows.map((r) => ({ x: r.x, med: Number(r.y), q1: Number(r.q1), q3: Number(r.q3) })).filter((g) => Number.isFinite(g.med));
+    if (!groups.length) return `${head} No data.`;
+    const top = groups.reduce((m, g) => (g.med > m.med ? g : m));
+    const bottom = groups.reduce((m, g) => (g.med < m.med ? g : m));
+    const middle = (g: typeof top) => (Number.isFinite(g.q1) && Number.isFinite(g.q3) ? `, middle half from ${said(g.q1)} to ${said(g.q3)}` : "");
+    const count = `${groups.length} group${groups.length === 1 ? "" : "s"}`;
+    if (groups.length === 1) return `${head} ${count}. ${name(top.x)} has a median of ${said(top.med)}${middle(top)}.`;
+    return `${head} ${count}. Highest median: ${name(top.x)}, ${said(top.med)}${middle(top)}. Lowest median: ${name(bottom.x)}, ${said(bottom.med)}${middle(bottom)}.`;
   }
 
   if (spec.type === "histogram") {

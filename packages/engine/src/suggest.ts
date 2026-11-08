@@ -63,6 +63,26 @@ export function histogramChart(measure: string): Omit<ChartSpec, "id" | "layout"
   };
 }
 
+/**
+ * How a measure is spread out within each group: the middle half of the values as a box, the median as a line, and
+ * whiskers out to the furthest value within one and a half box-lengths. x is the group, y the median, n the rows in it.
+ */
+export function boxplotChart(category: string, measure: string): Omit<ChartSpec, "id" | "layout"> {
+  const c = q(category);
+  const m = q(measure);
+  return {
+    type: "boxplot",
+    title: `How ${measure} varies by ${category}`,
+    query:
+      `WITH s AS (SELECT ${c} AS x, quantile_cont(${m}, 0.25) AS q1, quantile_cont(${m}, 0.5) AS y, quantile_cont(${m}, 0.75) AS q3, count(*) AS n FROM data WHERE ${c} IS NOT NULL AND ${m} IS NOT NULL GROUP BY 1) ` +
+      `SELECT s.x, s.y, min(d.${m}) FILTER (WHERE d.${m} >= s.q1 - 1.5 * (s.q3 - s.q1)) AS low, s.q1, s.q3, ` +
+      `max(d.${m}) FILTER (WHERE d.${m} <= s.q3 + 1.5 * (s.q3 - s.q1)) AS high, s.n ` +
+      `FROM s JOIN data d ON d.${c} = s.x AND d.${m} IS NOT NULL GROUP BY s.x, s.y, s.q1, s.q3, s.n ORDER BY s.y DESC LIMIT 20`,
+    x: "x",
+    y: ["y"],
+  };
+}
+
 /** Two categories against each other, each cell shaded by a measure (or by how many rows fall in it). */
 export function heatmapChart(a: string, b: string, measure?: ColumnProfile): Omit<ChartSpec, "id" | "layout"> {
   const value = measure ? `${aggregate(measure)}(${q(measure.name)})` : "count(*)";
@@ -88,9 +108,12 @@ export function regionsChart(column: string, measure?: ColumnProfile): Omit<Char
   };
 }
 
-/** Drop the bins on a map that hold too few rows to publish. Other charts are returned as they are. */
+/**
+ * Drop the bins on a map, and the groups in a box plot, that hold too few rows to publish: a box over one or two rows
+ * would show the values themselves. Other charts are returned as they are.
+ */
 export function applyPrivacyFloor<T extends Record<string, unknown>>(chart: Pick<ChartSpec, "type">, rows: T[]): T[] {
-  return chart.type === "map" ? rows.filter((r) => Number(r.n) >= MAP_MIN_ROWS) : rows;
+  return chart.type === "map" || chart.type === "boxplot" ? rows.filter((r) => Number(r.n) >= MAP_MIN_ROWS) : rows;
 }
 
 export function suggestDashboard(title: string, profile: TableProfile): DashboardSpec {
@@ -148,6 +171,10 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
   // How the main measure is spread out, when it takes enough different values to have a shape
   const spread = measures.find((m) => m.distinct > HISTOGRAM_BINS);
   if (spread) add(histogramChart(spread.name));
+
+  // How that measure differs between groups, when there is a small category to split it by
+  const groups = categories.find((c) => c.distinct >= 2 && c.distinct <= HEATMAP_MAX_SIDE);
+  if (spread && groups) add(boxplotChart(groups.name, spread.name));
 
   // Two categories against each other
   const sides = categories.filter((c) => c.distinct <= HEATMAP_MAX_SIDE);
