@@ -1,6 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
-import { guardSql, scrubDbError, tidySql } from "@dropboard/engine";
-import { AskInput, GenerateInput, RepairInput } from "@dropboard/spec";
+import { checkNarration, guardSql, scrubDbError, tidySql } from "@dropboard/engine";
+import { AskInput, GenerateInput, NarrateInput, RepairInput } from "@dropboard/spec";
 import type { Hono, MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import type { Prisma, PrismaClient } from "../generated/prisma/client";
@@ -85,6 +85,25 @@ export function registerAiRoutes(app: Hono<AppEnv>, { prisma, ai, dailyLimit = D
       if (!guarded.ok) throw new AiBadOutput(`Unsafe query: ${guarded.reason}`);
       await log(userId, "ask", false, usage);
       return c.json({ sql: tidySql(output.sql).trim().replace(/;+\s*$/, ""), explanation: output.explanation, remaining: left - 1 });
+    } catch (e) {
+      return failure(c, e);
+    }
+  });
+
+  // Words for the Story tab, written from numbers only. What comes back is checked before it is returned.
+  app.post("/api/ai/narrate", requireUser, small, zValidator("json", NarrateInput), async (c) => {
+    if (!ai) return c.json({ error: "ai not configured" }, 503);
+    const userId = c.get("userId");
+    const left = await remaining(userId);
+    if (left <= 0) return c.json({ error: "daily limit reached", remaining: 0 }, 429);
+
+    const { findings } = c.req.valid("json");
+    try {
+      const { output, usage } = await ai.narrate({ findings });
+      const items = checkNarration(findings, output.items);
+      if (items.length === 0) throw new AiBadOutput("No usable story text in the model output");
+      await log(userId, "narrate", false, usage);
+      return c.json({ items, remaining: left - 1 });
     } catch (e) {
       return failure(c, e);
     }

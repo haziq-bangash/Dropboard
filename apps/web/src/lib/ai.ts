@@ -1,4 +1,4 @@
-import { bindQuery, guardSql, mapDuckDbType, scrubDbError, type TableProfile } from "@dropboard/engine";
+import { bindQuery, guardSql, mapDuckDbType, scrubDbError, toNarrateFindings, type Finding, type NarratedItem, type TableProfile } from "@dropboard/engine";
 import type { AiTable, DashboardSpec } from "@dropboard/spec";
 import { ASSISTANT } from "./brand";
 import { runQuery } from "./duckdb";
@@ -88,6 +88,12 @@ export async function generateDashboard(table: AiTable, instruction: string, cur
   });
   const checked = await keepRunnable(res.spec);
   return { ...checked, cached: res.cached, remaining: res.remaining };
+}
+
+/** Story text from Pilot. Only numbers and placeholders are sent: no category name, date or row value leaves the browser. */
+export async function narrateStory(findings: Finding[]) {
+  const res = await post<{ items: NarratedItem[]; remaining: number }>("/api/ai/narrate", { findings: toNarrateFindings(findings) });
+  return res;
 }
 
 export async function askQuestion(table: AiTable, question: string) {

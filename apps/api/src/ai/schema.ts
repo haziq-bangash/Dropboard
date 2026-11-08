@@ -29,6 +29,11 @@ export const AiAskOutput = z.object({
   explanation: z.string(),
 });
 
+export const AiNarrateOutput = z.object({
+  items: z.array(z.object({ id: z.string(), headline: z.string(), sentence: z.string(), next: z.string() })),
+});
+
+export type AiNarrateOutput = z.infer<typeof AiNarrateOutput>;
 export type AiDashboardOutput = z.infer<typeof AiDashboardOutput>;
 export type AiAskOutput = z.infer<typeof AiAskOutput>;
 

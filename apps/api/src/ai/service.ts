@@ -1,5 +1,5 @@
-import type { AskInput, GenerateInput, RepairInput } from "@dropboard/spec";
-import type { AiAskOutput, AiDashboardOutput, AiUsage } from "./schema";
+import type { AskInput, GenerateInput, NarrateInput, RepairInput } from "@dropboard/spec";
+import type { AiAskOutput, AiDashboardOutput, AiNarrateOutput, AiUsage } from "./schema";
 
 /**
  * What the rest of the API knows about an AI provider. Providers live in ./providers and are chosen from the
@@ -11,6 +11,8 @@ export interface AiService {
   /** Model name within that vendor. */
   readonly model: string;
   generate(input: GenerateInput): Promise<{ output: AiDashboardOutput; usage: AiUsage }>;
+  /** Words for a story, written from numbers only. */
+  narrate(input: NarrateInput): Promise<{ output: AiNarrateOutput; usage: AiUsage }>;
   /** One corrected attempt at a question whose query failed. */
   repair(input: RepairInput): Promise<{ output: AiAskOutput; usage: AiUsage }>;
   ask(input: AskInput): Promise<{ output: AiAskOutput; usage: AiUsage }>;

@@ -77,7 +77,24 @@ export const RepairInput = z.object({
   error: z.string().trim().min(1).max(400),
 });
 
+// The numbers behind each finding, with every value from the rows replaced by a placeholder (see narrateFindings in the engine).
+export const NarrateInput = z.object({
+  findings: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(8),
+        kind: z.enum(["trend", "change", "outlier", "correlation", "dominance", "concentration", "missing"]),
+        columns: z.array(z.string().max(200)).min(1).max(2),
+        facts: z.record(z.string().max(40), z.number().finite()),
+        tokens: z.array(z.enum(["{label}", "{at}", "{worstValue}"])).max(3),
+      }),
+    )
+    .min(1)
+    .max(8),
+});
+
 export type AiTable = z.infer<typeof AiTable>;
+export type NarrateInput = z.infer<typeof NarrateInput>;
 export type RepairInput = z.infer<typeof RepairInput>;
 export type GenerateInput = z.infer<typeof GenerateInput>;
 export type AskInput = z.infer<typeof AskInput>;

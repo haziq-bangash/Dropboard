@@ -83,6 +83,14 @@ describe("AI SDK service", () => {
     expect(sent).toContain("Database error: Binder Error: column not found");
   });
 
+  it("writes story text from findings, sending the findings as the only content", async () => {
+    const item = { id: "f0", headline: "{label} leads", sentence: "{label} makes up 41%.", next: "Look." };
+    const { ai, model } = service(result(JSON.stringify({ items: [item] })));
+    const out = await ai.narrate({ findings: [{ id: "f0", kind: "dominance", columns: ["region"], facts: { share: 0.406 }, tokens: ["{label}"] }] });
+    expect(out.output.items).toEqual([item]);
+    expect(JSON.stringify(model.doGenerateCalls[0].prompt)).toContain('0.406');
+  });
+
   it("treats a content filter as a refusal", async () => {
     const { ai } = service(result("", "content-filter"));
     await expect(ai.generate(input)).rejects.toThrow(AiRefusal);

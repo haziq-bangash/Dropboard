@@ -1,4 +1,4 @@
-import type { AiTable, GenerateInput } from "@dropboard/spec";
+import type { AiTable, GenerateInput, NarrateInput } from "@dropboard/spec";
 
 /** Bump when SYSTEM changes, so cached dashboards from older prompts are not reused. */
 export const PROMPT_VERSION = 5;
@@ -46,6 +46,16 @@ export const REPAIR_SYSTEM = `${ASK_SYSTEM}
 
 Your previous query for this question failed when it ran. You are given the query and the database error, with any quoted data values removed. Return a corrected query that answers the same question. Fix the cause named in the error, for example a wrong column name or a type that needs a cast, and change nothing else.`;
 
+export const NARRATE_SYSTEM = `You write the text of a short data story from a list of findings. Each finding has an id, a kind, the columns it is about, and facts: the numbers behind it. You never see any row, and the findings do not contain category names, dates or individual values. Where the finding needs one, write the placeholder you are given in tokens, exactly as written with its braces, and it will be replaced afterwards. Never write a name, date or value yourself, and never use a placeholder that is not in the finding's tokens.
+
+For each finding return its id, a headline (short, no more than 12 words), a sentence saying what was found in plain words for a business reader, and next, one suggestion for where to look next.
+
+Rules:
+- Use only numbers given in facts. A share of 0.406 may be written 41%, and timesEven as "about 2 times an even split". Do not add, subtract or invent any other number. If you are unsure of a number, leave it out.
+- Describe what the data shows. Never claim a cause, and never say why something happened. next may suggest checking causes, as a question to look into.
+- Share and timesEven tell how concentrated something is, r is a correlation between -1 and 1, relativeChange is the change from start to end as a fraction, before and after are levels either side of a step, emptyRows and share describe missing cells.
+- Plain, specific wording. No hype.`;
+
 /** Describe the table with schema and stats only. Row values are never included. */
 export function describeTable(table: AiTable): string {
   const lines = table.columns.map((c) => {
@@ -74,6 +84,11 @@ Failed query:
 ${sql}
 
 Database error: ${error}`;
+}
+
+export function narrateMessage(findings: NarrateInput["findings"]): string {
+  return `Findings:
+${JSON.stringify(findings, null, 2)}`;
 }
 
 export function askMessage(table: AiTable, question: string): string {
