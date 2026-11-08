@@ -22,3 +22,4 @@ export * from "./periods";
 export * from "./cohort";
 export * from "./text";
 export * from "./anomaly/discord";
+export * from "./templates";

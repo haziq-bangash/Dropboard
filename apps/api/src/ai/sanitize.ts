@@ -1,4 +1,4 @@
-import { guardSql, boxplotChart, calendarChart, citiesChart, funnelChart, heatmapChart, histogramChart, mapChart, regionsChart, sankeyChart, treemapChart, tidySql, type ColumnProfile } from "@dropboard/engine";
+import { guardSql, templateChart, TEMPLATE_TYPES, type TemplateType, boxplotChart, calendarChart, citiesChart, funnelChart, heatmapChart, histogramChart, mapChart, regionsChart, sankeyChart, treemapChart, tidySql, type ColumnProfile } from "@dropboard/engine";
 import { DashboardSpec, type AiTable } from "@dropboard/spec";
 import { AiBadOutput, SPECIAL_CHARTS, type AiChartInput, type AiDashboardInput } from "./schema";
 
@@ -146,6 +146,16 @@ export function buildSpec(table: AiTable, output: AiDashboardInput): { spec: Das
         title: c.title.trim().slice(0, 120) || built.title,
         layout: { x: 0, y: 0, w: 1, h: 1 },
       });
+      continue;
+    }
+    // a headline number, bars, a pie, a line or an area named by columns instead of written as SQL: built from a template
+    if (!c.query.trim() && c.columns?.length && (TEMPLATE_TYPES as readonly string[]).includes(c.type)) {
+      const built = templateChart(c.type as TemplateType, c.columns, table.columns, c.title.trim().slice(0, 120));
+      if (typeof built === "string") {
+        dropped.push({ title: c.title, reason: built });
+        continue;
+      }
+      charts.push({ id: `c${charts.length + 1}`, ...built, layout: { x: 0, y: 0, w: 1, h: 1 } });
       continue;
     }
     const guarded = guardSql(c.query);

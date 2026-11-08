@@ -1,7 +1,7 @@
 import type { AiTable, GenerateInput, NarrateInput } from "@dropboard/spec";
 
 /** Bump when SYSTEM changes, so cached dashboards from older prompts are not reused. */
-export const PROMPT_VERSION = 7;
+export const PROMPT_VERSION = 8;
 
 export const SYSTEM = `You design dashboards for tabular data. You will be given only the SCHEMA of a table (column names, types, null counts and approximate distinct counts). You never see any row values, so never guess or quote values.
 
@@ -16,6 +16,11 @@ Rules for queries:
   - bar, pie: columns aliased x (category) and y (number). Order by y descending and LIMIT 20.
   - line, area: columns aliased x (a date or ordered value) and y (number), ordered by x. For dates use date_trunc('month', "col") or another grain that suits the span.
   - scatter: columns aliased x and y, both numbers, with LIMIT 1000.
+- Prefer the column form for the common shapes. For kpi, bar, pie, line and area, leave query empty and list columns instead, and the query is built for you from the column names, so it cannot be wrong:
+  - kpi: columns = [a number column] and optionally an aggregation word after it: sum, avg, count, min, max, median or distinct. Without one, a number column is summed.
+  - bar, pie: columns = [a text column to group by] and optionally [a number column to measure] and an aggregation word. With no number column it counts rows.
+  - line, area: columns = [a date column] and optionally [a number column], an aggregation word and a step word: day, week, month, quarter or year (month when none). With no number column it counts rows.
+  Write SQL only for what these cannot say: a filter, a ratio of two columns, a window, a calculation.
 - Eleven more chart types are not written as SQL. For these, set query to an empty string and list column names in columns, using exact names from the schema:
   - histogram: columns = [a number column]. Shows how its values are spread out.
   - heatmap: columns = [text column, text column] and optionally a number column third. Both text columns need few distinct values (25 at most). Shows each pair shaded by the number, or by row count.

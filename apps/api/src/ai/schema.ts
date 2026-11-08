@@ -9,7 +9,7 @@ export const SPECIAL_CHARTS = ["histogram", "heatmap", "map", "regions", "boxplo
 export const AiChart = z.object({
   type: z.enum(["kpi", "bar", "line", "area", "pie", "scatter", ...SPECIAL_CHARTS]),
   title: z.string(),
-  /** SQL for kpi, bar, line, area, pie and scatter. An empty string for the four chart types that use columns. */
+  /** SQL for kpi, bar, line, area, pie and scatter, or an empty string when the chart is described by columns instead (see templateChart in the engine). */
   query: z.string(),
   /** Column names for histogram, heatmap, map and regions. An empty list (or null) for the other types. */
   columns: z.array(z.string()).nullable(),
