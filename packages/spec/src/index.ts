@@ -10,6 +10,8 @@ export const ChartSpec = z.object({
   query: z.string().max(4000),
   x: z.string().optional(),
   y: z.array(z.string()).optional(),
+  // a line chart with one line for each value of this column of the query's result (a company, a channel)
+  group: z.string().optional(),
   // a region map draws countries on a world map (the default) or US states on a map of the United States
   map: z.enum(["world", "us"]).optional(),
   layout: z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() }),
@@ -83,7 +85,7 @@ export const NarrateInput = z.object({
     .array(
       z.object({
         id: z.string().min(1).max(8),
-        kind: z.enum(["trend", "change", "outlier", "correlation", "dominance", "concentration", "missing", "seasonal", "latest", "duplicates"]),
+        kind: z.enum(["trend", "change", "outlier", "correlation", "dominance", "concentration", "missing", "seasonal", "latest", "duplicates", "leader", "standout", "entitytrend", "jump", "rankshift"]),
         columns: z.array(z.string().max(200)).max(2),
         facts: z.record(z.string().max(40), z.number().finite()),
         tokens: z.array(z.enum(["{label}", "{at}", "{worstValue}", "{peak}", "{low}"])).max(5),
