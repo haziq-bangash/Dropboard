@@ -162,6 +162,31 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo): echarts.EChartsCoreOp
         } },
         series: [{ type: "bar", barCategoryGap: "6%", data: rows.map((r) => r[y]), itemStyle: { borderRadius: [2, 2, 0, 0] } }],
       };
+    case "calendar": {
+      // a year of days laid out like a wall calendar: a column per week, a row per weekday
+      const days = rows.filter((r) => Number.isFinite(Number(r.y))).map((r) => [String(r.x), Number(r.y)] as [string, number]);
+      const dates = days.map((d) => d[0]).sort();
+      const most = Math.max(1, ...days.map((d) => d[1]));
+      return {
+        color: COLORS,
+        tooltip: { formatter: (p: { value: [string, number] }) => `${p.value[0]}: ${fmt(p.value[1])} rows` },
+        visualMap: { min: 0, max: most, orient: "horizontal", left: "center", bottom: 0, itemWidth: 12, itemHeight: 120, calculable: false, textStyle: { color: MUTED }, inRange: { color: ["#E3ECED", "#3E8E94", "#075056"] } },
+        calendar: {
+          top: 28,
+          left: 36,
+          right: 8,
+          bottom: 40,
+          cellSize: ["auto", "auto"],
+          range: dates.length ? [dates[0], dates[dates.length - 1]] : undefined,
+          itemStyle: { borderWidth: 1.5, borderColor: "#FFFFFF", color: "#F1F3F4" },
+          splitLine: { show: false },
+          yearLabel: { show: false },
+          dayLabel: { firstDay: 1, color: MUTED, nameMap: "en" },
+          monthLabel: { color: MUTED },
+        },
+        series: [{ type: "heatmap", coordinateSystem: "calendar", data: days }],
+      };
+    }
     case "boxplot": {
       const usable = rows.filter((r) => Number.isFinite(Number(r.y)));
       return {
@@ -276,10 +301,11 @@ function Chart({ spec, rows, geo }: { spec: ChartSpec; rows: Rows; geo?: Geo }) 
   return <div ref={ref} className="h-64 w-full" role="img" aria-label={chartSummary(spec, rows)} />;
 }
 
-export function Table({ rows }: { rows: Rows }) {
+export function Table({ rows, label = "Table, scrolls both ways" }: { rows: Rows; label?: string }) {
   const cols = rows[0] ? Object.keys(rows[0]) : [];
   return (
-    <div className="max-h-80 overflow-auto rounded-md border">
+    // a scrolling box has to be reachable with the keyboard, and needs a name so a screen reader says what it is
+    <div className="max-h-80 overflow-auto rounded-md border focus-visible:outline-2 focus-visible:outline-ring" tabIndex={0} role="region" aria-label={label}>
       <UiTable>
         <TableHeader className="sticky top-0 bg-background">
           <TableRow>
@@ -369,7 +395,7 @@ function ChartCard({
         ) : !rows || (spec.type === "regions" && !world.data) ? (
           <Skeleton className="h-64 w-full" />
         ) : spec.type === "table" ? (
-          <Table rows={rows} />
+          <Table rows={rows} label={`${spec.title}, table that scrolls`} />
         ) : (
           <Chart spec={spec} rows={rows} geo={world.data} />
         )}
