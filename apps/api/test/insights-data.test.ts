@@ -75,6 +75,35 @@ describe("findings on the sample datasets", () => {
 });
 
 describe("gathering the summaries", () => {
+  it("samples a big table down to 5,000 rows, the same rows every time, and still finds a relationship in it", async () => {
+    const sql = await createSql();
+    // 12,000 rows: more than the sample size, so the sampling query runs. b follows a, c is unrelated.
+    let seed = 12345;
+    const next = () => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 4294967296);
+    const rows = Array.from({ length: 12_000 }, () => {
+      const a = next() * 100;
+      return `${a.toFixed(2)},${(a * 2 + next() * 20).toFixed(2)},${(next() * 100).toFixed(2)}`;
+    });
+    sql.load("a,b,c\n" + rows.join("\n") + "\n");
+    const run = async (q: string) => rowsOf(sql, q);
+    const first = await gatherInsightInput(sql.profile(), run);
+    const again = await gatherInsightInput(sql.profile(), run);
+
+    expect(first.numeric).toHaveLength(3);
+    expect(first.numeric![0].values).toHaveLength(5000);
+    expect(first.numeric![0].values).toEqual(again.numeric![0].values); // REPEATABLE: the same sample each time
+    const found = findInsights(first);
+    expect(found.some((f) => f.kind === "correlation" && f.columns.includes("a") && f.columns.includes("b"))).toBe(true);
+    expect(found.some((f) => f.kind === "correlation" && f.columns.includes("c"))).toBe(false);
+  }, 60_000);
+
+  it("does not sample a table that is small enough to read whole", async () => {
+    const sql = await createSql();
+    sql.load("a,b\n" + Array.from({ length: 300 }, (_, i) => `${i},${i * 3 + (i % 5)}`).join("\n") + "\n");
+    const { numeric } = await gatherInsightInput(sql.profile(), async (q) => rowsOf(sql, q));
+    expect(numeric![0].values).toHaveLength(300);
+  });
+
   it("skips the time series when there is no date, or the dates cover too short a span", async () => {
     const sql = await createSql();
     sql.load("a,b\n1,2\n3,4\n5,6\n");
