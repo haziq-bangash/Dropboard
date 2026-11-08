@@ -7,6 +7,7 @@ import { useCallback, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { SampleNotice } from "@/components/SampleNotice";
 import { loadFile } from "@/lib/ingest";
 import { newLoadId } from "@/lib/loaded-data";
 import { liveSource } from "@/lib/results";
@@ -17,7 +18,7 @@ import { PublishButton } from "./PublishButton";
 
 type State =
   | { status: "idle" }
-  | { status: "loading"; name: string }
+  | { status: "loading"; name: string; stage?: string }
   | { status: "error"; message: string }
   | { status: "ready"; spec: DashboardSpec; profile: TableProfile; ms: number; loadId: string };
 
@@ -33,7 +34,7 @@ export function Uploader({ hero, below }: { hero: React.ReactNode; below: React.
     setState({ status: "loading", name: file.name });
     const t0 = performance.now();
     try {
-      const { title, profile } = await loadFile(file);
+      const { title, profile } = await loadFile(file, (stage) => setState({ status: "loading", name: file.name, stage }));
       setState({ status: "ready", spec: suggestDashboard(title, profile), profile, ms: Math.round(performance.now() - t0), loadId: newLoadId() });
       window.scrollTo({ top: 0 });
     } catch (e) {
@@ -73,7 +74,7 @@ export function Uploader({ hero, below }: { hero: React.ReactNode; below: React.
           {state.status === "loading" ? <Loader2 className="size-5 animate-spin" /> : <Upload className="size-5" />}
         </div>
         <p className="text-lg font-medium">
-          {state.status === "loading" ? `Analyzing ${state.name}…` : "Drop a spreadsheet here, or click to browse"}
+          {state.status === "loading" ? `Analyzing ${state.name}…${state.stage ? ` ${state.stage}` : ""}` : "Drop a spreadsheet here, or click to browse"}
         </p>
         <div className="flex flex-wrap items-center justify-center gap-2">
           {[".xlsx", ".csv", ".json", ".ndjson"].map((t) => (
@@ -115,7 +116,10 @@ export function Uploader({ hero, below }: { hero: React.ReactNode; below: React.
         <PublishButton spec={state.spec} />
       </div>
       <AiPanel profile={state.profile} spec={state.spec} onSpec={(spec) => setState({ ...state, spec })} />
-      <Dashboard spec={state.spec} source={liveSource} dataKey={state.loadId} />
+      <>
+        {state.profile.sample && <SampleNotice sample={state.profile.sample} />}
+        <Dashboard spec={state.spec} source={liveSource} dataKey={state.loadId} />
+      </>
     </PageShell>
   );
 }
