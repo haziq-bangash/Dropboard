@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { signUp } from "./helpers";
+import { companiesByYear, signUp } from "./helpers";
 
 async function openSample(page: Page, title: string) {
   await page.goto("/app/new");
@@ -134,4 +134,21 @@ test("a file with three years of monthly sales shows its yearly pattern, and rep
   const findings = page.getByTestId("finding");
   await expect(findings.filter({ hasText: "yearly pattern" })).toContainText("highest in December, lowest in July", { timeout: 30_000 });
   await expect(findings.filter({ hasText: "exact copies" })).toContainText("5%");
+});
+
+test("a table of companies by year gets findings about the companies themselves, not about totals", async ({ page }) => {
+  await signUp(page);
+  await page.goto("/app/new");
+  await page.setInputFiles('input[type="file"]', { name: "financials.csv", mimeType: "text/csv", buffer: Buffer.from(companiesByYear()) });
+  await expect(page).toHaveURL(/\/app\/p\//, { timeout: 30_000 });
+  await expect(page.getByTestId("kpi-value").first()).not.toHaveText("", { timeout: 30_000 });
+  await openInsights(page);
+  const findings = page.getByTestId("finding");
+  await expect(findings.filter({ hasText: "has the largest Revenue in 2023" })).toBeVisible({ timeout: 30_000 });
+  await expect(findings.filter({ hasText: /Flint's Revenue fell about \d+% between 2014 and 2023/ })).toBeVisible();
+  // never a claim about a year being a measure, or about a pooled average of a rate
+  await expect(page.getByTestId("insights")).not.toContainText(/Year (rose|fell)|Average ROE (rose|fell)/);
+  await page.getByRole("tab", { name: "Story" }).click();
+  await expect(page.getByTestId("story-headline")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("story")).not.toContainText(/NaN|undefined/);
 });
