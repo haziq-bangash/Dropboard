@@ -15,6 +15,8 @@ export type Result = { columns: string[]; rows: Cell[][] };
 export interface Sql {
   /** Load a CSV as the table `data`. */
   load(csv: string): void;
+  /** Run a statement that changes the table (renaming a column), returning nothing. */
+  exec(sql: string): void;
   /** Run a query and get every cell back as text (or null), so comparisons do not depend on how types are encoded. */
   run(sql: string): Result;
   /** Names, types and counts only: the same summary Pilot is allowed to see. */
@@ -48,6 +50,9 @@ export async function createSql(): Promise<Sql> {
       conn.query("CREATE OR REPLACE TABLE data AS SELECT * FROM read_csv_auto('data.csv', header=true, sample_size=-1)");
     },
     run,
+    exec(sql) {
+      conn.query(sql);
+    },
     profile() {
       const cols = run("SELECT column_name, column_type FROM (DESCRIBE data)").rows;
       const rowCount = Number(run("SELECT count(*) FROM data").rows[0][0]);
