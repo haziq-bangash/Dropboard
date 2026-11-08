@@ -44,7 +44,7 @@ export interface SeriesInput {
   /** What to call each x in a sentence, same length as x. */
   labels?: string[];
   /** The step between points, when x is a time. Lets the engine look for a yearly or weekly pattern and for the latest move. */
-  unit?: "day" | "week" | "month";
+  unit?: "day" | "week" | "month" | "year";
 }
 
 export interface InsightInput {

@@ -7,6 +7,12 @@ export interface ColumnProfile {
   type: ColType;
   nullCount: number;
   distinct: number;
+  /** For a number column: the smallest and largest value, and whether every value is a whole number. */
+  min?: number;
+  max?: number;
+  integer?: boolean;
+  /** For a text column with many values: the average length, from a sample. Long text is notes, not a category. */
+  textLength?: number;
 }
 
 export interface TableProfile {
@@ -18,6 +24,8 @@ export interface TableProfile {
   countries?: string;
   /** A column of US states (names or abbreviations), when there is one */
   states?: string;
+  /** Set when the table is one row per entity per period (a company by year): which columns, found by testing that they identify a row. */
+  panel?: { entity: string; time: string };
   /** Set when the file was too big to hold, so the table is a random sample: how many rows it holds, and how many the file has. */
   sample?: { rows: number; of: number };
   /** A column of cities, when there is one (needs a column name that points at places, and the city list) */
