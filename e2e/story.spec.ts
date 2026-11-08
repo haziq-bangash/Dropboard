@@ -102,3 +102,51 @@ test("the tab order is Dashboard, Insights, Story, and no capitals are forced on
   await expect(eyebrow).toBeVisible({ timeout: 30_000 });
   expect(await eyebrow.evaluate((el) => getComputedStyle(el).textTransform)).toBe("none");
 });
+
+test("Pilot can write the story from numbers only, and the real names are put back in the browser", async ({ page }) => {
+  await signUp(page);
+  await openSample(page, "Household spending");
+  await openStory(page);
+  await expect(page.getByTestId("story-headline")).toBeVisible({ timeout: 30_000 });
+
+  // the category that dominates, as the plain story names it
+  const plain = await page.getByTestId("story").innerText();
+  const label = plain.match(/\n([^\n]+?) accounts for most of amount/)?.[1];
+  expect(label).toBeTruthy();
+
+  let sent = "";
+  await page.route("**/api/ai/narrate", (route) => {
+    sent = route.request().postData() ?? "";
+    const { findings } = JSON.parse(sent) as { findings: { id: string; columns: string[]; tokens: string[] }[] };
+    const items = findings.map((f) => ({
+      id: f.id,
+      headline: f.tokens.includes("{label}") ? "{label} carries the spending" : `About ${f.columns.join(" and ")}`,
+      sentence: f.tokens.includes("{label}") ? "{label} is where most of it goes." : "This is worth a closer look.",
+      next: "Check whether that is expected.",
+    }));
+    return route.fulfill({ json: { items, remaining: 7 } });
+  });
+
+  await page.getByRole("button", { name: "Write this with Pilot" }).click();
+  await expect(page.getByText("7 requests left today")).toBeVisible();
+  await expect(page.getByTestId("story")).toContainText(`${label} carries the spending`);
+  await expect(page.getByTestId("story")).toContainText(`${label} is where most of it goes.`);
+  await expect(page.getByTestId("story")).toContainText("The wording was written by Pilot");
+
+  // privacy: numbers and placeholders went out, the category name and the dates did not
+  expect(sent).toContain("{label}");
+  expect(sent).not.toContain(label!);
+  expect(sent).not.toMatch(/20\d\d/);
+});
+
+test("when Pilot's story cannot be written, the plain story stays and the person is told", async ({ page }) => {
+  await signUp(page);
+  await openSample(page, "Household spending");
+  await openStory(page);
+  await expect(page.getByTestId("story-headline")).toBeVisible({ timeout: 30_000 });
+  const before = await page.getByTestId("story-headline").innerText();
+  await page.route("**/api/ai/narrate", (route) => route.fulfill({ status: 502, json: { error: "The assistant could not produce a usable result. Try rephrasing." } }));
+  await page.getByRole("button", { name: "Write this with Pilot" }).click();
+  await expect(page.locator('[data-slot="alert"]')).toBeVisible();
+  await expect(page.getByTestId("story-headline")).toHaveText(before);
+});
