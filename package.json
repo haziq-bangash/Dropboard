@@ -1,6 +1,7 @@
 {
   "name": "dropboard",
   "private": true,
+  "license": "SEE LICENSE IN LICENSE",
   "packageManager": "pnpm@9.8.0",
   "scripts": {
     "dev": "docker compose up -d --wait && pnpm --filter @dropboard/api exec prisma migrate deploy && pnpm --parallel --filter @dropboard/api --filter @dropboard/web dev",
