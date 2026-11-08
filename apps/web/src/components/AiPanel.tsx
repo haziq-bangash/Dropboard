@@ -50,10 +50,13 @@ export function AiPanel({
   }
 
   return (
-    <Card>
+    <Card className="border-brand/30 bg-secondary/20 ring-brand/20">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Bot className="size-4" /> {ASSISTANT}
+        <CardTitle className="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
+          <span aria-hidden="true" className="grid size-9 place-items-center rounded-full bg-background text-brand-text ring-1 ring-border">
+            <Bot className="size-4" />
+          </span>
+          <em className="font-serif text-[1.14em] italic text-brand-text-strong">{ASSISTANT}</em>
           <Badge variant="secondary">New</Badge>
         </CardTitle>
         <CardDescription>

@@ -5,6 +5,7 @@ import { applyNarration } from "@dropboard/engine";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { narrateStory } from "@/lib/ai";
 import { ASSISTANT } from "@/lib/brand";
@@ -85,9 +86,11 @@ export function StoryPanel({
       data-testid="story"
     >
       <header>
-        <p className="text-sm font-medium text-brand-text-strong">Data story</p>
+        <Badge variant="outline" className="h-7 rounded-full px-3 text-sm font-normal text-brand-text-strong">
+          Data <em className="ml-1 font-serif text-[1.14em] italic">story</em>
+        </Badge>
         <h2
-          className="mt-2 font-serif text-4xl leading-tight tracking-normal text-balance sm:text-5xl"
+          className="mt-4 text-4xl leading-tight font-semibold tracking-tight text-balance sm:text-5xl"
           data-testid="story-headline"
         >
           {lead.headline}
@@ -98,7 +101,7 @@ export function StoryPanel({
         </p>
       </header>
 
-      <section aria-label={`Write this story with ${ASSISTANT}`} className="flex flex-col gap-2 rounded-lg border p-4 text-sm">
+      <section aria-label={`Write this story with ${ASSISTANT}`} className="flex flex-col gap-2 rounded-2xl border border-brand/30 bg-secondary/20 p-4 text-sm">
         {session ? (
           <div className="flex flex-wrap items-center gap-3">
             <Button variant="outline" disabled={narrate.isPending} onClick={() => narrate.mutate(plain)}>
@@ -135,9 +138,10 @@ export function StoryPanel({
             key={`${f.kind}-${f.columns.join("-")}`}
             size="sm"
             data-testid="story-figure"
+            className="bg-secondary/30"
           >
             <CardContent>
-              <p className="text-3xl font-semibold tracking-tight">
+              <p className="text-3xl font-semibold tracking-tight text-primary">
                 {f.figure.value}
               </p>
               <p className="mt-0.5 text-sm text-muted-foreground">
