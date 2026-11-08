@@ -1,4 +1,4 @@
-import { detectCoordinates, mapDuckDbType, q, type Range, type TableProfile } from "@dropboard/engine";
+import { detectCoordinates, detectPlaceColumn, mapDuckDbType, q, type Range, type TableProfile } from "@dropboard/engine";
 import { DuckDBDataProtocol } from "@duckdb/duckdb-wasm";
 import { getDb, runQuery } from "./duckdb";
 
@@ -86,5 +86,16 @@ export async function profileTable(): Promise<TableProfile> {
     if (found) coordinates = { lat: found.lat, lon: found.lon };
   }
 
-  return { rowCount: n, columns, ...(coordinates ? { coordinates } : {}) };
+  // a text column with a modest number of distinct values might be countries: look at the distinct values only
+  let countries: string | undefined;
+  for (const c of columns.filter((c) => c.type === "string" && c.distinct >= 2 && c.distinct <= 300).slice(0, 12)) {
+    const values = (await runQuery(`SELECT DISTINCT ${q(c.name)} AS v FROM data WHERE ${q(c.name)} IS NOT NULL LIMIT 300`)).map((v) => v.v);
+    const found = detectPlaceColumn(c.name, values, c.distinct);
+    if (found?.kind === "country") {
+      countries = c.name;
+      break;
+    }
+  }
+
+  return { rowCount: n, columns, ...(coordinates ? { coordinates } : {}), ...(countries ? { countries } : {}) };
 }
