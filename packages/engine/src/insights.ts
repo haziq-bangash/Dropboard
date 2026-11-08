@@ -10,7 +10,7 @@ import { benjaminiHochberg, changePoint, dominance, mannKendall, mean, median, o
  *   3. Findings come back ranked, with a plain sentence and the numbers behind it.
  */
 
-export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "missing";
+export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "concentration" | "missing";
 
 export interface Finding {
   kind: FindingKind;
@@ -43,6 +43,8 @@ export interface InsightInput {
   numeric?: { column: string; values: (number | null)[] }[];
   /** Category columns with how many rows each value has. */
   categories?: { column: string; counts: { label: string; count: number }[] }[];
+  /** How a measure that adds up (money, units) splits across the values of a category column. */
+  contributions?: { column: string; measure: string; parts: { label: string; value: number }[] }[];
   /** Columns and how many rows are empty. */
   missing?: { column: string; nullCount: number }[];
 }
@@ -52,6 +54,8 @@ export interface InsightOptions {
   q?: number;
   /** Largest number of findings to return. Default 8. */
   limit?: number;
+  /** Most findings of one kind in the result, so a list is not six correlations in a row. Default 3. */
+  perKind?: number;
 }
 
 /** What counts as big enough to matter, per kind. */
@@ -61,7 +65,9 @@ export const FLOORS = {
   correlation: 0.3, // |r|
   dominanceShare: 0.4, // one category holds at least 40% of rows
   dominanceTimes: 2, // and at least twice an even split
-  outlierShare: 0.05, // more than this is a skewed column, not outliers
+  outlierShare: 0.01, // more than 1% of rows far out is a skewed or structured column (rent among groceries), not outliers
+  concentrationShare: 0.4, // one category holds at least 40% of a total
+  concentrationTimes: 2, // and at least twice an even share
   missingShare: 0.2,
   changeShift: 4, // noise units
   changeRelative: 0.1, // and the level moves at least 10%
@@ -202,6 +208,25 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
     });
   }
 
+  // Where a total comes from. Counts are tested above; these are sums of money or units, which a count test cannot judge,
+  // so they pass on a clear, large share alone.
+  for (const c of input.contributions ?? []) {
+    const total = c.parts.reduce((s, p) => s + p.value, 0);
+    if (c.parts.length < 3 || !(total > 0) || c.parts.some((p) => p.value < 0)) continue;
+    const top = c.parts.reduce((best, p) => (p.value > best.value ? p : best));
+    const share = top.value / total;
+    const times = share * c.parts.length;
+    if (share < FLOORS.concentrationShare || times < FLOORS.concentrationTimes) continue;
+    found.push({
+      kind: "concentration",
+      columns: [c.column, c.measure],
+      sentence: `${top.label} accounts for ${pct(share)} of ${c.measure}, about ${fmt(times)} times an even share across ${c.column}.`,
+      p: null,
+      strength: share * 0.65,
+      evidence: { label: top.label, share: Number(share.toFixed(3)), timesEven: Number(times.toFixed(2)), groups: c.parts.length },
+    });
+  }
+
   for (const m of input.missing ?? []) {
     const share = input.rowCount ? m.nullCount / input.rowCount : 0;
     if (share < FLOORS.missingShare) continue;
@@ -215,5 +240,15 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
     });
   }
 
-  return found.sort((a, b) => b.strength - a.strength).slice(0, limit);
+  // strongest first, but never more than `perKind` of one kind
+  const perKind = options.perKind ?? 3;
+  const taken = new Map<FindingKind, number>();
+  return found
+    .sort((a, b) => b.strength - a.strength)
+    .filter((f) => {
+      const n = taken.get(f.kind) ?? 0;
+      taken.set(f.kind, n + 1);
+      return n < perKind;
+    })
+    .slice(0, limit);
 }

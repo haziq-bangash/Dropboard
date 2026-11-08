@@ -10,13 +10,13 @@ const looksLikeId = (c: ColumnProfile, rows: number) =>
 
 // Names that say a column is a rate, price, duration or score. Adding those up means little, so they are averaged.
 const AVERAGED = /(^|[_\s-])(avg|average|rate|ratio|pct|percent|percentage|price|score|satisfaction|rating|age|duration|minutes|hours|days|seconds|latency|margin|discount)($|[_\s-])/i;
-const aggregate = (c: ColumnProfile) => (AVERAGED.test(c.name) ? "avg" : "sum");
-const label = (c: ColumnProfile) => (aggregate(c) === "avg" ? `Average ${c.name}` : c.name);
+export const aggregate = (c: ColumnProfile) => (AVERAGED.test(c.name) ? "avg" : "sum");
+export const label = (c: ColumnProfile) => (aggregate(c) === "avg" ? `Average ${c.name}` : c.name);
 
-const isMeasure = (c: ColumnProfile, rows: number) =>
+export const isMeasure = (c: ColumnProfile, rows: number) =>
   c.type === "number" && !looksLikeId(c, rows) && c.distinct > 1;
 
-const isCategory = (c: ColumnProfile, rows: number) =>
+export const isCategory = (c: ColumnProfile, rows: number) =>
   c.type === "string" && !looksLikeId(c, rows) && c.distinct > 1 && c.distinct <= MAX_CATEGORIES;
 
 export function suggestDashboard(title: string, profile: TableProfile): DashboardSpec {
