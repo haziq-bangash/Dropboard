@@ -199,3 +199,26 @@ test("the data preview is kept on a rich file, and a keyboard can reach it", asy
   await preview.focus();
   await expect(preview).toBeFocused();
 });
+
+test("a dashboard fits a phone: nothing scrolls sideways and every chart is inside the screen", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signUp(page);
+  await page.goto("/app/new");
+  await page.getByTestId("starter").filter({ hasText: "Delivery drops" }).click();
+  await expect(page).toHaveURL(/\/app\/p\//, { timeout: 30_000 });
+  await expect(page.getByTestId("kpi-value").first()).not.toHaveText("", { timeout: 30_000 });
+  await expect(page.getByRole("img", { name: /^Region map/ })).toBeVisible({ timeout: 30_000 });
+  for (const tab of ["Dashboard", "Insights", "Story"]) {
+    await page.getByRole("tab", { name: tab }).click();
+    await page.waitForTimeout(500);
+    const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(wide, `${tab} scrolls sideways by ${wide}px`).toBeLessThanOrEqual(0);
+  }
+  await page.getByRole("tab", { name: "Dashboard" }).click();
+  const boxes = await page.locator('[data-testid="chart-card"]').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()));
+  expect(boxes.length).toBeGreaterThan(5);
+  for (const b of boxes) {
+    expect(b.left).toBeGreaterThanOrEqual(0);
+    expect(b.right).toBeLessThanOrEqual(391);
+  }
+});
