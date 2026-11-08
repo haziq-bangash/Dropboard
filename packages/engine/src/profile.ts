@@ -1,4 +1,5 @@
 import type { ColumnType } from "@dropboard/spec";
+import type { PeriodKind } from "./periods";
 
 export type ColType = ColumnType;
 
@@ -11,6 +12,8 @@ export interface ColumnProfile {
   min?: number;
   max?: number;
   integer?: boolean;
+  /** For a text column whose values are months, quarters or weekdays written as words or numbers: which kind. */
+  period?: PeriodKind;
   /** For a text column with many values: the average length, from a sample. Long text is notes, not a category. */
   textLength?: number;
 }

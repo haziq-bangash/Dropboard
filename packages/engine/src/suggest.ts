@@ -1,5 +1,6 @@
 import type { ChartSpec, DashboardSpec } from "@dropboard/spec";
 import { q, type ColumnProfile, type TableProfile } from "./profile";
+import { periodOrderSql } from "./periods";
 import { aggregateFor, looksLikeId, measureKind, timeColumn, timeExpression, valueKind } from "./understand";
 
 const MAX_CHARTS = 10;
@@ -142,11 +143,11 @@ const PANEL_LINES = 8;
 
 interface PanelCtx {
   entity: string;
-  time: { column: ColumnProfile; kind: "date" | "year" };
+  time: { column: ColumnProfile; kind: "date" | "year" | "period" };
 }
 
 /** The time of each row at the grain a panel chart uses: the year itself, or the month of a date. */
-const panelAxis = (t: PanelCtx["time"]) => (t.kind === "year" ? timeExpression(t.column, "year") : `date_trunc('month', ${q(t.column.name)})`);
+const panelAxis = (t: PanelCtx["time"]) => (t.kind === "year" ? timeExpression(t.column, "year") : `date_trunc('month', ${timeExpression(t.column, t.kind)})`);
 
 /**
  * The latest period that most entities reported. The very last period is often only partly in, which would make a total or a
@@ -212,6 +213,12 @@ export function entityYearHeatmap(p: PanelCtx, measure: ColumnProfile): Omit<Cha
     y: ["y"],
   };
 }
+
+/** How to order a category's bars: months, weekdays and quarters follow the calendar, everything else goes biggest first. */
+const barOrder = (c: ColumnProfile) => {
+  const calendar = c.period ? periodOrderSql(c.period, q(c.name)) : null;
+  return calendar ? `min(${calendar})` : "2 DESC";
+};
 
 const total = (measure?: ColumnProfile) => (measure ? `${aggregate(measure)}(${q(measure.name)})` : "count(*)");
 
@@ -343,7 +350,7 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
       add({
         type: "bar",
         title: `${label(main)} by ${group.name}`,
-        query: `SELECT ${q(group.name)} AS x, ${aggregate(main)}(${q(main.name)}) AS y FROM data GROUP BY 1 ORDER BY 2 DESC LIMIT ${MAX_CATEGORIES}`,
+        query: `SELECT ${q(group.name)} AS x, ${aggregate(main)}(${q(main.name)}) AS y FROM data GROUP BY 1 ORDER BY ${barOrder(group)} LIMIT ${MAX_CATEGORIES}`,
         x: "x",
         y: ["y"],
       });
@@ -371,9 +378,9 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
 
   // Trend: the time axis (dates, or a year stored as a number) x the first measure
   if (time && measures[0]) {
-    const axis = time.kind === "year" ? timeExpression(time.column, "year") : `date_trunc('month', ${q(time.column.name)})`;
+    const axis = time.kind === "year" ? timeExpression(time.column, "year") : `date_trunc('month', ${timeExpression(time.column, time.kind)})`;
     // "over time" only for a column that is the time of things happening: a year a house was built is a way to group, not a clock
-    const clock = time.kind === "date" || /^(year|yr|fy|fiscal year|season|period)$/i.test(time.column.name.trim());
+    const clock = time.kind !== "year" || /^(year|yr|fy|fiscal year|season|period)$/i.test(time.column.name.trim());
     add({
       type: "line",
       title: clock ? `${label(measures[0])} over time` : `${label(measures[0])} by ${time.column.name}`,
@@ -397,7 +404,7 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
     add({
       type: "bar",
       title,
-      query: `SELECT ${q(cat.name)} AS x, ${value} AS y FROM data GROUP BY 1 ORDER BY 2 DESC LIMIT ${MAX_CATEGORIES}`,
+      query: `SELECT ${q(cat.name)} AS x, ${value} AS y FROM data GROUP BY 1 ORDER BY ${barOrder(cat)} LIMIT ${MAX_CATEGORIES}`,
       x: "x",
       y: ["y"],
     });

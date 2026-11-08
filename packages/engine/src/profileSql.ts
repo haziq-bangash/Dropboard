@@ -1,5 +1,6 @@
 import { mapDuckDbType, q, type ColumnProfile, type TableProfile } from "./profile";
 import type { RunSql } from "./summarize";
+import { detectPeriodKind } from "./periods";
 import { isYearColumn, looksLikeId, timeColumn, timeExpression } from "./understand";
 
 /** Text columns longer than this on average are notes, not categories. Only measured for columns with many distinct values. */
@@ -53,6 +54,13 @@ export async function buildProfile(run: RunSql): Promise<TableProfile> {
     const [r] = await run(`SELECT avg(length(CAST(${q(c.name)} AS VARCHAR))) AS len FROM (SELECT ${q(c.name)} FROM data LIMIT ${TEXT_SAMPLE})`);
     const len = Number(r?.len);
     if (Number.isFinite(len)) c.textLength = Math.round(len);
+  }
+
+  // text columns of months, quarters or weekdays: a handful of their values is enough to tell
+  for (const c of columns.filter((c) => c.type === "string" && c.distinct >= 2 && c.distinct <= 400).slice(0, 12)) {
+    const values = (await run(`SELECT DISTINCT CAST(${q(c.name)} AS VARCHAR) AS v FROM data WHERE ${q(c.name)} IS NOT NULL LIMIT 60`)).map((r) => r.v);
+    const kind = detectPeriodKind(values);
+    if (kind) c.period = kind;
   }
 
   const profile: TableProfile = { rowCount, columns };

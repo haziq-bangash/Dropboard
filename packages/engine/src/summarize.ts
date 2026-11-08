@@ -144,6 +144,7 @@ export async function gatherInsightInput(profile: TableProfile, run: RunSql): Pr
               measure: m.name,
               kind: valueKind(m),
               periods: periods.map((x) => ({ x, label: labelFor(x, unit) })),
+              unit,
               entities: [...byEntity].map(([name, y]) => ({ label: name, y })),
             });
           }
