@@ -1,4 +1,4 @@
-import { applyPrivacyFloor, boxplotChart, calendarChart, chartSummary, guardSql, heatmapChart, histogramChart, regionsChart, STARTERS, suggestDashboard } from "@dropboard/engine";
+import { applyPrivacyFloor, boxplotChart, calendarChart, chartSummary, guardSql, heatmapChart, funnelChart, histogramChart, regionsChart, sankeyChart, STARTERS, suggestDashboard, treemapChart } from "@dropboard/engine";
 import { describe, expect, it } from "vitest";
 import { createSql } from "../eval/duckdb";
 
@@ -175,5 +175,62 @@ describe("US state maps", () => {
   it("leaves the map kind out for a country map", () => {
     expect(regionsChart("country")).not.toHaveProperty("map");
     expect(regionsChart("state", undefined, "us")).toHaveProperty("map", "us");
+  });
+});
+
+describe("treemap, funnel and flow diagram on real data", () => {
+  const layout = { id: "t", layout: { x: 0, y: 0, w: 1, h: 1 } };
+  const setup = async () => {
+    const sql = await createSql();
+    const starter = STARTERS.find((s) => s.id === "ecommerce-orders")!;
+    sql.load(starter.csv());
+    const profile = sql.profile();
+    const revenue = profile.columns.find((c) => c.name === "revenue")!;
+    const [{ v: total }] = rowsOf(sql, "SELECT sum(revenue) AS v FROM data");
+    return { sql, starter, revenue: { name: revenue.name, type: revenue.type, nullCount: revenue.nullCount ?? 0, distinct: revenue.distinct ?? 0 }, total: Number(total) };
+  };
+
+  it("a treemap's tiles add up to the whole, one level or two", async () => {
+    const { sql, revenue, total } = await setup();
+    const one = rowsOf(sql, treemapChart("category", revenue).query);
+    expect(one).toHaveLength(6);
+    expect(one.reduce((s, r) => s + Number(r.y), 0)).toBeCloseTo(total, 4);
+    const two = rowsOf(sql, treemapChart("region", revenue, "category").query);
+    expect(two).toHaveLength(24);
+    expect(two.reduce((s, r) => s + Number(r.y), 0)).toBeCloseTo(total, 4);
+    expect(chartSummary({ ...treemapChart("region", revenue, "category"), ...layout }, two)).toMatch(/^Treemap: revenue by region and category\. 4 groups, largest first: .+ \d+%.+\. Split into 24 parts; the largest is .+ under .+\.$/i);
+    expect(chartSummary({ ...treemapChart("category"), ...layout }, rowsOf(sql, treemapChart("category").query))).toMatch(/^Treemap: Rows by category\. 6 groups, largest first: /);
+  });
+
+  it("a funnel lists stages widest first, and counts rows when no measure is named", async () => {
+    const { sql, starter } = await setup();
+    const spec = { ...funnelChart("channel"), ...layout };
+    const stages = rowsOf(sql, spec.query);
+    expect(stages.map((s) => Number(s.y))).toEqual([...stages.map((s) => Number(s.y))].sort((a, b) => b - a));
+    expect(stages.reduce((s, r) => s + Number(r.y), 0)).toBe(starter.rows);
+    expect(chartSummary(spec, stages)).toMatch(/^Funnel: Rows by channel\. 4 stages, widest first\. .+ .+, then .+ \(\d+% of the first\).+\.$/);
+  });
+
+  it("a flow diagram's bands add up to the whole, and bands over fewer than five rows are left off a published copy", async () => {
+    const { sql, starter, revenue, total } = await setup();
+    const spec = { ...sankeyChart("region", "channel", revenue), ...layout };
+    const flows = rowsOf(sql, spec.query);
+    expect(flows).toHaveLength(16);
+    expect(flows.reduce((s, r) => s + Number(r.y), 0)).toBeCloseTo(total, 4);
+    expect(flows.reduce((s, r) => s + Number(r.n), 0)).toBe(starter.rows);
+    expect(chartSummary(spec, flows)).toMatch(/^Flow diagram: revenue from region to channel\. 16 flows from 4 starts to 4 ends\. Largest: .+ to .+ .+, .+ to .+ .+ and .+ to .+ .+\.$/);
+    const rows = [{ x: "a", target: "b", y: 9, n: 4 }, { x: "a", target: "c", y: 8, n: 5 }];
+    expect(applyPrivacyFloor({ type: "sankey" }, rows).map((r) => r.target)).toEqual(["c"]);
+    expect(applyPrivacyFloor({ type: "treemap" }, rows)).toHaveLength(2);
+  });
+
+  it("leaves out tiles and bands that are not positive, since they cannot be drawn", async () => {
+    const sql = await createSql();
+    sql.load("g,h,v\na,x,5\na,y,-5\nb,x,3\nb,y,0\n");
+    const profile = sql.profile();
+    const v = profile.columns.find((c) => c.name === "v")!;
+    const m = { name: v.name, type: v.type, nullCount: 0, distinct: v.distinct ?? 0 };
+    expect(rowsOf(sql, treemapChart("g", m).query).map((r) => r.x)).toEqual(["b"]);
+    expect(rowsOf(sql, sankeyChart("g", "h", m).query)).toHaveLength(2);
   });
 });

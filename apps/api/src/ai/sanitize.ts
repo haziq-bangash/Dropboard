@@ -1,4 +1,4 @@
-import { guardSql, boxplotChart, calendarChart, heatmapChart, histogramChart, mapChart, regionsChart, tidySql, type ColumnProfile } from "@dropboard/engine";
+import { guardSql, boxplotChart, calendarChart, funnelChart, heatmapChart, histogramChart, mapChart, regionsChart, sankeyChart, treemapChart, tidySql, type ColumnProfile } from "@dropboard/engine";
 import { DashboardSpec, type AiTable } from "@dropboard/spec";
 import { AiBadOutput, SPECIAL_CHARTS, type AiChartInput, type AiDashboardInput } from "./schema";
 
@@ -11,6 +11,9 @@ export interface Dropped {
 
 // the most groups a heatmap side or a box plot can show and stay readable
 const HEATMAP_MAX_SIDE = 25;
+// a treemap tile per value, and a funnel stage per value, stay readable only up to about this many
+const TREEMAP_MAX = 40;
+const FUNNEL_MAX = 12;
 
 type Built = Omit<DashboardSpec["charts"][number], "id" | "layout">;
 
@@ -63,6 +66,36 @@ function fromColumns(table: AiTable, c: AiChartInput): Built | string {
       const e = need(1);
       if (e) return e;
       return find(names[0])?.type === "date" ? calendarChart(names[0]) : `${names[0]} is not a date column`;
+    }
+    case "treemap": {
+      const e = need(1);
+      if (e) return e;
+      if (!isType(names[0], "string")) return `${names[0]} is not a text column`;
+      if ((find(names[0])?.distinct ?? 0) > TREEMAP_MAX) return "a treemap needs a column with fewer different values";
+      // [category], then optionally [second text column] and [measure], in either order
+      const child = names[1] !== undefined && isType(names[1], "string") ? names[1] : undefined;
+      const measure = [names[1], names[2]].find((n) => n !== undefined && isType(n, "number"));
+      if (names[1] !== undefined && !child && !measure) return `${names[1]} is neither a text nor a number column`;
+      if (child && (find(child)?.distinct ?? 0) > TREEMAP_MAX) return "a treemap needs a second column with fewer different values";
+      if (child === names[0]) return "a treemap needs two different columns";
+      return treemapChart(names[0], measure ? profile(measure) : undefined, child);
+    }
+    case "funnel": {
+      const e = need(1);
+      if (e) return e;
+      if (!isType(names[0], "string")) return `${names[0]} is not a text column`;
+      if ((find(names[0])?.distinct ?? 0) > FUNNEL_MAX) return "a funnel needs a column with few stages (12 at most)";
+      if (names[1] !== undefined && !isType(names[1], "number")) return `${names[1]} is not a number column`;
+      return funnelChart(names[0], names[1] ? profile(names[1]) : undefined);
+    }
+    case "sankey": {
+      const e = need(2);
+      if (e) return e;
+      if (!isType(names[0], "string") || !isType(names[1], "string")) return "a flow diagram needs two text columns";
+      if (names[0] === names[1]) return "a flow diagram needs two different columns";
+      if ((find(names[0])?.distinct ?? 0) > HEATMAP_MAX_SIDE || (find(names[1])?.distinct ?? 0) > HEATMAP_MAX_SIDE) return "a flow diagram needs columns with few distinct values";
+      if (names[2] !== undefined && !isType(names[2], "number")) return `${names[2]} is not a number column`;
+      return sankeyChart(names[0], names[1], names[2] ? profile(names[2]) : undefined);
     }
     case "map": {
       const e = need(2);
