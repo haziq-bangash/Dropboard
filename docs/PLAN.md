@@ -67,6 +67,7 @@ Findings are computed in the browser from the data, so they are free to run and 
   - **Samples.** Add a sample with locations (deliveries or store visits with coordinates and regions) so the maps show up in the starters.
   - **Exit:** a file with latitude and longitude opens with a cluster map; a file with country or state names opens with a choropleth; a published map holds no individual coordinates; a 50 MB file with coordinates still draws in under 5 seconds.
 - **Progress (Nov 2026).** Shipped: the coordinate map (v0.4.2), and a country-shaded region map with country shapes from Natural Earth 110m (public domain, 50 KB gzipped, served from `apps/web/public/geo/world.json`). Still to do: US states, cities and postal codes, heatmap, histogram, treemap, box plot, calendar heatmap, funnel, Sankey and flow map, and a hand-correction menu for detected place columns.
+- **Measured: large file (8 Nov 2026).** A generated CSV of 50.3 MB and 1,000,000 rows with latitude and longitude, dropped into the try-it page in headless Chromium on a developer desktop, showed its first charts and the map in 3.7, 4.1 and 4.2 seconds (three runs, file drop to map visible, covering read, profile and every first chart query). That meets the under-5-seconds exit here, but the margin is thin and a slower laptop or phone may not meet it. Not yet measured: where the time goes, other machines, or larger files.
 
 ### Phase 6: Sources (v0.6.0)
 - **Paste and drag:** paste copied cells or a table from a page.
