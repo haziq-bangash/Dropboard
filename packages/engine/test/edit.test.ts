@@ -66,3 +66,47 @@ describe("addPlaceChart", () => {
     expect(addPlaceChart(once, profile, "country", "origin")).toMatch(/already mapped/);
   });
 });
+
+describe("addRequestedChart", () => {
+  const rich: TableProfile = {
+    rowCount: 800,
+    columns: [
+      { name: "region", type: "string", nullCount: 0, distinct: 4 },
+      { name: "channel", type: "string", nullCount: 0, distinct: 6 },
+      { name: "customer", type: "string", nullCount: 0, distinct: 700 },
+      { name: "revenue", type: "number", nullCount: 0, distinct: 600 },
+      { name: "lat", type: "number", nullCount: 0, distinct: 700 },
+      { name: "lng", type: "number", nullCount: 0, distinct: 700 },
+    ],
+    coordinates: { lat: "lat", lon: "lng" },
+  };
+  const spec = suggestDashboard("t", rich);
+
+  it("offers only columns that suit the chart, and never a latitude as an amount", async () => {
+    const { textChoices, measureChoices } = await import("../src/edit");
+    expect(textChoices(rich, "funnel").map((c) => c.name)).toEqual(["region", "channel"]);
+    expect(textChoices(rich, "treemap").map((c) => c.name)).toEqual(["region", "channel"]);
+    expect(measureChoices(rich).map((c) => c.name)).toEqual(["revenue"]);
+  });
+
+  it("adds a treemap, a funnel and a flow diagram above the data preview", async () => {
+    const { addRequestedChart } = await import("../src/edit");
+    const withTreemap = addRequestedChart(spec, rich, { type: "treemap", category: "region", child: "channel", measure: "revenue" }) as typeof spec;
+    expect(withTreemap.charts.at(-1)!.type).toBe("table");
+    expect(withTreemap.charts.at(-2)!.type).toBe("treemap");
+    const withFunnel = addRequestedChart(withTreemap, rich, { type: "funnel", stage: "channel" }) as typeof spec;
+    const withFlow = addRequestedChart(withFunnel, rich, { type: "sankey", from: "region", to: "channel", measure: "revenue" }) as typeof spec;
+    expect(withFlow.charts.map((c) => c.type).filter((t) => ["treemap", "funnel", "sankey"].includes(t))).toEqual(["treemap", "funnel", "sankey"]);
+    expect(new Set(withFlow.charts.map((c) => c.id)).size).toBe(withFlow.charts.length);
+  });
+
+  it("says why not, and does not add the same chart twice", async () => {
+    const { addRequestedChart } = await import("../src/edit");
+    expect(addRequestedChart(spec, rich, { type: "funnel", stage: "customer" })).toMatch(/too many different values/);
+    expect(addRequestedChart(spec, rich, { type: "funnel", stage: "revenue" })).toMatch(/Choose a text column/);
+    expect(addRequestedChart(spec, rich, { type: "sankey", from: "region", to: "region" })).toMatch(/two different columns/);
+    expect(addRequestedChart(spec, rich, { type: "treemap", category: "region", measure: "region" })).toMatch(/not a number column/);
+    const once = addRequestedChart(spec, rich, { type: "funnel", stage: "region" }) as typeof spec;
+    expect(addRequestedChart(once, rich, { type: "funnel", stage: "region" })).toMatch(/already on this dashboard/);
+  });
+});
