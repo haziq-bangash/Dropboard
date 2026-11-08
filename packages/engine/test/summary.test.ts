@@ -76,6 +76,14 @@ describe("chartSummary", () => {
     expect(chartSummary(spec("regions", "Nothing"), [])).toBe("Region map: Nothing. No data.");
   });
 
+  it("counts as shaded only the values that match a country or state, and says how many do not", () => {
+    const states = { ...spec("regions", "Sales by area"), map: "us" as const };
+    const rows = [{ x: "Texas", y: 9 }, { x: "Ohio", y: 4 }, { x: "Guam", y: 7 }, { x: "Other", y: 1 }];
+    expect(chartSummary(states, rows)).toBe("Region map: Sales by area. 2 places shaded, highest first: Texas 9 and Ohio 4. 2 other values do not match a state and are not shown.");
+    expect(chartSummary(states, [{ x: "Guam", y: 7 }])).toBe("Region map: Sales by area. No value matches a state, so nothing is shaded.");
+    expect(chartSummary(spec("regions", "By country"), [{ x: "France", y: 5 }, { x: "Narnia", y: 2 }])).toContain("1 other value does not match a country and is not shown.");
+  });
+
   it("reads a headline number and a table", () => {
     expect(chartSummary(spec("kpi", "Total revenue"), [{ value: 120_825 }])).toBe("Headline number: Total revenue. 121 thousand.");
     expect(chartSummary(spec("kpi", "Empty"), [])).toBe("Headline number: Empty. No value.");

@@ -1,4 +1,5 @@
 import type { ChartSpec } from "@dropboard/spec";
+import { countryCode, usStateCode } from "./places";
 
 /**
  * A plain sentence or two describing what a chart shows, for people who cannot see it (a screen reader reads it in place
@@ -43,7 +44,7 @@ function name(v: unknown): string {
 
 const list = (items: string[]) => (items.length <= 2 ? items.join(" and ") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`);
 
-export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y">, rows: Row[]): string {
+export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y" | "map">, rows: Row[]): string {
   const head = `${KIND[spec.type]}: ${spec.title}.`;
   if (spec.type === "table") return `${head} ${rows.length} row${rows.length === 1 ? "" : "s"} shown.`;
 
@@ -105,10 +106,16 @@ export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y">
     }
 
     case "regions": {
-      const top = [...points].sort((a, b) => b.y - a.y);
+      // only values that match a country or state are shaded, so only those are counted as shaded
+      const us = spec.map === "us";
+      const matches = us ? usStateCode : countryCode;
+      const top = points.filter((p) => matches(p.x) !== null).sort((a, b) => b.y - a.y);
+      const left = points.length - top.length;
+      const unmatched = left > 0 ? ` ${left} other value${left === 1 ? " does" : "s do"} not match a ${us ? "state" : "country"} and ${left === 1 ? "is" : "are"} not shown.` : "";
+      if (top.length === 0) return `${head} No value matches a ${us ? "state" : "country"}, so nothing is shaded.`;
       const shown = top.slice(0, 5).map((p) => `${name(p.x)} ${said(p.y)}`);
       const more = top.length - shown.length;
-      return `${head} ${top.length} place${top.length === 1 ? "" : "s"} shaded, highest first: ${list(shown)}${more > 0 ? `, and ${more} more` : ""}.`;
+      return `${head} ${top.length} place${top.length === 1 ? "" : "s"} shaded, highest first: ${list(shown)}${more > 0 ? `, and ${more} more` : ""}.${unmatched}`;
     }
 
     case "pie": {
