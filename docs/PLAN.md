@@ -129,7 +129,7 @@ Findings are computed in the browser from the data, so they are free to run and 
 
 ## Phase 3 as built
 - `POST /api/ai/generate` designs or edits a dashboard (pass `current` to refine, which covers chat-style edits). `POST /api/ai/ask` returns one guarded SQL query that the browser runs.
-- The model sees only column names, types, null counts and approximate distinct counts. Never row values.
+- The model sees only column names, types, null counts and approximate distinct counts. Never row values. The one addition (approved 8 Nov 2026) is the database error text when a question's query fails, sent once for a repair, with every quoted value removed.
 - Model output is untrusted: structured output, then the server rebuilds the spec, drops charts whose SQL fails the guard, and the browser drops charts that do not bind to the real columns.
 - Results are cached by prompt version, model, column names and types, and instruction. Cache hits are free; misses count against a per-user daily limit (default 10, `AI_DAILY_LIMIT`). Failed and declined calls are not charged. Every call is logged with token counts for Phase 4 billing.
 - **Provider-agnostic.** Pilot is built on the Vercel AI SDK. `AiService` (generate, ask) is the only thing routes know; `ai/ai-sdk.ts` implements it for any AI SDK model, and `ai/providers/index.ts` is the only file that knows about vendors. Choose with `AI_PROVIDER` (`google`, `anthropic`, `openai`, `xai`, `none`) and `AI_MODEL`; adding a vendor is a few lines in that file. Cache keys and the usage log carry `provider/model`.
