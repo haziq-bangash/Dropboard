@@ -1,4 +1,5 @@
 import { ecod } from "./anomaly/ecod";
+import { gatherCohorts } from "./cohort";
 import { gatherQuality } from "./quality";
 import type { InsightInput, SeriesInput } from "./insights";
 import { aggregate, isCategory, isMeasure, label } from "./suggest";
@@ -283,6 +284,10 @@ export async function gatherInsightInput(profile: TableProfile, run: RunSql): Pr
   // ---- checks on the values themselves ----
   const quality = await gatherQuality(profile, run, qualitySeries);
   if (quality) input.quality = quality;
+
+  // ---- who comes back: people by the month they first appear ----
+  const cohorts = await gatherCohorts(profile, run);
+  if (cohorts) input.cohorts = cohorts;
 
   return input;
 }

@@ -263,7 +263,9 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo, cityIndex?: CityIndex)
       };
       // labels that are years or dates read left to right in time; the rest by size
       const timeLike = (k: string[]) => k.length > 0 && k.every((v) => /^\d{4}(-\d\d){0,2}$/.test(v));
-      const ordered = (k: string[]) => (timeLike(k) ? [...k].sort() : k);
+      // "Month 0, Month 1..." counts upward whatever the cell sizes are
+      const counted = (k: string[]) => k.length > 0 && k.every((v) => /^(month|week|day) d+$/i.test(v));
+      const ordered = (k: string[]) => (timeLike(k) ? [...k].sort() : counted(k) ? [...k].sort((a, b) => Number(a.split(" ")[1]) - Number(b.split(" ")[1])) : k);
       const xs = ordered(total("x"));
       const ys = ordered(total("y"));
       const values = rows.map((r) => Number(r.value)).filter(Number.isFinite);

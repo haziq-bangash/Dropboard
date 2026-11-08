@@ -85,7 +85,7 @@ export const NarrateInput = z.object({
     .array(
       z.object({
         id: z.string().min(1).max(8),
-        kind: z.enum(["trend", "change", "outlier", "correlation", "dominance", "concentration", "missing", "seasonal", "latest", "duplicates", "leader", "standout", "entitytrend", "jump", "rankshift", "unusualrows", "contextual", "quality", "pareto"]),
+        kind: z.enum(["trend", "change", "outlier", "correlation", "dominance", "concentration", "missing", "seasonal", "latest", "duplicates", "leader", "standout", "entitytrend", "jump", "rankshift", "unusualrows", "contextual", "quality", "pareto", "retention", "cohorttrend"]),
         columns: z.array(z.string().max(200)).max(2),
         facts: z.record(z.string().max(40), z.number().finite()),
         tokens: z.array(z.enum(["{label}", "{at}", "{worstValue}", "{peak}", "{low}"])).max(5),

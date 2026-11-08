@@ -31,6 +31,8 @@ export interface TableProfile {
   panel?: { entity: string; time: string; /** Rows beyond the first for an entity and period that appear more than once. */ repeated?: number };
   /** Set when the file was too big to hold, so the table is a random sample: how many rows it holds, and how many the file has. */
   sample?: { rows: number; of: number };
+  /** Set when each row is something a person did and one column says who (customers, users): which columns, for cohorts and retention. */
+  customers?: { column: string; time: string };
   /** A column of cities, when there is one (needs a column name that points at places, and the city list) */
   cities?: string;
 }

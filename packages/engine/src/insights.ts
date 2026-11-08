@@ -1,4 +1,5 @@
 import { seriesAnomalies } from "./anomaly/series";
+import { cohortFindings, type CohortInput } from "./cohort";
 import { clamp01, fmt, observedChange, pct, pctFine } from "./format";
 import { qualityFindings, type QualityInput } from "./quality";
 import { groupFindings, panelChecks, panelTrendCandidates, strongestTrends } from "./panelInsights";
@@ -15,7 +16,7 @@ import { benjaminiHochberg, changePoint, dominance, mannKendall, mean, median, o
  *   3. Findings come back ranked, with a plain sentence and the numbers behind it.
  */
 
-export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "concentration" | "missing" | "seasonal" | "latest" | "duplicates" | "leader" | "standout" | "entitytrend" | "jump" | "rankshift" | "unusualrows" | "contextual" | "quality" | "pareto";
+export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "concentration" | "missing" | "seasonal" | "latest" | "duplicates" | "leader" | "standout" | "entitytrend" | "jump" | "rankshift" | "unusualrows" | "contextual" | "quality" | "pareto" | "retention" | "cohorttrend";
 
 /** The rows or points behind a finding, for a person to look at. They stay in the browser: nothing here is ever sent to a model. */
 export interface FindingDetails {
@@ -95,6 +96,8 @@ export interface InsightInput {
   groups?: { column: string; measure: string; values: { label: string; value: number }[] }[];
   /** How much of a measure the biggest few values of a text column hold (customers, products): shares as fractions of the total. */
   pareto?: { column: string; measure: string; groups: number; top10: number; top20: number; biggest: number }[];
+  /** Who comes back: cohorts of people by the month they first appear, and how many of each are active again later. */
+  cohorts?: CohortInput;
   /** Checks on the values themselves: spellings, placeholders, numbers as text, impossible dates, empty periods, repeated keys. */
   quality?: QualityInput;
   /** How many rows are exact copies of an earlier row. */
@@ -218,6 +221,20 @@ function describe(f: RawFinding): Pick<Finding, "headline" | "figure" | "next"> 
         figure: { value: pct(Number(e.share20)), label: `of ${b} from the top 20%` },
         next: `Ask whether depending on so few ${a} values is a risk, and what it would take to grow the rest.`,
       };
+    case "retention":
+      return {
+        headline: `${pct(Number(e.share))} of ${a} values came back`,
+        figure: { value: pct(Number(e.share)), label: "active again in a later month" },
+        next: "Look at what the ones who stayed have in common (a first product, a channel, a price), and what could bring back the rest.",
+      };
+    case "cohorttrend": {
+      const change = Number(e.change);
+      return {
+        headline: `Newer ${a} values ${change > 0 ? "stay better" : "stay less"}`,
+        figure: { value: `${change >= 0 ? "+" : "-"}${Math.round(Math.abs(change) * 100)} points`, label: "next-month return, newer against older" },
+        next: "Find out what changed for the newer group: how they were found, what they first bought, or what the service was like in their first month.",
+      };
+    }
     case "unusualrows":
       return {
         headline: `${fmt(Number(e.flagged))} rows stand out`,
@@ -404,6 +421,10 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
     });
   }
 
+  // who comes back: the plain rate is a fact, and newer cohorts staying better or worse is one more test in the same correction
+  const cohort = cohortFindings(input.cohorts);
+  if (cohort.trend) candidates.push({ ...cohort.trend.finding, tested: true, passesFloor: cohort.trend.passesFloor });
+
   // each entity's own series is one more test in the same correction
   for (const c of panelTrendCandidates(input.panel ?? [])) candidates.push({ ...c.finding, tested: true, passesFloor: c.passesFloor });
 
@@ -534,6 +555,7 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
     found = found.filter((x) => x.kind !== "outlier");
   }
 
+  found.push(...cohort.facts);
   found.push(...qualityFindings(input.quality, input.rowCount));
   found.push(...groupFindings(input));
 

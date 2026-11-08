@@ -68,6 +68,8 @@ Rules:
 - unusualrows: flagged rows out of scored, share as a fraction, strongestZ how far out the most unusual one is in robust spreads. Never say anything about what is in the rows.
 - contextual: change is how far a point was from what its trend and season predict, as a fraction (0 when not meaningful), actual and expected are the two values, spreadsAway how unusual. {at} is the period; {label} the entity when there is one.
 - pareto: share20 and share10 are the fractions of a total held by the top 20% and top 10% of values, groups how many values there are, biggestShare the largest single value's fraction.
+- retention: share is the fraction of people (of people counted) who were active in a later month after their first, nextMonth the fraction who came back the very next month, cohorts how many monthly groups were followed.
+- cohorttrend: earlier and later are the fractions of older and newer groups who came back the next month, change their difference as a fraction; earlierPeople and laterPeople are the sizes. {at} stands for the span of newer groups.
 - quality: a problem in the data itself. count and share say how much of it; label stands for an example value. Describe the problem and what to fix, not what the values mean.
 - duplicates: duplicateRows is how many rows are copies, share is that as a fraction of all rows.
 - Plain, specific wording. No hype.`;

@@ -109,6 +109,28 @@ export function calendarChart(date: string): Omit<ChartSpec, "id" | "layout"> {
   };
 }
 
+/**
+ * People by the month they first appear (rows), and the share of each group active again 0, 1, 2... months later (columns).
+ * Month 0 is always 100%. Cells for months not over yet are left out, so a young group's row simply stops.
+ */
+export function cohortChart(person: string, when: string): Omit<ChartSpec, "id" | "layout"> {
+  const who = q(person);
+  return {
+    type: "heatmap",
+    title: `Share of ${person} values active again, by first month`,
+    query:
+      `WITH f AS (SELECT ${who} AS who, date_trunc('month', CAST(${when} AS DATE)) AS m FROM data WHERE ${who} IS NOT NULL AND ${when} IS NOT NULL GROUP BY 1, 2), ` +
+      `first AS (SELECT who, min(m) AS c FROM f GROUP BY 1), ` +
+      `last AS (SELECT max(m) AS l FROM f), ` +
+      `size AS (SELECT c, count(*) AS n FROM first GROUP BY 1), ` +
+      `active AS (SELECT first.c AS c, date_diff('month', first.c, f.m) AS k, count(*) AS n FROM f JOIN first USING (who) GROUP BY 1, 2) ` +
+      `SELECT strftime(active.c, '%Y-%m') AS x, 'Month ' || CAST(active.k AS VARCHAR) AS y, CAST(round(100.0 * active.n / size.n, 1) AS DOUBLE) AS value ` +
+      `FROM active JOIN size USING (c), last WHERE active.k <= 12 AND date_diff('month', active.c, last.l) >= active.k AND size.n >= 20 ORDER BY 1, 2`,
+    x: "x",
+    y: ["y"],
+  };
+}
+
 /** Two categories against each other, each cell shaded by a measure (or by how many rows fall in it). */
 export function heatmapChart(a: string, b: string, measure?: ColumnProfile): Omit<ChartSpec, "id" | "layout"> {
   const value = measure ? `${aggregate(measure)}(${q(measure.name)})` : "count(*)";
@@ -389,6 +411,9 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
       y: ["y"],
     });
   }
+
+  // Who comes back: each month's new people, and the share of them active in each month after
+  if (profile.customers) add(cohortChart(profile.customers.column, timeExpression(time!.column, time!.kind)));
 
   // Places: a latitude and longitude pair becomes a map of where the rows are
   if (profile.coordinates) add(mapChart(profile.coordinates.lat, profile.coordinates.lon));
