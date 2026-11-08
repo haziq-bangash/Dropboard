@@ -6,7 +6,9 @@ import * as echarts from "echarts";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table as UiTable,
@@ -16,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { imageName } from "@/lib/image-name";
 import type { RowSource, Rows } from "@/lib/results";
 
 // Brand chart palette (see --chart-* in globals.css): midnight green, orange, dark amber, gunmetal, teal tint, sand
@@ -284,6 +287,17 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo): echarts.EChartsCoreOp
   }
 }
 
+/** Save the chart inside `card` as a PNG, drawn at twice the size on a white page so it reads well when shared. */
+function saveImage(card: HTMLElement | null, title: string) {
+  const dom = card?.querySelector<HTMLElement>('[role="img"]');
+  const chart = dom ? echarts.getInstanceByDom(dom) : undefined;
+  if (!chart) return;
+  const link = document.createElement("a");
+  link.href = chart.getDataURL({ type: "png", pixelRatio: 2, backgroundColor: "#FFFFFF" });
+  link.download = imageName(title);
+  link.click();
+}
+
 function Chart({ spec, rows, geo }: { spec: ChartSpec; rows: Rows; geo?: Geo }) {
   const ref = useRef<HTMLDivElement>(null);
   // ECharts owns a canvas outside React: create it, resize it with the window, and dispose it. Nothing else fits here.
@@ -349,6 +363,7 @@ function ChartCard({
     retry: false,
     refetchOnWindowFocus: false,
   });
+  const cardRef = useRef<HTMLDivElement>(null);
   // a region map also needs the country shapes, loaded once and shared by every such chart
   const world = useQuery({ queryKey: ["geo", "world"], queryFn: loadWorld, enabled: spec.type === "regions", staleTime: Infinity, retry: false, refetchOnWindowFocus: false });
   const rows: Rows | null = query.data ?? null;
@@ -384,9 +399,17 @@ function ChartCard({
     <Card
       className={spec.type === "table" ? "md:col-span-2" : undefined}
       data-testid="chart-card"
+      ref={cardRef}
     >
       <CardHeader>
         <CardTitle>{spec.title}</CardTitle>
+        {spec.type !== "table" && rows && !error && (
+          <CardAction>
+            <Button variant="ghost" size="icon-sm" aria-label={`Save ${spec.title} as an image`} onClick={() => saveImage(cardRef.current, spec.title)}>
+              <Download />
+            </Button>
+          </CardAction>
+        )}
       </CardHeader>
       <CardContent>
         {error ? (

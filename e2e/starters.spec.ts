@@ -222,3 +222,37 @@ test("a dashboard fits a phone: nothing scrolls sideways and every chart is insi
     expect(b.right).toBeLessThanOrEqual(391);
   }
 });
+
+test("a chart can be saved as a PNG image, on the owner's page and on a shared link", async ({ page, browser }) => {
+  await signUp(page);
+  await page.goto("/app/new");
+  await page.getByTestId("starter").filter({ hasText: "Online store orders" }).click();
+  await expect(page).toHaveURL(/\/app\/p\//, { timeout: 30_000 });
+  await expect(page.getByTestId("kpi-value").first()).not.toHaveText("", { timeout: 30_000 });
+  await expect(page.getByRole("img", { name: /^Bar chart: revenue by region/ })).toBeVisible();
+
+  const savePng = async (target: typeof page) => {
+    const [download] = await Promise.all([target.waitForEvent("download"), target.getByRole("button", { name: "Save revenue by region as an image" }).click()]);
+    expect(download.suggestedFilename()).toBe("revenue-by-region.png");
+    const file = await download.path();
+    const bytes = (await import("node:fs")).readFileSync(file!);
+    // the PNG signature, and a picture with something in it
+    expect([...bytes.subarray(0, 8)]).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    expect(bytes.length).toBeGreaterThan(5_000);
+  };
+  await savePng(page);
+
+  // the table of rows has nothing to save, and so does a number
+  await expect(page.getByRole("button", { name: /Save Data preview/ })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Create link" }).click();
+  const url = await dialog.getByTestId("share-link").inputValue();
+  const stranger = await browser.newContext();
+  const view = await stranger.newPage();
+  await view.goto(url);
+  await expect(view.getByRole("img", { name: /^Bar chart: revenue by region/ })).toBeVisible({ timeout: 30_000 });
+  await savePng(view);
+  await stranger.close();
+});
