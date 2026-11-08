@@ -207,10 +207,10 @@ export default function ProjectPage() {
         />
       ) : (
         <Tabs defaultValue="dashboard">
-          <TabsList variant="line">
-            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="insights">Insights</TabsTrigger>
-            <TabsTrigger value="story">Story</TabsTrigger>
+          <TabsList className="h-10 rounded-full p-1">
+            <TabsTrigger value="dashboard" className="rounded-full px-4">Dashboard</TabsTrigger>
+            <TabsTrigger value="insights" className="rounded-full px-4">Insights</TabsTrigger>
+            <TabsTrigger value="story" className="rounded-full px-4">Story</TabsTrigger>
           </TabsList>
           <TabsContent value="dashboard" className="flex flex-col gap-6 pt-4">
             <AiPanel
@@ -263,7 +263,7 @@ function TitleEditor({
       onChange={(e) => setValue(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-      className="h-auto min-w-0 flex-1 border-transparent bg-transparent px-1 text-2xl font-semibold tracking-tight shadow-none hover:border-input focus-visible:border-ring sm:max-w-xl"
+      className="h-auto min-w-0 flex-1 border-transparent bg-transparent px-1 text-3xl font-semibold tracking-tight shadow-none md:text-3xl hover:border-input focus-visible:border-ring sm:max-w-xl"
     />
   );
 }

@@ -6,7 +6,7 @@ import * as echarts from "echarts";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ChevronLeft, ChevronRight, Download, Presentation } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Hash, Presentation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -384,19 +384,24 @@ function ChartCard({
   if (spec.type === "kpi") {
     return (
       <Card size="sm" data-testid="kpi">
-        <CardHeader>
-          <p className="text-sm text-muted-foreground">{spec.title}</p>
-          <div
-            className="text-3xl font-semibold tracking-tight"
-            data-testid="kpi-value"
-          >
-            {error ? (
-              "–"
-            ) : rows ? (
-              fmt(rows[0]?.value)
-            ) : (
-              <Skeleton className="h-9 w-24" />
-            )}
+        <CardHeader className="flex items-center gap-3">
+          <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-lg bg-secondary/60 text-brand-text">
+            <Hash className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm text-muted-foreground">{spec.title}</p>
+            <div
+              className="text-3xl font-semibold tracking-tight text-primary"
+              data-testid="kpi-value"
+            >
+              {error ? (
+                "–"
+              ) : rows ? (
+                fmt(rows[0]?.value)
+              ) : (
+                <Skeleton className="h-9 w-24" />
+              )}
+            </div>
           </div>
         </CardHeader>
       </Card>
