@@ -80,3 +80,27 @@ test("every sample builds a dashboard", async ({ page }) => {
     await expect(page.getByTestId("project-card")).toHaveCount(0);
   }
 });
+
+test("every chart has a text description for screen readers, built from its own data", async ({ page }) => {
+  await signUp(page);
+  await page.goto("/app/new");
+  await page.getByTestId("starter").filter({ hasText: "Online store orders" }).click();
+  await expect(page).toHaveURL(/\/app\/p\//, { timeout: 30_000 });
+  await expect(page.getByTestId("kpi-value").first()).not.toHaveText("", { timeout: 30_000 });
+  await expect(page.getByTestId("chart-card").first().locator("canvas")).toBeVisible();
+
+  const charts = page.locator('[data-testid="chart-card"] [role="img"]');
+  const count = await charts.count();
+  expect(count).toBeGreaterThanOrEqual(3);
+  for (let i = 0; i < count; i++) {
+    const label = (await charts.nth(i).getAttribute("aria-label"))!;
+    expect(label, label).toMatch(/^(Bar chart|Line chart|Area chart|Pie chart|Scatter plot): .+\./);
+    expect(label, label).not.toMatch(/undefined|NaN|null/);
+  }
+  // the bar chart of revenue by region reads out the regions, biggest first
+  const bar = page.getByRole("img", { name: /^Bar chart: revenue by region/ });
+  await expect(bar).toBeVisible();
+  expect(await bar.getAttribute("aria-label")).toMatch(/4 bars, highest first: South .* and /);
+  // and the line says where it starts and ends
+  await expect(page.getByRole("img", { name: /^Line chart: revenue over time/ })).toHaveAttribute("aria-label", /It starts at .* and ends (higher|lower)/);
+});
