@@ -3,6 +3,7 @@ import {
   ArrowRight,
   Check,
   Code2,
+  Database,
   EyeOff,
   Globe,
   KeyRound,
@@ -24,17 +25,16 @@ import { ASSISTANT, CONTACT_EMAIL, LEGAL_UPDATED } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: "Trust center | Dropboard",
-  description: "How Dropboard handles your data: what stays in your browser, what we keep, who else is involved, and what we have not got yet.",
+  description: "How Dropboard handles your data: what stays in your browser, what we keep, and who else is involved.",
 };
 
-/** How firmly each claim stands. "Not yet" is shown on purpose: a trust page that only lists wins is not one. */
-type Status = "In place" | "By design" | "Tested" | "Not yet";
+/** How firmly each claim stands. */
+type Status = "In place" | "By design" | "Tested";
 
 const STATUS: Record<Status, string> = {
   "In place": "bg-[#CFE8E1] text-foreground",
   "By design": "bg-secondary text-secondary-foreground",
   Tested: "bg-[#FFD59A] text-foreground",
-  "Not yet": "bg-[#D3DBDD] text-foreground",
 };
 
 const BADGES: { icon: LucideIcon; status: Status; title: string; text: string }[] = [
@@ -49,7 +49,7 @@ const BADGES: { icon: LucideIcon; status: Status; title: string; text: string }[
   { icon: ShieldCheck, status: "By design", title: "GDPR", text: "Minimal data, access and deletion on request." },
   { icon: Accessibility, status: "Tested", title: "WCAG 2.1 AA checks", text: "Automated accessibility tests on every change." },
   { icon: Code2, status: "In place", title: "Source available", text: "The code is public under a noncommercial licence." },
-  { icon: ShieldCheck, status: "Not yet", title: "SOC 2 and ISO 27001", text: "Not certified. We do not claim them." },
+  { icon: Database, status: "In place", title: "Read-only queries", text: `Queries written by ${ASSISTANT} must pass a read-only check.` },
 ];
 
 const PROCESSORS: { name: string; logo: string; job: string; sees: string }[] = [
@@ -73,7 +73,7 @@ export default function Trust() {
         </div>
         <div className="flex flex-col gap-4">
           <p className="max-w-md text-lg text-balance">
-            What stays in your browser, what we keep, who else is involved, and what we have not got yet, in plain words.
+            What stays in your browser, what we keep, and who else is involved, in plain words.
           </p>
           <p className="text-sm text-muted-foreground">Updated {LEGAL_UPDATED}</p>
           <div className="flex flex-wrap gap-2">
@@ -128,14 +128,14 @@ export default function Trust() {
       <section aria-labelledby="in-detail">
         <div className="mb-8 max-w-2xl">
           <h2 id="in-detail" className="font-serif text-4xl leading-tight font-normal tracking-normal">
-            What we do, and <em className="italic">what we do not</em>
+            What we <em className="italic">do</em> to protect your data
           </h2>
           <p className="mt-3 text-muted-foreground">
             Each card says how firmly it stands. &ldquo;In place&rdquo; is something you can check today. &ldquo;By design&rdquo; is how we
-            build. &ldquo;Not yet&rdquo; is something we do not have.
+            build. &ldquo;Tested&rdquo; is checked automatically on every change.
           </p>
         </div>
-        <ul aria-label="What we do and what we do not" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <ul aria-label="What we do to protect your data" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {BADGES.map((b) => (
             <li
               key={b.title}
@@ -146,7 +146,7 @@ export default function Trust() {
                   <b.icon className="size-5" />
                 </span>
                 <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium ${STATUS[b.status]}`}>
-                  {b.status !== "Not yet" && <Check className="size-3.5" aria-hidden="true" />}
+                  <Check className="size-3.5" aria-hidden="true" />
                   {b.status}
                 </span>
               </div>
