@@ -43,6 +43,19 @@ export function mapChart(lat: string, lon: string): Omit<ChartSpec, "id" | "layo
   };
 }
 
+/** A world map with each country shaded by a measure (or by how many rows it has). The names are read by the renderer. */
+export function regionsChart(column: string, measure?: ColumnProfile): Omit<ChartSpec, "id" | "layout"> {
+  const col = q(column);
+  const value = measure ? `${aggregate(measure)}(${q(measure.name)})` : "count(*)";
+  return {
+    type: "regions",
+    title: measure ? `${label(measure)} by ${column}` : `Rows by ${column}`,
+    query: `SELECT ${col} AS x, ${value} AS y FROM data WHERE ${col} IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 300`,
+    x: "x",
+    y: ["y"],
+  };
+}
+
 /** Drop the bins on a map that hold too few rows to publish. Other charts are returned as they are. */
 export function applyPrivacyFloor<T extends Record<string, unknown>>(chart: Pick<ChartSpec, "type">, rows: T[]): T[] {
   return chart.type === "map" ? rows.filter((r) => Number(r.n) >= MAP_MIN_ROWS) : rows;
@@ -83,6 +96,8 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
 
   // Places: a latitude and longitude pair becomes a map of where the rows are
   if (profile.coordinates) add(mapChart(profile.coordinates.lat, profile.coordinates.lon));
+
+  if (profile.countries) add(regionsChart(profile.countries, measures[0]));
 
   // Category breakdowns
   for (const cat of categories.slice(0, 2)) {
