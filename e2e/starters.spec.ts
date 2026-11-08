@@ -94,7 +94,7 @@ test("every chart has a text description for screen readers, built from its own 
   expect(count).toBeGreaterThanOrEqual(3);
   for (let i = 0; i < count; i++) {
     const label = (await charts.nth(i).getAttribute("aria-label"))!;
-    expect(label, label).toMatch(/^(Bar chart|Line chart|Area chart|Pie chart|Scatter plot|Map|Region map): .+\./);
+    expect(label, label).toMatch(/^(Bar chart|Line chart|Area chart|Pie chart|Scatter plot|Map|Region map|Histogram|Heatmap): .+\./);
     expect(label, label).not.toMatch(/undefined|NaN|null/);
   }
   // the bar chart of revenue by region reads out the regions, biggest first
@@ -144,4 +144,22 @@ test("a file with latitude and longitude opens with a map, and a published map h
   // a stranger sees the shaded countries too, from the published numbers and no data of their own
   await expect(view.getByRole("img", { name: /^Region map: Average delivery_minutes by country.*8 places shaded/ })).toBeVisible();
   await stranger.close();
+});
+
+test("a sample opens with a histogram of its main measure and a heatmap of two categories", async ({ page }) => {
+  await signUp(page);
+  await page.goto("/app/new");
+  await page.getByTestId("starter").filter({ hasText: "Online store orders" }).click();
+  await expect(page).toHaveURL(/\/app\/p\//, { timeout: 30_000 });
+  await expect(page.getByTestId("kpi-value").first()).not.toHaveText("", { timeout: 30_000 });
+
+  const histogram = page.getByRole("img", { name: /^Histogram: How revenue is spread out/ });
+  await expect(histogram).toBeVisible();
+  await expect(histogram).toHaveAttribute("aria-label", /20 bins from .+ to .+\. The most rows/);
+  await expect(histogram.locator("canvas").first()).toBeVisible();
+
+  const heatmap = page.getByRole("img", { name: /^Heatmap: revenue by region and category/ });
+  await expect(heatmap).toBeVisible();
+  await expect(heatmap).toHaveAttribute("aria-label", /\d+ combinations\. Highest: .+ and .+, .+\. Lowest:/);
+  await expect(heatmap.locator("canvas").first()).toBeVisible();
 });
