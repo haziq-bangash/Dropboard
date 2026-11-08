@@ -70,7 +70,7 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo): echarts.EChartsCoreOp
   const base = {
     color: COLORS,
     tooltip: { trigger: spec.type === "pie" ? "item" : "axis" },
-    grid: { left: 48, right: 16, top: 16, bottom: spec.type === "bar" && rows.length > 6 ? 64 : 32 },
+    grid: { left: 48, right: 16, top: 16, bottom: (spec.type === "bar" || spec.type === "boxplot") && rows.length > 6 ? 64 : 32 },
   };
   switch (spec.type) {
     case "bar":
@@ -162,6 +162,29 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo): echarts.EChartsCoreOp
         } },
         series: [{ type: "bar", barCategoryGap: "6%", data: rows.map((r) => r[y]), itemStyle: { borderRadius: [2, 2, 0, 0] } }],
       };
+    case "boxplot": {
+      const usable = rows.filter((r) => Number.isFinite(Number(r.y)));
+      return {
+        ...base,
+        tooltip: {
+          trigger: "item",
+          formatter: (p: { dataIndex: number }) => {
+            const r = usable[p.dataIndex];
+            return `${fmt(r.x)}<br/>Median ${fmt(r.y)}<br/>Middle half ${fmt(r.q1)} to ${fmt(r.q3)}<br/>Range ${fmt(r.low)} to ${fmt(r.high)}<br/>${fmt(r.n)} rows`;
+          },
+        },
+        xAxis: { ...axis, type: "category", data: usable.map((r) => fmt(r.x)), axisLabel: { ...axis.axisLabel, interval: 0, rotate: usable.length > 6 ? 35 : 0 } },
+        yAxis: { ...axis, type: "value", scale: true },
+        series: [
+          {
+            type: "boxplot",
+            data: usable.map((r) => [r.low, r.q1, r.y, r.q3, r.high]),
+            itemStyle: { color: "#E3ECED", borderColor: "#075056", borderWidth: 1.5 },
+            emphasis: { itemStyle: { borderColor: "#FF5B04" } },
+          },
+        ],
+      };
+    }
     case "heatmap": {
       const total = (key: string) => {
         const t = new Map<string, number>();

@@ -166,3 +166,24 @@ describe("buildSpec with charts described by columns", () => {
     expect(dropped[0].reason).toMatch(/^no column called/);
   });
 });
+
+describe("buildSpec with a box plot", () => {
+  const t = {
+    rowCount: 100,
+    columns: [
+      { name: "team", type: "string" as const, nullCount: 0, distinct: 6 },
+      { name: "names", type: "string" as const, nullCount: 0, distinct: 90 },
+      { name: "score", type: "number" as const, nullCount: 0, distinct: 80 },
+    ],
+  };
+  const box = (columns: string[]) => ({ type: "boxplot" as const, title: "", query: "", columns });
+  it("builds from a small text column and a number column, and drops the wrong shapes", () => {
+    const { spec, dropped } = buildSpec(t, {
+      title: "x",
+      charts: [box(["team", "score"]), box(["score", "team"]), box(["names", "score"]), box(["team"]), { type: "kpi", title: "k", query: "SELECT 1 AS value", columns: [] }],
+    });
+    expect(spec.charts.map((c) => c.type)).toEqual(["boxplot", "kpi"]);
+    expect(spec.charts[0].title).toBe("How score varies by team");
+    expect(dropped.map((d) => d.reason)).toEqual(["score is not a text column", "a box plot needs a column with few distinct values", "boxplot needs 2 column names"]);
+  });
+});

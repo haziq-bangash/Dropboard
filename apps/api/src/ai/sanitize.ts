@@ -1,4 +1,4 @@
-import { guardSql, heatmapChart, histogramChart, mapChart, regionsChart, tidySql, type ColumnProfile } from "@dropboard/engine";
+import { guardSql, boxplotChart, heatmapChart, histogramChart, mapChart, regionsChart, tidySql, type ColumnProfile } from "@dropboard/engine";
 import { DashboardSpec, type AiTable } from "@dropboard/spec";
 import { AiBadOutput, SPECIAL_CHARTS, type AiChartInput, type AiDashboardInput } from "./schema";
 
@@ -9,6 +9,7 @@ export interface Dropped {
   reason: string;
 }
 
+// the most groups a heatmap side or a box plot can show and stay readable
 const HEATMAP_MAX_SIDE = 25;
 
 type Built = Omit<DashboardSpec["charts"][number], "id" | "layout">;
@@ -42,6 +43,14 @@ function fromColumns(table: AiTable, c: AiChartInput): Built | string {
       if ((find(names[0])?.distinct ?? 0) > HEATMAP_MAX_SIDE || (find(names[1])?.distinct ?? 0) > HEATMAP_MAX_SIDE) return "a heatmap needs columns with few distinct values";
       if (names[2] !== undefined && !isType(names[2], "number")) return `${names[2]} is not a number column`;
       return heatmapChart(names[0], names[1], names[2] ? profile(names[2]) : undefined);
+    }
+    case "boxplot": {
+      const e = need(2);
+      if (e) return e;
+      if (!isType(names[0], "string")) return `${names[0]} is not a text column`;
+      if (!isType(names[1], "number")) return `${names[1]} is not a number column`;
+      if ((find(names[0])?.distinct ?? 0) > HEATMAP_MAX_SIDE) return "a box plot needs a column with few distinct values";
+      return boxplotChart(names[0], names[1]);
     }
     case "map": {
       const e = need(2);

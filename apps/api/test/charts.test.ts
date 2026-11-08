@@ -1,4 +1,4 @@
-import { chartSummary, guardSql, heatmapChart, histogramChart, STARTERS, suggestDashboard } from "@dropboard/engine";
+import { applyPrivacyFloor, boxplotChart, chartSummary, guardSql, heatmapChart, histogramChart, STARTERS, suggestDashboard } from "@dropboard/engine";
 import { describe, expect, it } from "vitest";
 import { createSql } from "../eval/duckdb";
 
@@ -63,5 +63,40 @@ describe("latitude and longitude are positions, not amounts", () => {
     expect(queries.length).toBeGreaterThan(3);
     for (const query of queries) expect(query).not.toMatch(/latitude|longitude/);
     expect(spec.charts.some((c) => c.type === "map")).toBe(true);
+  });
+});
+
+describe("box plot on real data", () => {
+  it("gives each group its median, middle half and whiskers, all taken from the data itself", async () => {
+    const sql = await createSql();
+    const starter = STARTERS.find((s) => s.id === "ecommerce-orders")!;
+    sql.load(starter.csv());
+    const spec = { ...boxplotChart("region", "revenue"), id: "b", layout: { x: 0, y: 0, w: 1, h: 1 } };
+    const groups = rowsOf(sql, spec.query);
+    expect(groups).toHaveLength(4);
+    expect(groups.reduce((s, g) => s + Number(g.n), 0)).toBe(starter.rows);
+    for (const g of groups) {
+      // the median agrees with DuckDB's own
+      const [m] = rowsOf(sql, `SELECT median(revenue) AS v FROM data WHERE region = '${g.x}'`);
+      expect(Number(g.y)).toBeCloseTo(Number(m.v), 6);
+      expect(Number(g.low)).toBeLessThanOrEqual(Number(g.q1));
+      expect(Number(g.q1)).toBeLessThanOrEqual(Number(g.y));
+      expect(Number(g.y)).toBeLessThanOrEqual(Number(g.q3));
+      expect(Number(g.q3)).toBeLessThanOrEqual(Number(g.high));
+      // whiskers are values that really occur, not computed fences
+      const [seen] = rowsOf(sql, `SELECT count(*) AS n FROM data WHERE region = '${g.x}' AND (revenue = ${g.low} OR revenue = ${g.high})`);
+      expect(Number(seen.n)).toBeGreaterThan(0);
+    }
+    // ordered by median, highest first
+    expect(groups.map((g) => Number(g.y))).toEqual([...groups.map((g) => Number(g.y))].sort((a, b) => b - a));
+    expect(chartSummary(spec, groups)).toMatch(/^Box plot: How revenue varies by region\. 4 groups\. Highest median: .+, middle half from .+ to .+\. Lowest median: .+/);
+  });
+
+  it("is suggested with a spread measure and a small category, and groups under five rows are left off a published one", async () => {
+    const sql = await createSql();
+    sql.load(STARTERS.find((s) => s.id === "ecommerce-orders")!.csv());
+    expect(suggestDashboard("Orders", sql.profile()).charts.map((c) => c.type)).toContain("boxplot");
+    const rows = [{ x: "a", n: 4 }, { x: "b", n: 5 }, { x: "c", n: 90 }];
+    expect(applyPrivacyFloor({ type: "boxplot" }, rows).map((r) => r.x)).toEqual(["b", "c"]);
   });
 });
