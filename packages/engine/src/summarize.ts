@@ -1,6 +1,7 @@
 import type { InsightInput, SeriesInput } from "./insights";
 import { aggregate, isCategory, isMeasure, label } from "./suggest";
 import { q, type TableProfile } from "./profile";
+import { timeColumn, timeExpression } from "./understand";
 
 /** Run one query against the table `data` and return its rows. The browser and the tests each supply their own. */
 export type RunSql = (sql: string) => Promise<Record<string, unknown>[]>;
@@ -10,14 +11,16 @@ const MAX_NUMERIC = 8;
 const MAX_CATEGORIES = 4;
 const SAMPLE_ROWS = 5000;
 const MIN_POINTS = 8;
+const MIN_YEAR_POINTS = 6;
 const MAX_POINTS = 400;
 const MAX_DUPLICATE_ROWS = 2_000_000;
 
-type Unit = "day" | "week" | "month";
+type Unit = "day" | "week" | "month" | "year";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function labelFor(ms: number, unit: Unit): string {
   const d = new Date(ms);
+  if (unit === "year") return String(d.getUTCFullYear());
   const month = `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
   if (unit === "month") return month;
   const day = `${d.getUTCDate()} ${month}`;
@@ -47,33 +50,47 @@ export async function gatherInsightInput(profile: TableProfile, run: RunSql): Pr
   }
 
   // ---- measures over time ----
-  const date = [...columns.filter((c) => c.type === "date")].sort((a, b) => b.distinct - a.distinct)[0];
-  if (date && measures.length) {
-    const d = q(date.name);
-    const [range] = await run(`SELECT CAST(epoch_ms(CAST(min(${d}) AS TIMESTAMP)) AS DOUBLE) AS lo, CAST(epoch_ms(CAST(max(${d}) AS TIMESTAMP)) AS DOUBLE) AS hi FROM data WHERE ${d} IS NOT NULL`);
+  const time = timeColumn(profile);
+  if (time && measures.length) {
+    // a year stored as a number becomes 1 January of that year, so it goes through the same steps as a date column
+    const d = timeExpression(time.column, time.kind);
+    const present = q(time.column.name);
+    const [range] = await run(`SELECT CAST(epoch_ms(CAST(min(${d}) AS TIMESTAMP)) AS DOUBLE) AS lo, CAST(epoch_ms(CAST(max(${d}) AS TIMESTAMP)) AS DOUBLE) AS hi FROM data WHERE ${present} IS NOT NULL`);
     const lo = Number(range?.lo);
     const hi = Number(range?.hi);
     const days = (hi - lo) / 86_400_000;
     if (Number.isFinite(days) && days >= MIN_POINTS) {
       // the finest step that still leaves a readable number of points
-      const unit: Unit = days / 30 >= 24 ? "month" : days >= 120 ? "week" : "day";
-      const step = unit === "month" ? 30 : unit === "week" ? 7 : 1;
+      // a year column has one value per year, so it is already at its step
+      const unit: Unit = time.kind === "year" ? "year" : days / 30 >= 24 ? "month" : days >= 120 ? "week" : "day";
+      const step = unit === "year" ? 365 : unit === "month" ? 30 : unit === "week" ? 7 : 1;
+      const minPoints = unit === "year" ? MIN_YEAR_POINTS : MIN_POINTS;
       if (days / step <= MAX_POINTS) {
         const series: SeriesInput[] = [];
+        // In a table of entities over periods, a period that few entities reported (the latest year, a late joiner's first)
+        // makes a total or an average look like a collapse or a surge. Only periods most entities are in are pooled.
+        let complete: Set<number> | null = null;
+        if (profile.panel && profile.panel.time === time.column.name) {
+          const counts = await run(
+            `SELECT CAST(epoch_ms(CAST(date_trunc('${unit}', ${d}) AS TIMESTAMP)) AS DOUBLE) AS x, CAST(count(DISTINCT ${q(profile.panel.entity)}) AS DOUBLE) AS n FROM data WHERE ${present} IS NOT NULL GROUP BY 1`,
+          );
+          const most = Math.max(...counts.map((r) => Number(r.n)));
+          complete = new Set(counts.filter((r) => Number(r.n) >= most * 0.8).map((r) => Number(r.x)));
+        }
         for (const m of measures.slice(0, MAX_SERIES)) {
           const agg = aggregate(m);
           const rows = await run(
             `SELECT CAST(epoch_ms(CAST(date_trunc('${unit}', ${d}) AS TIMESTAMP)) AS DOUBLE) AS x, CAST(${agg}(${q(m.name)}) AS DOUBLE) AS y FROM data WHERE ${d} IS NOT NULL AND ${q(m.name)} IS NOT NULL GROUP BY 1 ORDER BY 1`,
           );
-          let points = rows.map((r) => ({ x: Number(r.x), y: Number(r.y) })).filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+          let points = rows.map((r) => ({ x: Number(r.x), y: Number(r.y) })).filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y) && (!complete || complete.has(p.x)));
           // The first and last period are usually only partly covered, which would look like a rise or a drop. Dropping
           // them matters for sums; an average over a few days is still an average.
-          if (agg === "sum" && unit !== "day" && points.length > MIN_POINTS + 2) {
+          if (agg === "sum" && time.kind === "date" && unit !== "day" && points.length > MIN_POINTS + 2) {
             const startsMidPeriod = lo > points[0].x;
             const endsMidPeriod = hi < points[points.length - 1].x + (unit === "month" ? 28 : 6) * 86_400_000;
             points = points.slice(startsMidPeriod ? 1 : 0, endsMidPeriod ? points.length - 1 : undefined);
           }
-          if (points.length >= MIN_POINTS) {
+          if (points.length >= minPoints) {
             series.push({ column: label(m), x: points.map((p) => p.x), y: points.map((p) => p.y), labels: points.map((p) => labelFor(p.x, unit)), unit });
           }
         }

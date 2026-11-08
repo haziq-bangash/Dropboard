@@ -1,25 +1,28 @@
 import type { ChartSpec, DashboardSpec } from "@dropboard/spec";
 import { q, type ColumnProfile, type TableProfile } from "./profile";
+import { aggregateFor, looksLikeId, measureKind, timeColumn, timeExpression, valueKind } from "./understand";
 
 const MAX_CHARTS = 10;
 const HISTOGRAM_BINS = 20;
 const HEATMAP_MAX_SIDE = 12;
 const MAX_CATEGORIES = 20;
 
-// Columns that look like identifiers make poor measures or categories.
-const looksLikeId = (c: ColumnProfile, rows: number) =>
-  /(^|_|\s)id$/i.test(c.name) || (c.type !== "number" && c.distinct >= rows * 0.9 && rows > 20);
-
-// Names that say a column is a rate, price, duration or score. Adding those up means little, so they are averaged.
-const AVERAGED = /(^|[_\s-])(avg|average|rate|ratio|pct|percent|percentage|price|score|satisfaction|rating|age|duration|minutes|hours|days|seconds|latency|margin|discount)($|[_\s-])/i;
-export const aggregate = (c: ColumnProfile) => (AVERAGED.test(c.name) ? "avg" : "sum");
+export const aggregate = (c: ColumnProfile) => aggregateFor(valueKind(c));
 export const label = (c: ColumnProfile) => (aggregate(c) === "avg" ? `Average ${c.name}` : c.name);
 
-export const isMeasure = (c: ColumnProfile, rows: number) =>
-  c.type === "number" && !looksLikeId(c, rows) && c.distinct > 1;
+export const isMeasure = (c: ColumnProfile, rows: number) => measureKind(c, rows) !== null;
 
+const isLongText = (c: ColumnProfile) => (c.textLength ?? 0) > 40;
+
+/** A text column with a few values: good for splitting a measure, a share, a heatmap. */
 export const isCategory = (c: ColumnProfile, rows: number) =>
-  c.type === "string" && !looksLikeId(c, rows) && c.distinct > 1 && c.distinct <= MAX_CATEGORIES;
+  c.type === "string" && !looksLikeId(c, rows) && !isLongText(c) && c.distinct > 1 && c.distinct <= MAX_CATEGORIES;
+
+/** A text column with too many values to draw them all, but few enough that its top values mean something. */
+export const isRanking = (c: ColumnProfile, rows: number) =>
+  c.type === "string" && !looksLikeId(c, rows) && !isLongText(c) && c.distinct > MAX_CATEGORIES && c.distinct <= MAX_RANKING && c.distinct <= rows * 0.5;
+
+const MAX_RANKING = 500;
 
 /** Rows per map bin below which a bin is not shown on a published map, so no single place can be picked out. */
 export const MAP_MIN_ROWS = 5;
@@ -213,9 +216,18 @@ export function applyPrivacyFloor<T extends Record<string, unknown>>(chart: Pick
 export function suggestDashboard(title: string, profile: TableProfile): DashboardSpec {
   const { rowCount: rows, columns } = profile;
   // a latitude or longitude is a position, not an amount: adding them up or averaging them means nothing
-  const measures = columns.filter((c) => isMeasure(c, rows) && c.name !== profile.coordinates?.lat && c.name !== profile.coordinates?.lon);
+  // amounts first (they add up), then levels, then rates: the first measures are the ones shown biggest
+  const order = { flow: 0, level: 1, rate: 2 } as const;
+  const measures = columns
+    // a column that is mostly empty is a poor thing to total or plot against another: the Insights tab reports its gaps instead
+    .filter((c) => isMeasure(c, rows) && c.nullCount <= rows * 0.7 && c.name !== profile.coordinates?.lat && c.name !== profile.coordinates?.lon)
+    .map((c, i) => ({ c, i, k: order[valueKind(c)] }))
+    .sort((a, b) => a.k - b.k || a.i - b.i)
+    .map((x) => x.c);
   const categories = columns.filter((c) => isCategory(c, rows));
+  const rankings = columns.filter((c) => isRanking(c, rows));
   const dates = columns.filter((c) => c.type === "date");
+  const time = timeColumn(profile);
 
   const charts: ChartSpec[] = [];
   const add = (c: Omit<ChartSpec, "id" | "layout">) => {
@@ -234,12 +246,16 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
     });
   }
 
-  // Trend: first date x first measure
-  if (dates[0] && measures[0]) {
+
+  // Trend: the time axis (dates, or a year stored as a number) x the first measure
+  if (time && measures[0]) {
+    const axis = time.kind === "year" ? timeExpression(time.column, "year") : `date_trunc('month', ${q(time.column.name)})`;
+    // "over time" only for a column that is the time of things happening: a year a house was built is a way to group, not a clock
+    const clock = time.kind === "date" || /^(year|yr|fy|fiscal year|season|period)$/i.test(time.column.name.trim());
     add({
       type: "line",
-      title: `${label(measures[0])} over time`,
-      query: `SELECT date_trunc('month', ${q(dates[0].name)}) AS x, ${aggregate(measures[0])}(${q(measures[0].name)}) AS y FROM data WHERE ${q(dates[0].name)} IS NOT NULL GROUP BY 1 ORDER BY 1`,
+      title: clock ? `${label(measures[0])} over time` : `${label(measures[0])} by ${time.column.name}`,
+      query: `SELECT ${axis} AS x, ${aggregate(measures[0])}(${q(measures[0].name)}) AS y FROM data WHERE ${q(time.column.name)} IS NOT NULL GROUP BY 1 ORDER BY 1`,
       x: "x",
       y: ["y"],
     });
@@ -260,6 +276,19 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
       type: "bar",
       title,
       query: `SELECT ${q(cat.name)} AS x, ${value} AS y FROM data GROUP BY 1 ORDER BY 2 DESC LIMIT ${MAX_CATEGORIES}`,
+      x: "x",
+      y: ["y"],
+    });
+  }
+
+  // A text column with too many values to show them all: its top twenty
+  const many = rankings[0];
+  if (many) {
+    const value = measures[0] ? `${aggregate(measures[0])}(${q(measures[0].name)})` : "count(*)";
+    add({
+      type: "bar",
+      title: measures[0] ? `${label(measures[0])} by ${many.name}, top ${MAX_CATEGORIES}` : `Rows by ${many.name}, top ${MAX_CATEGORIES}`,
+      query: `SELECT ${q(many.name)} AS x, ${value} AS y FROM data WHERE ${q(many.name)} IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT ${MAX_CATEGORIES}`,
       x: "x",
       y: ["y"],
     });

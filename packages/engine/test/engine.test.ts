@@ -67,7 +67,14 @@ describe("suggestDashboard aggregation", () => {
       { name: "priority", type: "string", nullCount: 0, distinct: 4 },
     ],
   };
-  const byTitle = (title: string) => suggestDashboard("t", tickets).charts.find((c) => c.title === title);
+  // without money in the table, the first measures are the durations and scores
+  const withoutMoney: TableProfile = { ...tickets, columns: tickets.columns.filter((c) => c.name !== "revenue") };
+  const byTitle = (title: string) => suggestDashboard("t", withoutMoney).charts.find((c) => c.title === title);
+
+  it("shows amounts before durations and scores, since they are what a table is usually about", () => {
+    const titles = suggestDashboard("t", tickets).charts.filter((c) => c.type === "kpi").map((c) => c.title);
+    expect(titles).toEqual(["Rows", "Total revenue", "Average resolution_hours"]);
+  });
 
   it("averages durations and scores instead of adding them up", () => {
     expect(byTitle("Average resolution_hours")?.query).toContain("avg(");
