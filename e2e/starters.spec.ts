@@ -19,11 +19,13 @@ test("a new account sees the getting-started card, and dismissing it sticks", as
   await expect(page.getByTestId("getting-started")).toHaveCount(0);
 });
 
-test("the guide can be brought back from the account menu", async ({ page }) => {
+test("the guide can be brought back from the account menu", async ({ page, isMobile }) => {
   const email = await signUp(page);
   await page.getByTestId("getting-started").getByRole("button", { name: "Dismiss the guide" }).click();
   await expect(page.getByTestId("getting-started")).toHaveCount(0);
 
+  // on a phone the account menu is inside the side menu
+  if (isMobile) await page.getByRole("button", { name: "Toggle Sidebar" }).click();
   await page.getByRole("button", { name: new RegExp(email) }).click();
   await page.getByRole("menuitem", { name: "Show the guide again" }).click();
   await expect(page.getByTestId("getting-started")).toBeVisible();
@@ -45,7 +47,9 @@ test("an empty workspace offers the samples", async ({ page }) => {
   await expect(page.getByTestId("starter").first()).toContainText("rows");
 });
 
-test("a sample opens as a real project with a working dashboard", async ({ page }) => {
+test("a sample opens as a real project with a working dashboard", async ({ page, browserName }) => {
+  // Playwright's WebKit has no private storage (OPFS), as in a private window: the app then asks for the file again, which is its fallback
+  test.skip(browserName === "webkit", "a saved copy needs the browser's private storage");
   await signUp(page);
   await page.goto("/app/new");
   await page.getByTestId("starter").filter({ hasText: "Online store orders" }).click();
@@ -299,7 +303,8 @@ test("present mode walks through the charts full screen with the keyboard, on th
     await expect(chart).toBeVisible();
     const box = (await chart.boundingBox())!;
     expect(box.height).toBeGreaterThan(380);
-    expect(box.width).toBeGreaterThan(600);
+    // drawn large: most of the width of the screen, which on a phone is well under 600
+    expect(box.width).toBeGreaterThan(Math.min(600, (target.viewportSize()?.width ?? 1280) * 0.7));
 
     await target.keyboard.press("End");
     await expect(count).toHaveText(`${total} of ${total}`);
