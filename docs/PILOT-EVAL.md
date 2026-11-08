@@ -55,3 +55,9 @@ pnpm --filter @dropboard/api exec tsx eval/run.ts --rescore eval/results/<run>.j
 ## Reading it for a default
 
 For answer quality alone, `gpt-5.4-mini` led, with every dashboard chart working and a median of 3 seconds per answer. `grok-4.20-0309-non-reasoning` is the fastest and held up on dashboards but gave fewer right answers. Until Anthropic and Gemini are measured with the same questions, there is nothing here to justify changing the current default, and no setting has been changed.
+
+## Chart types Pilot can choose (Nov 2026)
+
+Pilot can now pick a histogram, heatmap, map or region map. It does not write SQL for these: it names columns, and the server builds the query with the same code the automatic dashboard uses, after checking each name is a real column of the right type. So a column name that is not in the table, or a text column named as a number, drops that one chart and nothing reaches the database.
+
+One live check on 8 Nov 2026, one try per model per dataset, so a smoke test and not a measurement: gpt-5.4-mini and grok-4.20-0309-non-reasoning each designed a dashboard for the delivery sample (with coordinates and a country column) and the store sample. Every chart from both models ran. On the delivery sample both chose a map, a country map, a histogram and a heatmap unprompted by name; on the store sample gpt-5.4-mini added a histogram and grok added a histogram and a heatmap. Nothing was dropped. Anthropic and Gemini were not tried (see above).
