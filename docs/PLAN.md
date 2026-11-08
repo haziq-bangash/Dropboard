@@ -107,7 +107,7 @@ Findings are computed in the browser from the data, so they are free to run and 
 
 ### Cross-cutting, scheduled into the phases above
 - **Security:** rate limit on the public share endpoint (phase 4), per-user limits on every write route, SSRF guard (phase 6), webhook verification (phase 8), secret rotation checklist, dependency audit in CI.
-- **Accessibility:** keyboard paths and contrast checks in e2e from phase 4; charts get text summaries.
+- **Accessibility:** an automated axe scan (WCAG 2.0 and 2.1, A and AA) runs in the browser tests on the landing page, sign-in and reset, the workspace, the account page, a project's dashboard, insights and story tabs, menus and dialogs, and a published dashboard; it found and fixed real contrast problems, and a failure lists each element and how to fix it. Still to do: keyboard-path tests, and text summaries for charts. Automated scans catch roughly the mechanical problems, so using the product with a keyboard and a screen reader stays on the list.
 - **Performance budgets:** time-to-dashboard stays under 5 s for 50 MB; bundle and image size budgets stay enforced in CI.
 - **Observability:** structured logs, error reporting, and a cost view (Pilot tokens, Cloud Run, storage) before phase 8 launches.
 - **Design rules:** Dropboard palette and tone; sentence case; no sparkle icons; the assistant is "Pilot"; no fake testimonials, ratings, badges or countdowns.

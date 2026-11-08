@@ -75,7 +75,7 @@ export function StoryPanel({
       data-testid="story"
     >
       <header>
-        <p className="text-sm font-medium text-brand-text">Data story</p>
+        <p className="text-sm font-medium text-brand-text-strong">Data story</p>
         <h2
           className="mt-2 font-serif text-4xl leading-tight tracking-normal text-balance sm:text-5xl"
           data-testid="story-headline"

@@ -50,7 +50,7 @@ export function GettingStarted() {
         </Button>
         <h2 className="text-lg font-semibold tracking-tight">
           Welcome to{" "}
-          <em className="font-serif text-[1.14em] italic text-brand-text">
+          <em className="font-serif text-[1.14em] italic text-brand-text-strong">
             Dropboard
           </em>
         </h2>

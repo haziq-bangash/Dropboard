@@ -19,7 +19,7 @@ function Bar({
         <span className="text-sidebar-foreground/70">{label}</span>
         <span
           className={
-            full ? "font-medium text-brand-text" : "text-sidebar-foreground/70"
+            full ? "font-medium text-brand-text-strong" : "text-sidebar-foreground/70"
           }
         >
           {used} of {max}

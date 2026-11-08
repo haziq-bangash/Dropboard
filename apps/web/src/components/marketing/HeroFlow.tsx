@@ -100,7 +100,7 @@ function InsightCard({ icon: Icon, title, sub, value, delta, up }: Insight) {
         <p className="text-sm font-semibold text-primary">{value}</p>
         <span
           className={`mt-0.5 inline-flex items-center gap-1 rounded px-1 text-[10px] font-medium ${
-            up ? "bg-secondary text-secondary-foreground" : "bg-destructive/10 text-destructive"
+            up ? "bg-secondary text-secondary-foreground" : "bg-destructive/10 text-red-700"
           }`}
         >
           <Arrow className="size-2.5" />
