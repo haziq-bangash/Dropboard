@@ -58,7 +58,7 @@ export function AiPanel({
         </CardTitle>
         <CardDescription>
           Design or refine this dashboard, or ask a question in plain English. {ASSISTANT} is powered by a language model that sees only your column names, types and counts, never
-          your rows. Answers are computed in your browser.
+          your rows. If a query fails, it also gets the database's error message with any quoted values removed. Answers are computed in your browser.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
@@ -121,6 +121,7 @@ export function AiPanel({
                     (r) => {
                       setAnswer({ explanation: r.explanation, sql: r.sql, rows: r.rows });
                       setRemaining(r.remaining);
+                      if (r.repaired) setNote(`${ASSISTANT}'s first query failed, so it tried once more.`);
                     },
                   )
                 }
