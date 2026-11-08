@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { companiesByYear, messyExport, signUp } from "./helpers";
+import { companiesByYear, messyExport, ordersWithBigCustomers, signUp } from "./helpers";
 
 async function openSample(page: Page, title: string) {
   await page.goto("/app/new");
@@ -167,4 +167,16 @@ test("problems in the file are listed in one Data quality card, with what to fix
   await expect(table).toContainText("stands for missing");
   await expect(table).toContainText("Stored as text");
   await expect(card).toContainText("Data quality");
+});
+
+test("a few customers holding most of the money, and one product far above the rest, are reported", async ({ page }) => {
+  await signUp(page);
+  await page.goto("/app/new");
+  await page.setInputFiles('input[type="file"]', { name: "orders.csv", mimeType: "text/csv", buffer: Buffer.from(ordersWithBigCustomers()) });
+  await expect(page).toHaveURL(/\/app\/p\//, { timeout: 30_000 });
+  await expect(page.getByTestId("kpi-value").first()).not.toHaveText("", { timeout: 30_000 });
+  await openInsights(page);
+  const findings = page.getByTestId("finding");
+  await expect(findings.filter({ hasText: /The top 20% of customer_id \(\d+ of \d+\) account for \d+% of amount/ })).toBeVisible({ timeout: 30_000 });
+  await expect(findings.filter({ hasText: "Product 7 has the highest total amount" })).toBeVisible();
 });

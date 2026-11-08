@@ -20,6 +20,8 @@ export interface Dataset {
   charts?: string[];
   /** Anomalies planted in the data: the kind of finding that must appear, and words its sentence must contain. Tables without this must produce none. */
   anomalies?: { kind: "unusualrows" | "contextual"; mentions: string }[];
+  /** Findings that must appear, by kind, with words their sentence must contain. Tables that are not panels and list none must produce no concentration or standout. */
+  insights?: { kind: string; mentions: string }[];
   /** Problems planted in the data: the issue codes of the data-quality findings that must appear. Tables without this must have none. */
   quality?: string[];
 }
@@ -359,6 +361,30 @@ function cyclicMonths(): Dataset {
   };
 }
 
+/** Orders where ten of six hundred customers place most of the money, and one product sells several times what the rest do. */
+function retailWhales(): Dataset {
+  const r = seeded(51);
+  const rows = range(3000).map((i) => {
+    const whale = r.uniform() < 0.28;
+    const customer = whale ? r.int(1, 10) : r.int(11, 600);
+    const product = r.uniform() < 0.12 ? "Product 7" : `Product ${r.int(1, 40)}`;
+    const amount = Math.round((whale ? 900 : 60) * (0.6 + r.uniform() * 0.8) * (product === "Product 7" ? 1.4 : 1));
+    return [i + 1, iso(day(r.int(0, 360))), `C${String(customer).padStart(4, "0")}`, product, amount];
+  });
+  return {
+    id: "retail-whales",
+    title: "Orders with a few big customers",
+    csv: csv(["order_id", "order_date", "customer_id", "product", "amount"], rows),
+    rows: rows.length,
+    roles: { order_id: "id", customer_id: "id", product: "category", amount: "flow" },
+    time: "order_date",
+    insights: [
+      { kind: "pareto", mentions: "top 20% of customer_id" },
+      { kind: "standout", mentions: "Product 7 has the highest total amount" },
+    ],
+  };
+}
+
 function tiny(): Dataset {
   return { id: "edge-tiny", title: "Five rows", csv: csv(["item", "qty", "note"], [["a", 1, "x"], ["b", 2, "y"], ["c", 3, "z"], ["d", 4, "w"], ["e", 5, "v"]]), rows: 5, roles: {} };
 }
@@ -383,4 +409,4 @@ function sparse(): Dataset {
   };
 }
 
-export const DATASETS: Dataset[] = [textPeriods("text-months-iso", "Revenue with 2021-03 months", (y, m) => `${y}-${String(m + 1).padStart(2, "0")}`), textPeriods("text-months-words", "Revenue with Mar 2021 months", (y, m) => `${MONTHS[m]} ${y}`), textPeriods("text-quarters", "Revenue with 2021-Q1 quarters", (y, m) => `${y}-Q${Math.floor(m / 3) + 1}`, 3), cyclicMonths(), finance(), retail(), retailWithErrors(), monthlySales(), dirtyOrders(), dirtyPanel(), hr(), saas(), web(), survey(), sensors(), marketing(), realEstate(), education(), healthcare(), sports(), tiny(), oneColumn(), allText(), sparse()];
+export const DATASETS: Dataset[] = [retailWhales(), textPeriods("text-months-iso", "Revenue with 2021-03 months", (y, m) => `${y}-${String(m + 1).padStart(2, "0")}`), textPeriods("text-months-words", "Revenue with Mar 2021 months", (y, m) => `${MONTHS[m]} ${y}`), textPeriods("text-quarters", "Revenue with 2021-Q1 quarters", (y, m) => `${y}-Q${Math.floor(m / 3) + 1}`, 3), cyclicMonths(), finance(), retail(), retailWithErrors(), monthlySales(), dirtyOrders(), dirtyPanel(), hr(), saas(), web(), survey(), sensors(), marketing(), realEstate(), education(), healthcare(), sports(), tiny(), oneColumn(), allText(), sparse()];

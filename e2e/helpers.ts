@@ -51,3 +51,18 @@ export function messyExport(): string {
   }
   return rows.join("\n") + "\n";
 }
+
+/** Three thousand orders where ten of six hundred customers place most of the money, and one product sells far more than the rest. */
+export function ordersWithBigCustomers(): string {
+  let seed = 51;
+  const rnd = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
+  const rows = ["order_id,customer_id,product,amount"];
+  for (let i = 1; i <= 3000; i++) {
+    const whale = rnd() < 0.28;
+    const customer = whale ? 1 + Math.floor(rnd() * 10) : 11 + Math.floor(rnd() * 590);
+    const star = rnd() < 0.12;
+    const product = star ? "Product 7" : `Product ${1 + Math.floor(rnd() * 40)}`;
+    rows.push([i, `C${String(customer).padStart(4, "0")}`, product, Math.round((whale ? 900 : 60) * (0.6 + rnd() * 0.8) * (star ? 1.4 : 1))].join(","));
+  }
+  return rows.join("\n") + "\n";
+}
