@@ -83,6 +83,11 @@ export const countryCode = (value: unknown): string | null => (typeof value === 
 /** The two-letter code for a US state name or abbreviation, or null. */
 export const usStateCode = (value: unknown): string | null => (typeof value === "string" ? (US_STATES.get(clean(value)) ?? null) : null);
 
+const STATE_NAMES = new Map(US_STATE_ROWS.split("|").map((row) => [row.slice(0, 2), row.slice(3)]));
+
+/** The name of a state from its two-letter code, or null. */
+export const usStateName = (code: string): string | null => STATE_NAMES.get(code) ?? null;
+
 /** The state for a value in a US map column: a state's name or code, or a ZIP code (or its first three digits). */
 export const usRegionCode = (value: unknown): string | null => usStateCode(value) ?? zipState(value);
 

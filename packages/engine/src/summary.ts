@@ -1,5 +1,5 @@
 import type { ChartSpec } from "@dropboard/spec";
-import { countryCode, usRegionCode } from "./places";
+import { countryCode, usRegionCode, usStateName } from "./places";
 
 /**
  * A plain sentence or two describing what a chart shows, for people who cannot see it (a screen reader reads it in place
@@ -186,14 +186,20 @@ export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y" 
       const us = spec.map === "us";
       const matches = us ? usRegionCode : countryCode;
       // several ZIP prefixes in one state are one shaded state
-      const folded = new Map<string, number>();
+      const folded = new Map<string, { y: number; label: unknown; biggest: number }>();
       let unmatchedCount = 0;
       for (const p of points) {
         const code = matches(p.x);
-        if (code === null) unmatchedCount++;
-        else folded.set(code, (folded.get(code) ?? 0) + p.y);
+        if (code === null) {
+          unmatchedCount++;
+          continue;
+        }
+        const seen = folded.get(code);
+        // named as the file wrote it, except a ZIP prefix, which is named by its state
+        const label = us && /^[0-9]/.test(String(p.x).trim()) ? (usStateName(code) ?? code) : p.x;
+        folded.set(code, { y: (seen?.y ?? 0) + p.y, label: seen && seen.biggest >= p.y ? seen.label : label, biggest: Math.max(seen?.biggest ?? -Infinity, p.y) });
       }
-      const top = [...folded].map(([x, y]) => ({ x, y })).sort((a, b) => b.y - a.y);
+      const top = [...folded.values()].map((v) => ({ x: v.label, y: v.y })).sort((a, b) => b.y - a.y);
       const left = unmatchedCount;
       const unmatched = left > 0 ? ` ${left} other value${left === 1 ? " does" : "s do"} not match a ${us ? "state" : "country"} and ${left === 1 ? "is" : "are"} not shown.` : "";
       if (top.length === 0) return `${head} No value matches a ${us ? "state" : "country"}, so nothing is shaded.`;
