@@ -12,6 +12,7 @@ committed: they are large).
 | `out/gallery-2x/` | The same eight at 2540 x 1520, for sharper display | Use these if the upload allows |
 | `out/demo.mp4` | About 70 seconds, 1920 x 1080, no sound | Upload to YouTube, paste the link as the video |
 | `out/gifs/*.gif` | Three short loops, each under 3 MB | Gallery (GIFs up to 3 MB) or the launch post |
+| `out/home/*.png` | Captures of the live homepage at 2x: the first screen, each section, the whole page, and the phone version (3x) | Extra images, the launch post, social |
 | `ARCADE.md` | The click-by-click script for an Arcade demo | First comment, the site |
 
 The gallery order matters: **image 1 is the one people see in the feed** and when the launch is shared. The order is the hero, the
@@ -32,6 +33,7 @@ Needs the app running locally (web on 4310, API on 4311, Postgres), with Pilot e
 3. `cd apps/api && pnpm exec tsx ../../marketing/producthunt/export-demo.ts`: the sample files to drop in.
 4. `node marketing/producthunt/record.mjs`: the video, and `out/scenes.json` with when each scene starts.
 5. `node marketing/producthunt/gifs.mjs`: the loops, cut from the video.
+6. `node marketing/producthunt/capture-home.mjs`: the live homepage (https://dropboard.de, or set `URL=`), no local app needed.
 
 The scripts write a demo user into the **local** database and rename it ("Maya") so the pictures look tidy. They never touch staging or
 production.
