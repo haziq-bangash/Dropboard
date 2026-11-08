@@ -1,4 +1,4 @@
-import { guardSql, type TableProfile } from "@dropboard/engine";
+import { bindQuery, guardSql, mapDuckDbType, type TableProfile } from "@dropboard/engine";
 import type { AiTable, DashboardSpec } from "@dropboard/spec";
 import { ASSISTANT } from "./brand";
 import { runQuery } from "./duckdb";
@@ -46,23 +46,38 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return data as T;
 }
 
-/** Drop charts that do not bind to the real table (wrong column names etc.) before showing them. */
-export async function keepRunnable(spec: DashboardSpec): Promise<{ spec: DashboardSpec; removed: number }> {
-  const checks = await Promise.all(
+/**
+ * Check every designed chart against the real table before showing it. A chart whose SQL does not run is dropped. One that
+ * runs but names its output columns differently from what the renderer reads (a headline number called `total_revenue`
+ * instead of `value`) is repaired by renaming, instead of being shown blank.
+ */
+export async function keepRunnable(spec: DashboardSpec): Promise<{ spec: DashboardSpec; removed: number; repaired: number }> {
+  const checked = await Promise.all(
     spec.charts.map(async (chart) => {
       const guarded = guardSql(chart.query);
-      if (!guarded.ok) return false;
+      if (!guarded.ok) return null;
       try {
-        await runQuery(`SELECT * FROM (${chart.query}) LIMIT 0`);
-        return true;
+        // what the query really returns, without running it over the data
+        const described = await runQuery(`DESCRIBE SELECT * FROM (${chart.query}) LIMIT 0`);
+        const columns = described.map((r) => ({ name: String(r.column_name), type: mapDuckDbType(String(r.column_type)) }));
+        const bound = bindQuery(chart.type, chart.query, columns);
+        if (bound === null) return null;
+        if (bound === chart.query) return { chart, repaired: false };
+        if (!guardSql(bound).ok) return null;
+        await runQuery(`SELECT * FROM (${bound}) LIMIT 0`);
+        return { chart: { ...chart, query: bound }, repaired: true };
       } catch {
-        return false;
+        return null;
       }
     }),
   );
-  const charts = spec.charts.filter((_, i) => checks[i]);
-  if (charts.length === 0) throw new AiError(`${ASSISTANT} suggested charts that do not fit your columns. Try rephrasing.`, 502);
-  return { spec: { ...spec, charts }, removed: spec.charts.length - charts.length };
+  const kept = checked.filter((c): c is NonNullable<typeof c> => c !== null);
+  if (kept.length === 0) throw new AiError(`${ASSISTANT} suggested charts that do not fit your columns. Try rephrasing.`, 502);
+  return {
+    spec: { ...spec, charts: kept.map((c) => c.chart) },
+    removed: spec.charts.length - kept.length,
+    repaired: kept.filter((c) => c.repaired).length,
+  };
 }
 
 export async function generateDashboard(table: AiTable, instruction: string, current?: DashboardSpec) {
