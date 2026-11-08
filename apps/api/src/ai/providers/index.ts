@@ -1,6 +1,8 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
 import { createVertex } from "@ai-sdk/google-vertex";
+import { createXai } from "@ai-sdk/xai";
 import { createAiSdkService, type AiSdkOptions } from "../ai-sdk";
 import type { AiService } from "../service";
 
@@ -8,12 +10,18 @@ type Env = Record<string, string | undefined>;
 
 export const ANTHROPIC_DEFAULT_MODEL = "claude-haiku-5-5";
 export const GOOGLE_DEFAULT_MODEL = "gemini-3.5-flash-lite";
+export const OPENAI_DEFAULT_MODEL = "gpt-5.4-mini";
+export const XAI_DEFAULT_MODEL = "grok-4.20-0309-non-reasoning";
 
 /**
  * Work out which AI SDK model to use from environment variables. This is the only place that knows about vendors.
  *
- *   AI_PROVIDER         anthropic | google | none   (default: anthropic if ANTHROPIC_API_KEY is set, else google if GOOGLE_API_KEY is set)
+ *   AI_PROVIDER         anthropic | google | openai | xai | none   (default: anthropic if ANTHROPIC_API_KEY is set, else google if GOOGLE_API_KEY is set;
+ *                       openai and xai are chosen only by naming them)
  *   AI_MODEL            model name (defaults per provider; ANTHROPIC_MODEL still works)
+ *
+ *   openai:  OPENAI_API_KEY (default model gpt-5.4-mini)
+ *   xai:     XAI_API_KEY (default model grok-4.20-0309-non-reasoning)
  *
  *   google:
  *     AI_GOOGLE_BACKEND     vertex (default, billed to the Google Cloud project) | gemini-api (AI Studio keys)
@@ -82,6 +90,36 @@ export function resolveAiOptions(env: Env = process.env, deps: { fetch?: typeof 
       }
       console.warn("AI_PROVIDER=google without GOOGLE_API_KEY needs GOOGLE_CLOUD_PROJECT: AI routes disabled");
       return undefined;
+    }
+
+    case "openai": {
+      if (!env.OPENAI_API_KEY) {
+        console.warn("AI_PROVIDER=openai but OPENAI_API_KEY is missing: AI routes disabled");
+        return undefined;
+      }
+      const modelName = env.AI_MODEL ?? OPENAI_DEFAULT_MODEL;
+      return {
+        provider: "openai",
+        modelName,
+        model: createOpenAI({ apiKey: env.OPENAI_API_KEY, fetch: deps.fetch })(modelName),
+        // light task: the least reasoning keeps it quick and cheap
+        providerOptions: { openai: { reasoningEffort: "low" } },
+        secrets: [env.OPENAI_API_KEY],
+      };
+    }
+
+    case "xai": {
+      if (!env.XAI_API_KEY) {
+        console.warn("AI_PROVIDER=xai but XAI_API_KEY is missing: AI routes disabled");
+        return undefined;
+      }
+      const modelName = env.AI_MODEL ?? XAI_DEFAULT_MODEL;
+      return {
+        provider: "xai",
+        modelName,
+        model: createXai({ apiKey: env.XAI_API_KEY, fetch: deps.fetch })(modelName),
+        secrets: [env.XAI_API_KEY],
+      };
     }
 
     default:

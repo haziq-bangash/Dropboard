@@ -162,6 +162,16 @@ describe("provider selection", () => {
     expect(console.warn).toHaveBeenCalledTimes(4);
   });
 
+  it("picks OpenAI and xAI only when they are named, with their own keys and default models", () => {
+    expect(pick({ AI_PROVIDER: "openai", OPENAI_API_KEY: "k" })).toBe("openai/gpt-5.4-mini");
+    expect(pick({ AI_PROVIDER: "xai", XAI_API_KEY: "k" })).toBe("xai/grok-4.20-0309-non-reasoning");
+    expect(pick({ AI_PROVIDER: "openai", OPENAI_API_KEY: "k", AI_MODEL: "gpt-5.5" })).toBe("openai/gpt-5.5");
+    // a key on its own never switches the provider on
+    expect(pick({ OPENAI_API_KEY: "k", XAI_API_KEY: "k" })).toBeUndefined();
+    // the right key is needed: another vendor's key does not stand in
+    expect(pick({ AI_PROVIDER: "xai", OPENAI_API_KEY: "k" })).toBeUndefined();
+  });
+
   it("builds models that carry the chosen model id", () => {
     expect((resolveAiOptions({ GOOGLE_API_KEY: "k", AI_MODEL: "gemini-x" })!.model as { modelId: string }).modelId).toBe("gemini-x");
     expect((resolveAiOptions({ ANTHROPIC_API_KEY: "k" })!.model as { modelId: string }).modelId).toBe("claude-haiku-5-5");
@@ -193,6 +203,38 @@ function recordingFetch(body: unknown) {
   }) as typeof fetch;
   return { fn, calls };
 }
+
+describe("OpenAI and xAI over the wire", () => {
+  // the reply shape differs per vendor, so only what is sent is checked here
+  it("OpenAI: the key goes in a bearer header, never in the URL or body, with low reasoning effort", async () => {
+    const { fn, calls } = recordingFetch({});
+    const ai = createAiFromEnv({ AI_PROVIDER: "openai", OPENAI_API_KEY: "sk-openai-test" }, { fetch: fn })!;
+    await ai.generate(input).catch(() => undefined);
+    expect(calls[0].url).toContain("api.openai.com");
+    expect(calls[0].headers.authorization).toBe("Bearer sk-openai-test");
+    expect(calls[0].url).not.toContain("sk-openai-test");
+    expect(calls[0].body).not.toContain("sk-openai-test");
+    expect(calls[0].body).toContain('"model":"gpt-5.4-mini"');
+    expect(calls[0].body).toContain('"effort":"low"');
+  });
+
+  it("xAI: the key goes in a bearer header, never in the URL or body", async () => {
+    const { fn, calls } = recordingFetch({});
+    const ai = createAiFromEnv({ AI_PROVIDER: "xai", XAI_API_KEY: "xai-test-key" }, { fetch: fn })!;
+    await ai.generate(input).catch(() => undefined);
+    expect(calls[0].url).toContain("api.x.ai");
+    expect(calls[0].headers.authorization).toBe("Bearer xai-test-key");
+    expect(calls[0].url).not.toContain("xai-test-key");
+    expect(calls[0].body).not.toContain("xai-test-key");
+    expect(calls[0].body).toContain('"model":"grok-4.20-0309-non-reasoning"');
+  });
+
+  it("scrubs each key from the errors it can produce", async () => {
+    const failing = (async () => new Response('{"error":{"message":"bad key sk-openai-test"}}', { status: 401, headers: { "content-type": "application/json" } })) as unknown as typeof fetch;
+    const ai = createAiFromEnv({ AI_PROVIDER: "openai", OPENAI_API_KEY: "sk-openai-test" }, { fetch: failing })!;
+    await expect(ai.generate(input)).rejects.toSatisfy((e: Error) => !e.message.includes("sk-openai-test"));
+  });
+});
 
 describe("what each setup sends over the wire", () => {
   const geminiReply = {
