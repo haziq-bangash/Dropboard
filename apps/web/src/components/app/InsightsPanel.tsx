@@ -6,8 +6,11 @@ import {
   CalendarClock,
   CircleDashed,
   Copy,
+  Crown,
   Flag,
   GitCompareArrows,
+  ArrowUpDown,
+  Zap,
   PieChart,
   Repeat,
   TrendingDown,
@@ -31,6 +34,11 @@ const KIND: Record<FindingKind, { label: string; icon: LucideIcon }> = {
   seasonal: { label: "Repeating pattern", icon: Repeat },
   latest: { label: "Latest period", icon: CalendarClock },
   duplicates: { label: "Repeated rows", icon: Copy },
+  leader: { label: "Who leads", icon: Crown },
+  standout: { label: "Stands out", icon: CircleAlert },
+  entitytrend: { label: "Trend", icon: TrendingUp },
+  jump: { label: "Biggest move", icon: Zap },
+  rankshift: { label: "Changed rank", icon: ArrowUpDown },
 };
 
 /** The numbers behind a finding, in plain words, so a claim can be traced. */
@@ -55,6 +63,16 @@ function evidenceLines(f: Finding): string[] {
     lines.push(
       `The level moved ${e.shiftInNoiseUnits} times the usual ups and downs, around ${e.at}`,
     );
+  if (f.kind === "entitytrend")
+    lines.push(`Based on ${e.points} periods of its own figures; the fitted line moves ${e.noiseUnits} times the usual ups and downs`);
+  if (f.kind === "leader")
+    lines.push(`${(Number(e.share) * 100).toFixed(0)}% held by one against ${((Number(e.share) / Number(e.timesEven)) * 100).toFixed(0)}% each in an even split, across ${e.groups}`);
+  if (f.kind === "standout")
+    lines.push(`${e.spreadsAway} times the usual spread away from the typical value`);
+  if (f.kind === "jump")
+    lines.push(`${e.spreadsAway} times the usual spread away from how entities normally move from one period to the next`);
+  if (f.kind === "rankshift")
+    lines.push(`Ranked #${e.from} at the start and #${e.to} at the end, out of ${e.groups}`);
   if (f.kind === "seasonal")
     lines.push(
       `The pattern explains ${(Number(e.strength) * 100).toFixed(0)}% of what is left once the trend is taken out, over at least two full cycles`,
