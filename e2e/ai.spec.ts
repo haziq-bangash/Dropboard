@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { heatmapChart, histogramChart } from "../packages/engine/src/suggest";
 import path from "node:path";
 
 const CSV = path.join(__dirname, "fixtures", "sales.csv");
@@ -152,4 +153,41 @@ test("asking a question runs the returned SQL in the browser and shows the answe
   const body = JSON.parse(sentBody) as { table: { columns: { name: string }[] }; question: string };
   expect(body.table.columns.map((c) => c.name)).toContain("region");
   expect(sentBody).not.toContain("2025-01-");
+});
+
+test("a histogram and a heatmap that Pilot names by column are drawn and described", async ({ page }) => {
+  await signUp(page);
+  await upload(page);
+
+  // the server builds these queries from column names; here the stub returns what it would have built
+  const histogram = histogramChart("amount");
+  const heatmap = heatmapChart("region", "region");
+  await page.route("**/api/ai/generate", (route) =>
+    route.fulfill({
+      json: {
+        cached: false,
+        remaining: 6,
+        dropped: [],
+        spec: {
+          version: 1,
+          title: "Shapes",
+          schema: [],
+          charts: [
+            { id: "c1", type: "kpi", title: "Rows", query: "SELECT count(*) AS value FROM data", layout: { x: 0, y: 0, w: 1, h: 1 } },
+            { id: "c2", ...histogram, title: "Spread of amount", layout: { x: 0, y: 0, w: 1, h: 1 } },
+            { id: "c3", ...heatmap, title: "Region against itself", layout: { x: 0, y: 0, w: 1, h: 1 } },
+          ],
+        },
+      },
+    }),
+  );
+  await page.getByRole("button", { name: "Design with Pilot" }).click();
+
+  await expect(page.getByRole("heading", { name: "Shapes", exact: true })).toBeVisible({ timeout: 30_000 });
+  const hist = page.getByRole("img", { name: /^Histogram: Spread of amount\. 20 bins from/ });
+  await expect(hist).toBeVisible();
+  await expect(hist.locator("canvas").first()).toBeVisible();
+  await expect(page.getByRole("img", { name: /^Heatmap: Region against itself\. \d+ combinations/ })).toBeVisible();
+  // nothing was dropped as unrunnable
+  await expect(page.getByText(/did not fit your data/)).toHaveCount(0);
 });

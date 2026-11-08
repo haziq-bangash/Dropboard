@@ -12,7 +12,7 @@ const input: GenerateInput = {
   table: { rowCount: 10, columns: [{ name: "region", type: "string", nullCount: 0, distinct: 3 }, { name: "amount", type: "number" }] },
   instruction: "focus on revenue",
 };
-const dashboard = { title: "Revenue", charts: [{ type: "kpi", title: "Rows", query: "SELECT count(*) AS value FROM data" }] };
+const dashboard = { title: "Revenue", charts: [{ type: "kpi", title: "Rows", query: "SELECT count(*) AS value FROM data", columns: [] }] };
 
 const usage = (input = 700, output = 350, cacheRead = 20) => ({
   inputTokens: { total: input, noCache: input - cacheRead, cacheRead, cacheWrite: undefined },
