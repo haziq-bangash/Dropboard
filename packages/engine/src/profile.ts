@@ -12,6 +12,8 @@ export interface ColumnProfile {
 export interface TableProfile {
   rowCount: number;
   columns: ColumnProfile[];
+  /** A latitude and longitude pair found in the columns, when there is one */
+  coordinates?: { lat: string; lon: string };
 }
 
 /** Map a DuckDB type name (e.g. "BIGINT", "DECIMAL(18,3)", "TIMESTAMP WITH TIME ZONE") to our simple types. */

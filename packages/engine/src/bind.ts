@@ -5,7 +5,7 @@ export interface ResultColumn {
   type: ColType;
 }
 
-type ChartKind = "kpi" | "bar" | "line" | "area" | "pie" | "scatter" | "table";
+type ChartKind = "kpi" | "bar" | "line" | "area" | "pie" | "scatter" | "map" | "table";
 
 /**
  * The renderer reads a headline number from a column called `value`, and every other chart from columns called `x`
