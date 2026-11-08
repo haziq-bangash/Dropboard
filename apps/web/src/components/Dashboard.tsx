@@ -369,6 +369,61 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo, cityIndex?: CityIndex)
         ],
       };
     }
+    case "flows": {
+      // both ends of each route are looked up in the city list; a route with an end that is not a city is left off
+      const routes: { from: { name: string; lon: number; lat: number }; to: { name: string; lon: number; lat: number }; value: number }[] = [];
+      const traffic = new Map<string, { name: string; lon: number; lat: number; value: number }>();
+      for (const r of rows) {
+        const a = cityIndex?.find(r[x]);
+        const b = cityIndex?.find(r.target);
+        const v = Number(r[y]);
+        if (!a || !b || !Number.isFinite(v) || v <= 0) continue;
+        routes.push({ from: a, to: b, value: v });
+        for (const c of [a, b]) {
+          const key = `${c.name}|${c.lon}|${c.lat}`;
+          const at = traffic.get(key);
+          if (at) at.value += v;
+          else traffic.set(key, { name: c.name, lon: c.lon, lat: c.lat, value: v });
+        }
+      }
+      const biggest = Math.max(1, ...routes.map((r) => r.value));
+      const busiest = Math.max(1, ...[...traffic.values()].map((c) => c.value));
+      const ends = [...traffic.values()];
+      const lons = ends.map((p) => p.lon);
+      const lats = ends.map((p) => p.lat);
+      const wide = ends.length > 0 && Math.max(...lons) - Math.min(...lons) < 250;
+      return {
+        color: COLORS,
+        tooltip: {
+          trigger: "item",
+          formatter: (p: { name: string; data: { from?: string; to?: string; value: number | number[] } }) =>
+            p.data.from ? `${p.data.from} to ${p.data.to}: ${fmt(p.data.value)}` : `${p.name}: ${fmt((p.data.value as number[])[2])}`,
+        },
+        geo: {
+          map: "world",
+          roam: false,
+          silent: true,
+          boundingCoords: wide ? [[Math.min(...lons) - 6, Math.max(...lats) + 6], [Math.max(...lons) + 6, Math.min(...lats) - 6]] : undefined,
+          itemStyle: { areaColor: "#F1F3F4", borderColor: "#FFFFFF", borderWidth: 0.6 },
+        },
+        series: [
+          {
+            type: "lines",
+            coordinateSystem: "geo",
+            // thicker for a bigger route, and curved so a pair going both ways can be told apart
+            lineStyle: { color: "#075056", opacity: 0.5, curveness: 0.2 },
+            data: routes.map((r) => ({ from: r.from.name, to: r.to.name, value: r.value, coords: [[r.from.lon, r.from.lat], [r.to.lon, r.to.lat]], lineStyle: { width: 0.8 + 4.2 * Math.sqrt(r.value / biggest) } })),
+          },
+          {
+            type: "scatter",
+            coordinateSystem: "geo",
+            symbolSize: (value: number[]) => 6 + 14 * Math.sqrt(Math.max(0, value[2]) / busiest),
+            itemStyle: { color: "#FF5B04", opacity: 0.85, borderColor: "#FFFFFF", borderWidth: 1 },
+            data: ends.map((p) => ({ name: p.name, value: [p.lon, p.lat, p.value] })),
+          },
+        ],
+      };
+    }
     case "treemap": {
       const two = rows.some((r) => r.child !== undefined && r.child !== null);
       const groups = new Map<string, { name: string; value: number; children: { name: string; value: number }[] }>();
@@ -558,9 +613,9 @@ function ChartCard({
   const cardRef = useRef<HTMLDivElement>(null);
   // a region map also needs the country shapes, loaded once and shared by every such chart
   const mapKind = spec.map === "us" ? "us" : "world";
-  const world = useQuery({ queryKey: ["geo", mapKind], queryFn: () => loadGeo(mapKind), enabled: spec.type === "regions" || spec.type === "cities", staleTime: Infinity, retry: false, refetchOnWindowFocus: false });
+  const world = useQuery({ queryKey: ["geo", mapKind], queryFn: () => loadGeo(mapKind), enabled: spec.type === "regions" || spec.type === "cities" || spec.type === "flows", staleTime: Infinity, retry: false, refetchOnWindowFocus: false });
   // a city map also needs the city list, loaded once and shared by every such chart
-  const cityList = useQuery({ queryKey: ["cities"], queryFn: loadCities, enabled: spec.type === "cities", staleTime: Infinity, retry: false, refetchOnWindowFocus: false });
+  const cityList = useQuery({ queryKey: ["cities"], queryFn: loadCities, enabled: spec.type === "cities" || spec.type === "flows", staleTime: Infinity, retry: false, refetchOnWindowFocus: false });
   const rows: Rows | null = query.data ?? null;
   const error = (query.error ?? world.error ?? cityList.error)
     ? query.error instanceof Error || world.error instanceof Error || cityList.error instanceof Error
@@ -611,7 +666,7 @@ function ChartCard({
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
-        ) : !rows || ((spec.type === "regions" || spec.type === "cities") && !world.data) || (spec.type === "cities" && !cityList.data) ? (
+        ) : !rows || ((spec.type === "regions" || spec.type === "cities" || spec.type === "flows") && !world.data) || ((spec.type === "cities" || spec.type === "flows") && !cityList.data) ? (
           <Skeleton className="h-64 w-full" />
         ) : spec.type === "table" ? (
           <Table rows={rows} label={`${spec.title}, table that scrolls`} />

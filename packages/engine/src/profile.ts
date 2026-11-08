@@ -35,6 +35,8 @@ export interface TableProfile {
   sample?: { rows: number; of: number };
   /** Set when each row is something a person did and one column says who (customers, users): which columns, for cohorts and retention. */
   customers?: { column: string; time: string };
+  /** Two columns of cities, where things start and where they end (an origin and a destination), when there are two */
+  flows?: { from: string; to: string };
   /** A column of cities, when there is one (needs a column name that points at places, and the city list) */
   cities?: string;
 }

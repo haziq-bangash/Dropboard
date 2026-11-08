@@ -17,6 +17,7 @@ const PRIORITY: Record<ChartSpec["type"], number> = {
   regions: 86,
   map: 86,
   cities: 86,
+  flows: 84,
   bar: 80,
   treemap: 70,
   funnel: 70,
@@ -352,11 +353,29 @@ export function citiesChart(column: string, measure?: ColumnProfile): Omit<Chart
 }
 
 /**
+ * Lines between cities on a world map, one for each pair of an origin and a destination, as thick as a measure or as how many rows
+ * the pair has. The renderer looks both names up in the city list. x is where it starts, target where it ends, y the size and n the
+ * rows behind the pair, so a route with a few rows can be left out of a published copy.
+ */
+export function flowMapChart(from: string, to: string, measure?: ColumnProfile): Omit<ChartSpec, "id" | "layout"> {
+  const v = total(measure);
+  const a = q(from);
+  const b = q(to);
+  return {
+    type: "flows",
+    title: `${measure ? label(measure) : "Rows"} from ${from} to ${to}`,
+    query: `SELECT ${a} AS x, ${b} AS target, ${v} AS y, count(*) AS n FROM data WHERE ${a} IS NOT NULL AND ${b} IS NOT NULL AND ${a} <> ${b} GROUP BY 1, 2 HAVING ${v} > 0 ORDER BY 3 DESC LIMIT 150`,
+    x: "x",
+    y: ["y"],
+  };
+}
+
+/**
  * Drop the bins on a map, the groups in a box plot, the bands in a flow diagram and the cities that hold too few rows to publish: a
  * box or a band over one or two rows would show the values themselves. Other charts are returned as they are.
  */
 export function applyPrivacyFloor<T extends Record<string, unknown>>(chart: Pick<ChartSpec, "type">, rows: T[]): T[] {
-  return chart.type === "map" || chart.type === "boxplot" || chart.type === "sankey" || chart.type === "cities" ? rows.filter((r) => Number(r.n) >= MAP_MIN_ROWS) : rows;
+  return chart.type === "map" || chart.type === "boxplot" || chart.type === "sankey" || chart.type === "cities" || chart.type === "flows" ? rows.filter((r) => Number(r.n) >= MAP_MIN_ROWS) : rows;
 }
 
 export function suggestDashboard(title: string, profile: TableProfile): DashboardSpec {
@@ -484,6 +503,7 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
   if (profile.states) add(regionsChart(profile.states, measures[0], "us"));
   else if (profile.zips) add(zipRegionsChart(profile.zips, measures[0]));
   else if (profile.countries) add(regionsChart(profile.countries, measures[0]));
+  if (profile.flows) add(flowMapChart(profile.flows.from, profile.flows.to, measures[0]), 84);
   if (profile.cities) add(citiesChart(profile.cities, measures[0]));
 
   // Category breakdowns

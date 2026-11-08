@@ -47,6 +47,20 @@ export function createCityIndex(rows: CityRow[]): CityIndex {
 /** Column names that say the values are places. Two-word city names are common, so values alone are not enough to call a column cities. */
 export const CITY_NAME_HINT = /(^|[^a-z])(city|cities|town|municipality|metro|location|place|destination|origin|ville|stadt|ciudad)([^a-z]|$)/i;
 
+/** Names that say where something starts, and where it ends. */
+const FROM_NAME = /(^|[^a-z])(origin|from|source|start|departure|depart|pickup|pick up|sender|ship from)([^a-z]|$)/i;
+const TO_NAME = /(^|[^a-z])(destination|dest|to|end|arrival|arrive|dropoff|drop off|recipient|ship to)([^a-z]|$)/i;
+
+/**
+ * Of the columns found to be cities, an origin and a destination: one named like where things start and another like where they end.
+ * Two columns of cities that are not named that way are not guessed at, since the direction would be a coin flip.
+ */
+export function findFlowColumns(cityColumns: string[]): { from: string; to: string } | undefined {
+  const from = cityColumns.find((c) => FROM_NAME.test(c) && !TO_NAME.test(c));
+  const to = cityColumns.find((c) => TO_NAME.test(c) && !FROM_NAME.test(c) && c !== from);
+  return from && to ? { from, to } : undefined;
+}
+
 /** Most different values a column of cities can have and still be mapped. */
 export const MAX_CITIES = 2000;
 

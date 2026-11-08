@@ -97,3 +97,21 @@ test("a column of ZIP codes, kept as numbers that lost their leading zero, opens
   await expect(map).toHaveAttribute("aria-label", /7 places shaded, highest first: .+\./);
   await expect(map.locator("canvas").first()).toBeVisible();
 });
+
+test("a table of shipments from one city to another opens as a map with a line for each route", async ({ page }) => {
+  test.setTimeout(90_000);
+  const cities = ["London", "Paris", "Berlin", "Madrid", "Rome", "Tokyo", "Sydney", "Toronto"];
+  const rows = ["origin_city,destination_city,shipments,day"];
+  for (let i = 0; i < 400; i++) {
+    const from = cities[i % cities.length];
+    const to = cities[(i * 3 + 1) % cities.length];
+    rows.push(`${from},${to === from ? cities[(i + 2) % cities.length] : to},${5 + ((i * 7) % 40)},2024-0${1 + (i % 9)}-1${i % 9}`);
+  }
+  await page.goto("/");
+  await page.setInputFiles('input[type="file"]', { name: "routes.csv", mimeType: "text/csv", buffer: Buffer.from(rows.join("\n") + "\n") });
+  await expect(page.getByTestId("kpi-value").first()).not.toHaveText("", { timeout: 30_000 });
+  const map = page.getByRole("img", { name: /^Flow map: shipments from origin_city to destination_city/ });
+  await expect(map).toBeVisible({ timeout: 30_000 });
+  await expect(map).toHaveAttribute("aria-label", /\d+ routes between 8 cities, biggest first: .+ to .+\./);
+  await expect(map.locator("canvas").first()).toBeVisible();
+});

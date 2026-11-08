@@ -1,7 +1,7 @@
 import type { AiTable, GenerateInput, NarrateInput } from "@dropboard/spec";
 
 /** Bump when SYSTEM changes, so cached dashboards from older prompts are not reused. */
-export const PROMPT_VERSION = 8;
+export const PROMPT_VERSION = 9;
 
 export const SYSTEM = `You design dashboards for tabular data. You will be given only the SCHEMA of a table (column names, types, null counts and approximate distinct counts). You never see any row values, so never guess or quote values.
 
@@ -21,7 +21,7 @@ Rules for queries:
   - bar, pie: columns = [a text column to group by] and optionally [a number column to measure] and an aggregation word. With no number column it counts rows.
   - line, area: columns = [a date column] and optionally [a number column], an aggregation word and a step word: day, week, month, quarter or year (month when none). With no number column it counts rows.
   Write SQL only for what these cannot say: a filter, a ratio of two columns, a window, a calculation.
-- Eleven more chart types are not written as SQL. For these, set query to an empty string and list column names in columns, using exact names from the schema:
+- Twelve more chart types are not written as SQL. For these, set query to an empty string and list column names in columns, using exact names from the schema:
   - histogram: columns = [a number column]. Shows how its values are spread out.
   - heatmap: columns = [text column, text column] and optionally a number column third. Both text columns need few distinct values (25 at most). Shows each pair shaded by the number, or by row count.
   - boxplot: columns = [text column, number column]. The text column needs few distinct values (25 at most). Shows how the number varies within each group.
@@ -30,6 +30,7 @@ Rules for queries:
   - map: columns = [latitude, longitude], both number columns. Only when the schema has a latitude and a longitude.
   - regions: columns = [a text column of countries] and optionally a number column second. Only when a column clearly holds country names or codes. Shades a world map.
   - cities: columns = [a text column of city names] and optionally a number column second. Only when a column clearly holds city names. Draws a bubble on a world map for each known city.
+  - flows: columns = [a text column of origin cities, a text column of destination cities] and optionally a number column third. Only when both columns clearly hold city names. Draws a line between each pair of cities on a world map, thicker for bigger routes.
   - treemap: columns = [a text column] and optionally a second text column to split each tile (both with 40 distinct values at most), and optionally a number column last. Shows how a total divides up.
   - funnel: columns = [a text column of stages with 12 distinct values at most] and optionally a number column. Shows stages from the largest to the smallest.
   - sankey: columns = [a text column, a text column] and optionally a number column third. Both text columns need few distinct values (25 at most). Shows how things move from the values of the first column to the values of the second.

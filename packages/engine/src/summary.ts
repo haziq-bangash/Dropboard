@@ -23,6 +23,7 @@ const KIND: Record<ChartSpec["type"], string> = {
   funnel: "Funnel",
   sankey: "Flow diagram",
   cities: "City map",
+  flows: "Flow map",
   kpi: "Headline number",
   table: "Table",
 };
@@ -98,6 +99,20 @@ export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y" 
     const top = bins.reduce((m, b) => (b.n > m.n ? b : m));
     const end = (b: { from: number; width: number }) => (Number.isFinite(b.width) ? b.from + b.width : b.from);
     return `${head} ${bins.length} bins from ${said(bins[0].from)} to ${said(end(bins[bins.length - 1]))}. The most rows, ${said(top.n)} of ${said(total)}, fall between ${said(top.from)} and ${said(end(top))}.`;
+  }
+
+  if (spec.type === "flows") {
+    const routes = rows.map((r) => ({ from: r[spec.x ?? "x"], to: r.target, v: Number(r[spec.y?.[0] ?? "y"]) })).filter((r) => Number.isFinite(r.v));
+    if (!routes.length) return `${head} No data.`;
+    const drawn = known ? routes.filter((r) => known(r.from) && known(r.to)) : routes;
+    if (!drawn.length) return `${head} No pair of values is two cities in the list, so nothing is drawn.`;
+    const left = routes.length - drawn.length;
+    const places = new Set(drawn.flatMap((r) => [name(r.from), name(r.to)]));
+    const top = [...drawn].sort((a, b) => b.v - a.v);
+    const shown = top.slice(0, 4).map((r) => `${name(r.from)} to ${name(r.to)} ${said(r.v)}`);
+    const more = top.length - shown.length;
+    const unmatched = left > 0 ? ` ${left} other route${left === 1 ? " has" : "s have"} a place that is not a known city and ${left === 1 ? "is" : "are"} not shown.` : "";
+    return `${head} ${top.length} route${top.length === 1 ? "" : "s"} between ${places.size} cities, biggest first: ${list(shown)}${more > 0 ? `, and ${more} more` : ""}.${unmatched}`;
   }
 
   if (spec.type === "cities") {
