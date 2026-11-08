@@ -93,6 +93,16 @@ describe.each(DATASETS)("corpus: $title ($rows rows)", (dataset) => {
     }
   });
 
+  it("finds the data problems planted in it, and none in a clean table", async () => {
+    const { findings } = await result;
+    const issues = findings.filter((f) => f.kind === "quality").flatMap((f) => String(f.evidence.codes).split(","));
+    if (!dataset.quality) {
+      expect(findings.filter((f) => f.kind === "quality").map((f) => f.sentence), "no data problem where none was planted").toEqual([]);
+      return;
+    }
+    for (const issue of dataset.quality) expect(issues, `a ${issue} finding`).toContain(issue);
+  });
+
   it("finds the anomalies planted in it, and none in a table that has none", async () => {
     const { findings } = await result;
     const anomalous = findings.filter((f) => f.kind === "unusualrows" || f.kind === "contextual");

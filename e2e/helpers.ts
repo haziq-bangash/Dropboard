@@ -40,3 +40,14 @@ export function ordersWithErrors(): string {
   }
   return rows.join("\n") + "\n";
 }
+
+/** An export with problems in it: one value written two ways, a placeholder for missing, and a column of numbers with a few "N/A". */
+export function messyExport(): string {
+  const rows = ["order_id,status,revenue,region"];
+  for (let i = 1; i <= 240; i++) {
+    const status = i % 9 === 0 ? "SHIPPED" : i % 5 === 0 ? "Pending" : "Shipped";
+    const revenue = i % 17 === 0 ? "N/A" : String(20 + ((i * 37) % 380));
+    rows.push([i, status, revenue, ["North", "South", "East", "West"][i % 4]].join(","));
+  }
+  return rows.join("\n") + "\n";
+}

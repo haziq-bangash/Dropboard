@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { companiesByYear, signUp } from "./helpers";
+import { companiesByYear, messyExport, signUp } from "./helpers";
 
 async function openSample(page: Page, title: string) {
   await page.goto("/app/new");
@@ -151,4 +151,20 @@ test("a table of companies by year gets findings about the companies themselves,
   await page.getByRole("tab", { name: "Story" }).click();
   await expect(page.getByTestId("story-headline")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("story")).not.toContainText(/NaN|undefined/);
+});
+
+test("problems in the file are listed in one Data quality card, with what to fix", async ({ page }) => {
+  await signUp(page);
+  await page.goto("/app/new");
+  await page.setInputFiles('input[type="file"]', { name: "export.csv", mimeType: "text/csv", buffer: Buffer.from(messyExport()) });
+  await expect(page).toHaveURL(/\/app\/p\//, { timeout: 30_000 });
+  await expect(page.getByTestId("kpi-value").first()).not.toHaveText("", { timeout: 30_000 });
+  await openInsights(page);
+  const card = page.getByTestId("finding").filter({ hasText: /things? in the data change/ });
+  await expect(card).toBeVisible({ timeout: 30_000 });
+  const table = card.getByTestId("finding-details");
+  await expect(table).toContainText("are the same value written two ways");
+  await expect(table).toContainText("stands for missing");
+  await expect(table).toContainText("Stored as text");
+  await expect(card).toContainText("Data quality");
 });
