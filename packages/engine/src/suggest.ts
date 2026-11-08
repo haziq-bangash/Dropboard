@@ -9,7 +9,7 @@ const looksLikeId = (c: ColumnProfile, rows: number) =>
   /(^|_|\s)id$/i.test(c.name) || (c.type !== "number" && c.distinct >= rows * 0.9 && rows > 20);
 
 // Names that say a column is a rate, price, duration or score. Adding those up means little, so they are averaged.
-const AVERAGED = /(^|[_s-])(avg|average|rate|ratio|pct|percent|percentage|price|score|satisfaction|rating|age|duration|minutes|hours|days|seconds|latency|margin|discount)($|[_s-])/i;
+const AVERAGED = /(^|[_\s-])(avg|average|rate|ratio|pct|percent|percentage|price|score|satisfaction|rating|age|duration|minutes|hours|days|seconds|latency|margin|discount)($|[_\s-])/i;
 const aggregate = (c: ColumnProfile) => (AVERAGED.test(c.name) ? "avg" : "sum");
 const label = (c: ColumnProfile) => (aggregate(c) === "avg" ? `Average ${c.name}` : c.name);
 

@@ -76,6 +76,54 @@ test("Pilot-designed dashboards replace the current one and drop charts that do 
   await expect(page.getByText("7 requests left today.")).toBeVisible();
 });
 
+test("charts whose output columns are named differently are repaired and drawn, not shown blank", async ({ page }) => {
+  await signUp(page);
+  await upload(page);
+
+  // A model can write good SQL and still name its columns its own way. The renderer reads `value` and `x` / `y`.
+  await page.route("**/api/ai/generate", (route) =>
+    route.fulfill({
+      json: {
+        cached: false,
+        remaining: 5,
+        dropped: [],
+        spec: {
+          version: 1,
+          title: "Renamed columns",
+          schema: [],
+          charts: [
+            { id: "c1", type: "kpi", title: "Headline amount", query: 'SELECT sum("amount") AS total_amount FROM data', layout: { x: 0, y: 0, w: 1, h: 1 } },
+            {
+              id: "c2",
+              type: "bar",
+              title: "Revenue per region",
+              query: 'SELECT "region", sum("amount") AS revenue FROM data GROUP BY 1 ORDER BY 2 DESC',
+              x: "x",
+              y: ["y"],
+              layout: { x: 0, y: 0, w: 1, h: 1 },
+            },
+            // nothing numeric to show as a headline number: cannot be repaired, so it is skipped
+            { id: "c3", type: "kpi", title: "Only text", query: 'SELECT "region" FROM data LIMIT 1', layout: { x: 0, y: 0, w: 1, h: 1 } },
+          ],
+        },
+      },
+    }),
+  );
+
+  await page.getByLabel("Dashboard instruction").fill("anything");
+  await page.getByRole("button", { name: "Design with Pilot" }).click();
+
+  await expect(page.getByRole("heading", { name: "Renamed columns", exact: true })).toBeVisible({ timeout: 30_000 });
+  // the headline number really shows the sum, not a blank
+  await expect(page.getByTestId("kpi-value")).toHaveText("120,825", { timeout: 30_000 });
+  // and the bar chart draws: its card is there with a canvas and no error
+  const bar = page.getByTestId("chart-card").filter({ hasText: "Revenue per region" });
+  await expect(bar.locator("canvas")).toBeVisible();
+  await expect(bar.locator('[data-slot="alert"]')).toHaveCount(0);
+  await expect(page.getByText("Only text")).toHaveCount(0);
+  await expect(page.getByText(/1 suggested chart did not fit your data/)).toBeVisible();
+});
+
 test("asking a question runs the returned SQL in the browser and shows the answer", async ({ page }) => {
   await signUp(page);
   await upload(page);

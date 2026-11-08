@@ -82,6 +82,32 @@ describe("suggestDashboard aggregation", () => {
     expect(s.charts.find((c) => c.title === "revenue by priority")?.query).toContain("sum(");
   });
 
+  it("recognises a keyword as its own word when names use spaces or hyphens", () => {
+    const s = suggestDashboard("t", {
+      rowCount: 100,
+      columns: [
+        { name: "Order hours", type: "number", nullCount: 0, distinct: 50 },
+        { name: "first-response-minutes", type: "number", nullCount: 0, distinct: 50 },
+        { name: "Customer Rating", type: "number", nullCount: 0, distinct: 5 },
+      ],
+    });
+    expect(s.charts.find((c) => c.title === "Average Order hours")).toBeDefined();
+    expect(s.charts.find((c) => c.title === "Average first-response-minutes")).toBeDefined();
+  });
+
+  it("does not take a keyword from the middle of a longer word", () => {
+    const s = suggestDashboard("t", {
+      rowCount: 100,
+      columns: [
+        { name: "usage", type: "number", nullCount: 0, distinct: 50 }, // ends in "age" but is not an age
+        { name: "overage", type: "number", nullCount: 0, distinct: 50 },
+        { name: "decorates", type: "number", nullCount: 0, distinct: 50 }, // contains "rate" inside a word
+      ],
+    });
+    expect(s.charts.find((c) => c.title === "Total usage")).toBeDefined();
+    expect(s.charts.find((c) => c.title === "Total overage")).toBeDefined();
+  });
+
   it("does not mistake words that merely contain a keyword for one", () => {
     const s = suggestDashboard("t", {
       rowCount: 100,
