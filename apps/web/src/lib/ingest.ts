@@ -1,4 +1,4 @@
-import { CITY_NAME_HINT, detectCityColumn, detectCoordinates, detectPlaceColumn, MAX_CITIES, mapDuckDbType, q, type Range, type TableProfile } from "@dropboard/engine";
+import { buildProfile, CITY_NAME_HINT, detectCityColumn, detectCoordinates, detectPlaceColumn, MAX_CITIES, q, tidyColumnNames, type Range, type TableProfile } from "@dropboard/engine";
 import { DuckDBDataProtocol } from "@duckdb/duckdb-wasm";
 import { getDb, resetDb, runQuery } from "./duckdb";
 import { loadCities } from "./cities";
@@ -139,26 +139,15 @@ export async function loadFile(file: File, onStage?: (message: string) => void):
     if (!complete) sample = { rows: Number(kept.n), of };
   }
   onStage?.("Understanding the columns");
+  await tidyColumnNames(runQuery);
   const profile = await profileTable();
   return { title, profile: sample ? { ...profile, sample } : profile };
 }
 
 export async function profileTable(): Promise<TableProfile> {
-  const cols = await runQuery("SELECT column_name, column_type FROM (DESCRIBE data)");
-  const [{ n }] = (await runQuery("SELECT count(*) AS n FROM data")) as { n: number }[];
-  if (!cols.length) throw new Error("No columns found in the file.");
-
-  const stats = cols
-    .map((c, i) => `count(*) - count(${q(String(c.column_name))}) AS nulls_${i}, approx_count_distinct(${q(String(c.column_name))}) AS dist_${i}`)
-    .join(", ");
-  const [row] = await runQuery(`SELECT ${stats} FROM data`);
-
-  const columns = cols.map((c, i) => ({
-    name: String(c.column_name),
-    type: mapDuckDbType(String(c.column_type)),
-    nullCount: Number(row[`nulls_${i}`]),
-    distinct: Number(row[`dist_${i}`]),
-  }));
+  // columns, ranges, counts and whether the table is one row per entity per period: shared with the tests
+  const base = await buildProfile(runQuery);
+  const { columns } = base;
 
   // only number columns with a latitude or longitude style name need their range read
   const named = columns.filter((c) => c.type === "number" && /^(lat|latitude|lon|lng|long|longitude)$/i.test(c.name.trim().replace(/[ -]+/g, "_")));
@@ -201,5 +190,5 @@ export async function profileTable(): Promise<TableProfile> {
     }
   }
 
-  return { rowCount: n, columns, ...(coordinates ? { coordinates } : {}), ...(countries ? { countries } : {}), ...(states ? { states } : {}), ...(cities ? { cities } : {}) };
+  return { ...base, ...(coordinates ? { coordinates } : {}), ...(countries ? { countries } : {}), ...(states ? { states } : {}), ...(cities ? { cities } : {}) };
 }
