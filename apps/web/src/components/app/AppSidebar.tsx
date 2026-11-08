@@ -37,6 +37,7 @@ import { authClient } from "@/lib/auth-client";
 import { showGuideAgain } from "@/lib/guide";
 import { clearLocalData } from "@/lib/local-data";
 import { setLoaded } from "@/lib/loaded-data";
+import { markLeaving } from "@/lib/query-provider";
 import { Logo } from "../Logo";
 import { UsageMeter } from "./UsageMeter";
 
@@ -154,6 +155,7 @@ export function AppSidebar({
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={async () => {
+                    markLeaving();
                     setLoaded(null);
                     await clearLocalData();
                     await authClient.signOut();
