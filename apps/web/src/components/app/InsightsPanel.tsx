@@ -3,10 +3,13 @@
 import type { Finding, FindingKind, TableProfile } from "@dropboard/engine";
 import {
   CircleAlert,
+  CalendarClock,
   CircleDashed,
+  Copy,
   Flag,
   GitCompareArrows,
   PieChart,
+  Repeat,
   TrendingDown,
   TrendingUp,
   type LucideIcon,
@@ -25,6 +28,9 @@ const KIND: Record<FindingKind, { label: string; icon: LucideIcon }> = {
   dominance: { label: "Dominant category", icon: PieChart },
   concentration: { label: "Share of a total", icon: PieChart },
   missing: { label: "Missing values", icon: CircleDashed },
+  seasonal: { label: "Repeating pattern", icon: Repeat },
+  latest: { label: "Latest period", icon: CalendarClock },
+  duplicates: { label: "Repeated rows", icon: Copy },
 };
 
 /** The numbers behind a finding, in plain words, so a claim can be traced. */
@@ -49,6 +55,16 @@ function evidenceLines(f: Finding): string[] {
     lines.push(
       `The level moved ${e.shiftInNoiseUnits} times the usual ups and downs, around ${e.at}`,
     );
+  if (f.kind === "seasonal")
+    lines.push(
+      `The pattern explains ${(Number(e.strength) * 100).toFixed(0)}% of what is left once the trend is taken out, over at least two full cycles`,
+    );
+  if (f.kind === "latest")
+    lines.push(
+      `Moved ${e.z} times a usual period-to-period change, from ${e.previous} to ${e.latest}`,
+    );
+  if (f.kind === "duplicates")
+    lines.push(`${e.duplicateRows} rows repeat an earlier row exactly`);
   if (f.kind === "correlation")
     lines.push(`Correlation ${e.r} across ${e.rows} rows`);
   if (f.kind === "outlier")
