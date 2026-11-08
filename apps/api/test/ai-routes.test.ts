@@ -207,6 +207,30 @@ describe("POST /api/ai/ask", () => {
     expect(await res.json()).toEqual({ sql: "SELECT count(*) AS n FROM data", explanation: "Counts rows.", remaining: 2 });
   });
 
+  it("turns a double-escaped answer, with a backslash-n where a line break belongs, into a query that parses", async () => {
+    const escaped = 'SELECT "region", count(*) AS n\\nFROM data\\nGROUP BY "region"';
+    const app = createApp({ prisma, auth, ai: fakeAi({ ask: () => ({ sql: escaped, explanation: "Counts rows." }) }).service });
+    const cookie = await signUp("askesc");
+    const res = await post(app, "/api/ai/ask", cookie, ask);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { sql: string };
+    expect(body.sql).toBe('SELECT "region", count(*) AS n FROM data GROUP BY "region"');
+    expect(body.sql).not.toContain("\\n");
+  });
+
+  it("turns the same escapes in a designed dashboard's charts into queries that parse", async () => {
+    const app = createApp({
+      prisma,
+      auth,
+      ai: fakeAi({ generate: () => ({ title: "t", charts: [{ type: "bar", title: "By region", query: 'SELECT region AS x, count(*) AS y\\nFROM data\\nGROUP BY 1' }] }) }).service,
+    });
+    const cookie = await signUp("genesc");
+    const res = await post(app, "/api/ai/generate", cookie, { table: { rowCount: 3, columns: [{ name: "region", type: "string" }] } });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { spec: { charts: { query: string }[] } };
+    expect(body.spec.charts[0].query).toBe("SELECT region AS x, count(*) AS y FROM data GROUP BY 1");
+  });
+
   it("rejects unsafe SQL from the model with a 502", async () => {
     const app = createApp({ prisma, auth, ai: fakeAi({ ask: () => ({ sql: "COPY data TO '/tmp/x.csv'", explanation: "x" }) }).service });
     const cookie = await signUp("asku");

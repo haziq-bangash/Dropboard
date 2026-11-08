@@ -1,4 +1,4 @@
-import { guardSql } from "@dropboard/engine";
+import { guardSql, tidySql } from "@dropboard/engine";
 import { DashboardSpec, type AiTable } from "@dropboard/spec";
 import { AiBadOutput, type AiDashboardOutput } from "./schema";
 
@@ -30,7 +30,7 @@ export function buildSpec(table: AiTable, output: AiDashboardOutput): { spec: Da
       id: `c${charts.length + 1}`,
       type: c.type,
       title,
-      query: c.query.trim().replace(/;+\s*$/, ""),
+      query: tidySql(c.query).trim().replace(/;+\s*$/, ""),
       ...(c.type === "kpi" ? {} : { x: "x", y: ["y"] }),
       layout: { x: 0, y: 0, w: 1, h: 1 },
     });

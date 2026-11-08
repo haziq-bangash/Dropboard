@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { guardSql } from "@dropboard/engine";
+import { guardSql, tidySql } from "@dropboard/engine";
 import { AskInput, GenerateInput } from "@dropboard/spec";
 import type { Hono, MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -84,7 +84,7 @@ export function registerAiRoutes(app: Hono<AppEnv>, { prisma, ai, dailyLimit = D
       const guarded = guardSql(output.sql);
       if (!guarded.ok) throw new AiBadOutput(`Unsafe query: ${guarded.reason}`);
       await log(userId, "ask", false, usage);
-      return c.json({ sql: output.sql.trim().replace(/;+\s*$/, ""), explanation: output.explanation, remaining: left - 1 });
+      return c.json({ sql: tidySql(output.sql).trim().replace(/;+\s*$/, ""), explanation: output.explanation, remaining: left - 1 });
     } catch (e) {
       return failure(c, e);
     }
