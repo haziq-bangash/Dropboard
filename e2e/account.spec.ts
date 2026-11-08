@@ -26,7 +26,7 @@ test("the account page shows the plan and what is used", async ({ page }) => {
   await expect(page.getByRole("progressbar", { name: "Projects used" })).toHaveAttribute("aria-valuemax", "3");
   await expect(page.getByRole("progressbar", { name: "Published links used" })).toHaveAttribute("aria-valuemax", "3");
   await expect(page.getByRole("progressbar", { name: "Pilot requests today used" })).toHaveAttribute("aria-valuemax", "10");
-  await expect(page.getByText("Free", { exact: true })).toBeVisible();
+  await expect(page.locator("[data-slot=badge]", { hasText: /^Free$/ })).toBeVisible();
 });
 
 test("the name can be changed and stays changed", async ({ page }) => {

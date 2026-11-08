@@ -260,8 +260,8 @@ function layout(ctx: Ctx, s: StoryImage, f: StoryFonts, paint: boolean): number 
   return y + 56;
 }
 
-/** Draw the story and return it as a PNG. Fonts are waited for first, so the picture uses the page's own type and not a fallback. */
-export async function renderStoryImage(story: StoryImage, fonts: StoryFonts): Promise<Blob> {
+/** Draw the story on a canvas. Fonts are waited for first, so the picture uses the page's own type and not a fallback. */
+async function drawStory(story: StoryImage, fonts: StoryFonts): Promise<HTMLCanvasElement> {
   // a font that cannot be loaded must not stop the picture: after a few seconds the fallback type is used
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   await Promise.race([wait(4000), Promise.all([document.fonts.load(`88px ${fonts.serif}`), document.fonts.load(`italic 88px ${fonts.serif}`), document.fonts.load(`24px ${fonts.sans}`), document.fonts.load(`600 22px ${fonts.sans}`)]).catch(() => undefined)]);
@@ -277,5 +277,20 @@ export async function renderStoryImage(story: StoryImage, fonts: StoryFonts): Pr
   ctx.fillStyle = PAPER;
   ctx.fillRect(0, 0, WIDTH, height);
   layout(ctx, story, fonts, true);
-  return new Promise((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("The picture could not be saved."))), "image/png"));
+  return canvas;
+}
+
+const toBlob = (canvas: HTMLCanvasElement, type: string, quality?: number) =>
+  new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("The picture could not be saved."))), type, quality));
+
+/** The story as a PNG. */
+export async function renderStoryImage(story: StoryImage, fonts: StoryFonts): Promise<Blob> {
+  return toBlob(await drawStory(story, fonts), "image/png");
+}
+
+/** The story as a JPEG, with its size in pixels, for putting into a PDF. The background is solid, so nothing is lost to JPEG. */
+export async function renderStoryJpeg(story: StoryImage, fonts: StoryFonts): Promise<{ bytes: Uint8Array; width: number; height: number }> {
+  const canvas = await drawStory(story, fonts);
+  const blob = await toBlob(canvas, "image/jpeg", 0.92);
+  return { bytes: new Uint8Array(await blob.arrayBuffer()), width: canvas.width, height: canvas.height };
 }
