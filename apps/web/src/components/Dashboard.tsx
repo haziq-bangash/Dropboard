@@ -4,11 +4,12 @@ import { chartSummary, countryCode } from "@dropboard/engine";
 import type { ChartSpec, DashboardSpec } from "@dropboard/spec";
 import * as echarts from "echarts";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Presentation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table as UiTable,
@@ -298,7 +299,7 @@ function saveImage(card: HTMLElement | null, title: string) {
   link.click();
 }
 
-function Chart({ spec, rows, geo }: { spec: ChartSpec; rows: Rows; geo?: Geo }) {
+function Chart({ spec, rows, geo, tall }: { spec: ChartSpec; rows: Rows; geo?: Geo; tall?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   // ECharts owns a canvas outside React: create it, resize it with the window, and dispose it. Nothing else fits here.
   useEffect(() => {
@@ -313,7 +314,7 @@ function Chart({ spec, rows, geo }: { spec: ChartSpec; rows: Rows; geo?: Geo }) 
     };
   }, [spec, rows, geo]);
   // the picture is a canvas, which a screen reader cannot read: give it a sentence built from the same rows
-  return <div ref={ref} className="h-64 w-full" role="img" aria-label={chartSummary(spec, rows)} />;
+  return <div ref={ref} className={tall ? "h-[min(62vh,640px)] w-full" : "h-64 w-full"} role="img" aria-label={chartSummary(spec, rows)} />;
 }
 
 export function Table({ rows, label = "Table, scrolls both ways" }: { rows: Rows; label?: string }) {
@@ -349,10 +350,13 @@ function ChartCard({
   spec,
   source,
   dataKey,
+  tall,
 }: {
   spec: ChartSpec;
   source: RowSource;
   dataKey: string;
+  /** Draw the chart large, for present mode */
+  tall?: boolean;
 }) {
   // Keyed by which rows are loaded, so the same SQL on a different file is never answered from the old rows
   const query = useQuery({
@@ -421,10 +425,85 @@ function ChartCard({
         ) : spec.type === "table" ? (
           <Table rows={rows} label={`${spec.title}, table that scrolls`} />
         ) : (
-          <Chart spec={spec} rows={rows} geo={world.data} />
+          <Chart spec={spec} rows={rows} geo={world.data} tall={tall} />
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Walk through a dashboard one slide at a time, full screen: the headline numbers first, then each chart large.
+ * Left and right arrows move, Escape leaves. Charts come from the same cached queries as the dashboard behind it.
+ */
+function Present({ spec, source, dataKey }: { spec: DashboardSpec; source: RowSource; dataKey: string }) {
+  const [open, setOpen] = useState(false);
+  const [index, setIndex] = useState(0);
+  const kpis = spec.charts.filter((c) => c.type === "kpi");
+  // the table of rows is for working with the data, not for showing it to a room
+  const charts = spec.charts.filter((c) => c.type !== "kpi" && c.type !== "table");
+  const slides: (ChartSpec | "numbers")[] = [...(kpis.length ? (["numbers"] as const) : []), ...charts];
+  if (slides.length === 0) return null;
+
+  // the arrow buttons stay focusable at the ends (aria-disabled, not disabled): a disabled button would drop keyboard focus out of the dialog and the arrow keys would stop working
+  const go = (to: number) => setIndex(Math.min(slides.length - 1, Math.max(0, to)));
+  const slide = slides[Math.min(index, slides.length - 1)];
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        onClick={() => {
+          setIndex(0);
+          setOpen(true);
+        }}
+      >
+        <Presentation /> Present
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent
+          showCloseButton
+          data-testid="present"
+          className="top-0 left-0 h-dvh w-screen max-w-none translate-x-0 translate-y-0 grid-rows-[auto_1fr_auto] rounded-none p-4 sm:max-w-none sm:p-8"
+          onKeyDown={(e) => {
+            if (e.key === "ArrowRight" || e.key === "PageDown") go(index + 1);
+            else if (e.key === "ArrowLeft" || e.key === "PageUp") go(index - 1);
+            else if (e.key === "Home") go(0);
+            else if (e.key === "End") go(slides.length - 1);
+            else return;
+            e.preventDefault();
+          }}
+        >
+          <DialogTitle className="text-xl font-semibold tracking-tight">{spec.title}</DialogTitle>
+          <DialogDescription className="sr-only">Use the left and right arrow keys to move between charts, and Escape to leave.</DialogDescription>
+          <div className="min-h-0 overflow-auto" data-testid="present-slide">
+            {slide === "numbers" ? (
+              <div className="grid h-full grid-cols-2 content-center gap-4 lg:grid-cols-4">
+                {kpis.map((c) => (
+                  <ChartCard key={c.id} spec={c} source={source} dataKey={dataKey} />
+                ))}
+              </div>
+            ) : (
+              <ChartCard key={slide.id} spec={slide} source={source} dataKey={dataKey} tall />
+            )}
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <p className="hidden text-sm text-muted-foreground sm:block">Arrow keys to move, Escape to leave</p>
+            <div className="ml-auto flex items-center gap-2">
+              <Button variant="outline" size="icon" aria-label="Previous chart" aria-disabled={index === 0} className="aria-disabled:pointer-events-none aria-disabled:opacity-50" onClick={() => go(index - 1)}>
+                <ChevronLeft />
+              </Button>
+              <span className="min-w-16 text-center text-sm tabular-nums" aria-live="polite" data-testid="present-count">
+                {Math.min(index, slides.length - 1) + 1} of {slides.length}
+              </span>
+              <Button variant="outline" size="icon" aria-label="Next chart" aria-disabled={index >= slides.length - 1} className="aria-disabled:pointer-events-none aria-disabled:opacity-50" onClick={() => go(index + 1)}>
+                <ChevronRight />
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -444,9 +523,10 @@ export function Dashboard({
   const rest = spec.charts.filter((c) => c.type !== "kpi");
   return (
     <section className="flex flex-col gap-4">
-      {showTitle && (
-        <h2 className="text-2xl font-semibold tracking-tight">{spec.title}</h2>
-      )}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {showTitle ? <h2 className="text-2xl font-semibold tracking-tight">{spec.title}</h2> : <span />}
+        <Present spec={spec} source={source} dataKey={dataKey} />
+      </div>
       {kpis.length > 0 && (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {kpis.map((c) => (
