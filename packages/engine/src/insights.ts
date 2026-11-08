@@ -24,7 +24,16 @@ export interface Finding {
   strength: number;
   /** The numbers behind the sentence, so every claim can be traced. */
   evidence: Record<string, number | string>;
+  /** A short title for a story page, without the detail of the sentence. */
+  headline: string;
+  /** The one number worth showing big, and what it is. */
+  figure: { value: string; label: string };
+  /** A suggestion for what to look at next. It points somewhere to look; it does not claim a cause. */
+  next: string;
 }
+
+/** A finding before its headline, figure and suggestion are worked out from its evidence. */
+export type RawFinding = Omit<Finding, "headline" | "figure" | "next">;
 
 export interface SeriesInput {
   column: string;
@@ -86,7 +95,67 @@ const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 /** Fold how unlikely the result is by chance into the ranking, without letting it overrule how big the effect is. */
 const confidence = (p: number | null) => (p === null ? 0.7 : clamp01(0.5 + -Math.log10(Math.max(p, 1e-300)) / 20));
 
-interface Candidate extends Finding {
+/** The headline, big number and next step for a finding, all taken from its own evidence so they cannot disagree with it. */
+function describe(f: RawFinding): Pick<Finding, "headline" | "figure" | "next"> {
+  const e = f.evidence;
+  const [a, b] = f.columns;
+  switch (f.kind) {
+    case "trend": {
+      const change = Number(e.relativeChange);
+      return {
+        headline: `${a} ${change > 0 ? "rose" : "fell"} ${pct(change)}`,
+        figure: { value: `${change > 0 ? "+" : "-"}${pct(change)}`, label: "from start to end" },
+        next: "Look for what changed over the period: a price, a campaign, a season, a new group of customers.",
+      };
+    }
+    case "change": {
+      const before = Number(e.before);
+      const after = Number(e.after);
+      const relative = before !== 0 ? (after - before) / Math.abs(before) : 0;
+      return {
+        headline: `${a} ${after > before ? "stepped up" : "dropped"} around ${e.at}`,
+        figure: { value: `${relative >= 0 ? "+" : "-"}${pct(relative)}`, label: `${fmt(before)} to ${fmt(after)}` },
+        next: `Find out what happened around ${e.at}: a launch, a policy change, a change in how the data was recorded.`,
+      };
+    }
+    case "correlation": {
+      const r = Number(e.r);
+      return {
+        headline: `${a} and ${b} ${r > 0 ? "move together" : "move in opposite directions"}`,
+        figure: { value: `r = ${r.toFixed(2)}`, label: "correlation" },
+        next: "A relationship is not a cause. Look for what drives both, or whether one really leads the other.",
+      };
+    }
+    case "dominance":
+      return {
+        headline: `${e.label} dominates ${a}`,
+        figure: { value: pct(Number(e.share)), label: "of all rows" },
+        next: "Ask whether depending on one value is a risk, and whether the others deserve more attention.",
+      };
+    case "concentration":
+      return {
+        headline: `${e.label} accounts for most of ${b}`,
+        figure: { value: pct(Number(e.share)), label: `of ${b}` },
+        next: "Ask whether depending on one value is a risk, and whether the others deserve more attention.",
+      };
+    case "outlier": {
+      const count = Number(e.count);
+      return {
+        headline: `${count === 1 ? "One" : "A few"} ${a} ${count === 1 ? "value stands" : "values stand"} apart`,
+        figure: { value: fmt(Number(e.worstValue)), label: "the most extreme value" },
+        next: "Check whether these are mistakes (a typo, an extra zero) or real events worth a closer look.",
+      };
+    }
+    case "missing":
+      return {
+        headline: `${a} has gaps`,
+        figure: { value: pct(Number(e.share)), label: "of rows are empty" },
+        next: "Find out why these cells are empty before trusting averages and totals built on them.",
+      };
+  }
+}
+
+interface Candidate extends RawFinding {
   /** The family of tests this belongs to, so the correction counts them. */
   tested: boolean;
   passesFloor: boolean;
@@ -158,7 +227,7 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
     q,
   );
 
-  let found: Finding[] = [];
+  let found: RawFinding[] = [];
   candidates.forEach((c, i) => {
     if (kept[i] && c.passesFloor) {
       const { tested: _t, passesFloor: _f, ...finding } = c;
@@ -250,5 +319,6 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
       taken.set(f.kind, n + 1);
       return n < perKind;
     })
-    .slice(0, limit);
+    .slice(0, limit)
+    .map((f) => ({ ...f, ...describe(f) }));
 }
