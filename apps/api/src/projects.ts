@@ -44,6 +44,7 @@ export function registerProjectRoutes(
           id: true,
           title: true,
           sourceName: true,
+          sourceUrl: true,
           rowCount: true,
           createdAt: true,
           updatedAt: true,
@@ -78,7 +79,7 @@ export function registerProjectRoutes(
       return c.json(limitReached("saved projects", limits.projects), 402);
     }
     const created = await prisma.dashboard.create({
-      data: { ownerId: userId, title: spec.title, spec: json(spec), sourceName: source?.fileName, rowCount: source?.rowCount },
+      data: { ownerId: userId, title: spec.title, spec: json(spec), sourceName: source?.fileName, sourceUrl: source?.url, rowCount: source?.rowCount },
       select: { id: true, title: true },
     });
     return c.json(created, 201);
@@ -118,6 +119,7 @@ export function registerProjectRoutes(
     }
     if (source) {
       data.sourceName = source.fileName;
+      data.sourceUrl = source.url ?? null;
       data.rowCount = source.rowCount;
     }
     const { count } = await prisma.dashboard.updateMany({ where, data });
@@ -139,6 +141,7 @@ export function registerProjectRoutes(
         title,
         spec: json({ ...DashboardSpec.parse(original.spec), title }),
         sourceName: original.sourceName,
+        sourceUrl: original.sourceUrl,
         rowCount: original.rowCount,
       },
       select: { id: true, title: true },

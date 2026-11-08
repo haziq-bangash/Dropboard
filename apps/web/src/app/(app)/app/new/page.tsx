@@ -1,6 +1,6 @@
 "use client";
 
-import { DropZone } from "@/components/app/DropZone";
+import { SourcePicker } from "@/components/app/SourcePicker";
 import { StarterGrid } from "@/components/app/StarterGrid";
 import { useStartProject } from "@/lib/start-project";
 
@@ -16,15 +16,11 @@ export default function NewProject() {
         </em>
       </h1>
       <p className="mt-2 text-muted-foreground">
-        Start from a spreadsheet. We build a first dashboard in your browser and
-        save it as a project.
+        Start from a file, pasted cells or a link. We build a first dashboard in
+        your browser and save it as a project.
       </p>
       <div className="mt-8">
-        <DropZone
-          onFile={(file) => start.mutate({ file })}
-          busyName={start.isPending ? start.variables?.file.name : null}
-          error={start.error?.message}
-        />
+        <SourcePicker start={start} />
       </div>
       <div className="mt-12">
         <StarterGrid />

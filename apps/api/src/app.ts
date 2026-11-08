@@ -8,6 +8,8 @@ import { registerAiRoutes } from "./ai/routes";
 import type { AiService } from "./ai/service";
 import type { LimitsFor } from "./plans";
 import { registerAccountRoutes } from "./account";
+import { registerImportRoutes } from "./import/routes";
+import type { FetchOptions, Fetched } from "./import/public-fetch";
 import { registerProjectRoutes } from "./projects";
 import type { AppEnv } from "./types";
 import type { PrismaClient } from "./generated/prisma/client";
@@ -23,9 +25,13 @@ export interface Deps {
   /** Plan limits per user; defaults to the free plan. */
   limitsFor?: LimitsFor;
   shareLimits?: { requestsPerMinute: number; wrongPasswordsPerMinute: number };
+  /** Fetches a file from a link for the import routes; replaced in tests. */
+  importFetch?: (url: string, options?: FetchOptions) => Promise<Fetched>;
+  /** Loosens the address checks of the import fetch. For tests only. */
+  importOptions?: FetchOptions;
 }
 
-export function createApp({ prisma, auth, ai, aiDailyLimit, mailer, limitsFor, shareLimits }: Deps) {
+export function createApp({ prisma, auth, ai, aiDailyLimit, mailer, limitsFor, shareLimits, importFetch, importOptions }: Deps) {
   const app = new Hono<AppEnv>();
 
   app.use("*", secureHeaders());
@@ -53,6 +59,7 @@ export function createApp({ prisma, auth, ai, aiDailyLimit, mailer, limitsFor, s
 
   registerProjectRoutes(app, { prisma, requireUser, limitsFor, shareLimits });
   registerAccountRoutes(app, { prisma, requireUser, limitsFor, aiDailyLimit });
+  registerImportRoutes(app, { requireUser, fetchLink: importFetch, options: importOptions });
 
   return app;
 }

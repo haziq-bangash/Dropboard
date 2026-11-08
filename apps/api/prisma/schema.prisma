@@ -81,6 +81,8 @@ model Dashboard {
   title      String
   // Where the data came from, shown so people know which file to re-attach. Rows are never stored here.
   sourceName String?
+  // The link the data was fetched from (a Google Sheet, a CSV or JSON address), so it can be fetched again. Never a place for rows.
+  sourceUrl  String?
   rowCount   Int?
   // DashboardSpec (see packages/spec). Validated with zod before write.
   spec       Json

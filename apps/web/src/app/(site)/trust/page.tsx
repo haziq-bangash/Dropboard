@@ -38,7 +38,7 @@ const STATUS: Record<Status, string> = {
 };
 
 const BADGES: { icon: LucideIcon; status: Status; title: string; text: string }[] = [
-  { icon: Laptop, status: "In place", title: "Rows stay on your device", text: "Files are read in your browser and never uploaded." },
+  { icon: Laptop, status: "In place", title: "Rows stay on your device", text: "Files and pasted cells are read in your browser, never uploaded." },
   { icon: Lock, status: "In place", title: "Encrypted in transit", text: "Every connection uses HTTPS." },
   { icon: Globe, status: "In place", title: "Hosted in the EU", text: "The site and service run in Frankfurt, Germany." },
   { icon: KeyRound, status: "In place", title: "Passwords are hashed", text: "Never stored, never emailed." },
@@ -95,7 +95,7 @@ export default function Trust() {
             <span className="block text-8xl">0</span>
           </Stat>
           <p className="mt-3 text-xl font-medium">rows uploaded to our servers</p>
-          <p className="mt-1 text-sm opacity-90">Your file is read, analysed and drawn on your own device.</p>
+          <p className="mt-1 text-sm opacity-90">Your file is read, analysed and drawn on your own device. A link you import passes through our server and is not stored.</p>
         </div>
         <div className={`${bentoBase} ${TONES.yellow} min-h-[300px]`}>
           <Grain className="-z-10 opacity-40" />

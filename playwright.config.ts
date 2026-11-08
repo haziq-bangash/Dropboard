@@ -37,6 +37,8 @@ export default defineConfig({
         BETTER_AUTH_SECRET: "e2e-secret-e2e-secret-e2e-secret-1234",
         BETTER_AUTH_URL: WEB,
         WEB_ORIGIN: WEB,
+        // lets the tests import from a server on this machine; the API ignores it in production
+        IMPORT_ALLOW_PRIVATE_FOR_TESTS: "1",
       },
     },
     {

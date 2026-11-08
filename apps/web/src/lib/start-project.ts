@@ -24,14 +24,17 @@ export function useStartProject() {
     mutationFn: async ({
       file,
       title: chosen,
+      sourceUrl,
     }: {
       file: File;
       title?: string;
+      /** The link the file was fetched from, kept so the data can be refreshed. */
+      sourceUrl?: string;
     }) => {
       const { title, profile } = await loadFile(file);
       const created = await create.mutateAsync({
         spec: suggestDashboard(chosen ?? title, profile),
-        source: { fileName: file.name, rowCount: profile.rowCount },
+        source: { fileName: file.name, rowCount: profile.rowCount, ...(sourceUrl ? { url: sourceUrl } : {}) },
       });
       setLoaded({
         projectId: created.id,

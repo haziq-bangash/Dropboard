@@ -30,6 +30,11 @@ export default function Privacy() {
           So that a saved project opens without asking for the file again, your browser can keep a copy of the table in its private
           storage, on this device only. It is kept per signed-in account and removed when you sign out.
         </p>
+        <p>
+          Pasting cells or a table works the same way. The one exception is starting from a link (a Google Sheet, or the address of a CSV or JSON
+          file): our server fetches the file for you and hands it straight to your browser. It is not stored and not logged, but it does pass through
+          our server on the way in, and only a public address can be fetched. We save the link with the project, so you can refresh the data from it.
+        </p>
       </LegalSection>
 
       <LegalSection title="What we keep on our servers">
@@ -43,7 +48,7 @@ export default function Privacy() {
             it used, so that we can protect your account and show you where you are signed in.
           </li>
           <li>
-            <strong>Your projects:</strong> the name, the file name, how many rows the file had, and the dashboard itself: its charts,
+            <strong>Your projects:</strong> the name, the file name, the link if you started from one, how many rows the file had, and the dashboard itself: its charts,
             their titles and the queries behind them. Not the rows.
           </li>
           <li>
