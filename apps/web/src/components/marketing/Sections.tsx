@@ -8,6 +8,7 @@ import { ASSISTANT } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 import { MockChat, MockDashboard, MockShare } from "./Mocks";
 import { AskArt, DashboardArt, FastArt, PilotArt, PrivateArt, ShareArt } from "./ToolArt";
+import { bentoBase, Chip, Stat } from "./bento";
 import { PromptCarousel } from "./PromptCarousel";
 
 const wrap = "mx-auto w-full max-w-6xl px-5";
@@ -261,23 +262,6 @@ export function AiPrompts() {
       </div>
       <PromptCarousel />
     </section>
-  );
-}
-
-const bentoBase =
-  "group relative isolate flex flex-col justify-end overflow-hidden rounded-3xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl min-h-[220px]";
-
-function Stat({ children }: { children: React.ReactNode }) {
-  return <p className="font-serif leading-[0.9] tracking-normal">{children}</p>;
-}
-
-function Chip({ children, tilt, className }: { children: React.ReactNode; tilt: string; className?: string }) {
-  return (
-    <span
-      className={`inline-block rounded-full px-3 py-1 text-sm font-medium shadow-sm transition-transform duration-300 group-hover:rotate-0 ${tilt} ${className ?? ""}`}
-    >
-      {children}
-    </span>
   );
 }
 
