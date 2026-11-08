@@ -26,3 +26,17 @@ export function companiesByYear(): string {
   });
   return rows.join("\n") + "\n";
 }
+
+/** Four hundred orders, six of them keyed in wrongly (a quantity of 900 and an amount to match). */
+export function ordersWithErrors(): string {
+  let seed = 11;
+  const rnd = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
+  const rows = ["order_id,day,quantity,unit_price,amount,discount_pct,region"];
+  for (let i = 1; i <= 400; i++) {
+    const wrong = [40, 120, 200, 260, 310, 370].includes(i);
+    const quantity = wrong ? 900 : 1 + Math.floor(rnd() * 8);
+    const price = Math.round((5 + rnd() * 95) * 100) / 100;
+    rows.push([i, `2023-${String(1 + (i % 12)).padStart(2, "0")}-${String(1 + (i % 28)).padStart(2, "0")}`, quantity, price, Math.round(quantity * price * 100) / 100, Math.floor(rnd() * 30), ["North", "South", "East", "West"][i % 4]].join(","));
+  }
+  return rows.join("\n") + "\n";
+}
