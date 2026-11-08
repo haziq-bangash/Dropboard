@@ -1,11 +1,12 @@
 "use client";
 
-import { FolderOpen, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { GettingStarted } from "@/components/app/GettingStarted";
 import { ProjectCard } from "@/components/app/ProjectCard";
 import { StarterGrid } from "@/components/app/StarterGrid";
+import { EmptyTile } from "@/components/marketing/bento";
 import { useProjects } from "@/components/app/projects-store";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -65,21 +66,12 @@ export default function Projects() {
           </div>
         ) : items.length === 0 ? (
           <div className="flex flex-col gap-12">
-            <div className="flex flex-col items-center gap-4 rounded-2xl border-2 border-dashed px-6 py-16 text-center">
-              <div className="grid size-12 place-items-center rounded-full bg-secondary/60">
-                <FolderOpen className="size-6 text-brand-text" />
-              </div>
-              <div>
-                <p className="text-lg font-medium">No projects yet</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Drop a spreadsheet and your first dashboard is ready in
-                  seconds.
-                </p>
-              </div>
-              <Button render={<Link href="/app/new" />} nativeButton={false}>
+            <EmptyTile tone="dashed" eyebrow="Your workspace" title="No projects yet">
+              <p>Drop a spreadsheet and your first dashboard is ready in seconds.</p>
+              <Button className="mt-5 rounded-full" size="lg" render={<Link href="/app/new" />} nativeButton={false}>
                 <Plus /> Start a project
               </Button>
-            </div>
+            </EmptyTile>
             <StarterGrid />
           </div>
         ) : (

@@ -98,9 +98,13 @@ test("the tab order is Dashboard, Insights, Story, and no capitals are forced on
   await openSample(page, "Support tickets");
   await expect(page.getByRole("tab")).toHaveText(["Dashboard", "Insights", "Story"]);
   await openStory(page);
-  const eyebrow = page.getByText("Data story", { exact: true });
-  await expect(eyebrow).toBeVisible({ timeout: 30_000 });
-  expect(await eyebrow.evaluate((el) => getComputedStyle(el).textTransform)).toBe("none");
+  // the headline and the small tags saying what the story is made of are in sentence case, never forced into capitals
+  const headline = page.getByTestId("story-headline");
+  await expect(headline).toBeVisible({ timeout: 30_000 });
+  expect(await headline.evaluate((el) => getComputedStyle(el).textTransform)).toBe("none");
+  const tag = page.getByRole("list", { name: "What this story is made of" }).getByRole("listitem").first();
+  await expect(tag).toBeVisible();
+  expect(await tag.evaluate((el) => getComputedStyle(el).textTransform)).toBe("none");
 });
 
 test("Pilot can write the story from numbers only, and the real names are put back in the browser", async ({ page }) => {

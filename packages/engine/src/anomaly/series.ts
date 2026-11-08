@@ -104,5 +104,15 @@ export function seriesAnomalies(y: number[], options: SeriesOptions = {}): Serie
     if (relative !== null && Math.abs(relative) < minRelative) return;
     found.push({ index: i, actual: value, expected, relative, z });
   });
+  // Anomalies are rare and do not keep time. If more than a seventh of the points stand out, or the ones that do come at a steady spacing (rent
+  // on the first of every month shows up as a spike in every fourth or fifth week), that is a rhythm in the data and not a run of
+  // surprises, and it is a pattern the calendar-season check could not know about.
+  if (found.length > Math.max(3, n * 0.15)) return [];
+  if (found.length >= 4) {
+    const at = found.map((f) => f.index).sort((a, b) => a - b);
+    const gaps = at.slice(1).map((v, i) => v - at[i]);
+    const typical = median(gaps);
+    if (typical >= 2 && gaps.filter((g) => Math.abs(g - typical) <= 1).length / gaps.length >= 0.8) return [];
+  }
   return found.sort((x, y2) => Math.abs(y2.z) - Math.abs(x.z));
 }

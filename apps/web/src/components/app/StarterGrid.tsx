@@ -3,7 +3,7 @@
 import { STARTERS } from "@dropboard/engine";
 import { Loader2 } from "lucide-react";
 import { Grain } from "@/components/art/Grain";
-import { bentoBase, Chip, Stat } from "@/components/marketing/bento";
+import { bentoBase, Chip, ItalicLast, Stat } from "@/components/marketing/bento";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { starterFile, useStartProject } from "@/lib/start-project";
 
@@ -20,17 +20,6 @@ const TILES = [
 ] as const;
 
 const TILTS = ["-rotate-3", "rotate-2", "-rotate-1"];
-
-/** The title with its last word set in the italic accent, as the homepage does ("Never indexed"). */
-function Title({ text }: { text: string }) {
-  const words = text.split(" ");
-  const last = words.pop();
-  return (
-    <>
-      {words.join(" ")} <em className="italic">{last}</em>
-    </>
-  );
-}
 
 /** Sample datasets that open as real projects, for anyone without a file at hand. The numbers are made up. */
 export function StarterGrid() {
@@ -79,7 +68,7 @@ export function StarterGrid() {
               {tile.big ? (
                 <Stat>
                   <span className="mt-1 block text-5xl sm:text-6xl">
-                    <Title text={s.title} />
+                    <ItalicLast text={s.title} />
                   </span>
                 </Stat>
               ) : (
