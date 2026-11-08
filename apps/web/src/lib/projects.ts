@@ -37,11 +37,17 @@ export class ApiError extends Error {
   }
 }
 
+/** The server sends a sentence for most errors, but an object for a rejected request body: never show that as text. */
+export function errorMessage(body: { error?: unknown } | null, status: number): string {
+  if (typeof body?.error === "string" && body.error) return body.error;
+  return status === 400 || status === 422 ? "The server did not accept this request. Reload the page and try again." : `Request failed (${status})`;
+}
+
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { ...init, headers: { "content-type": "application/json", ...init?.headers } });
   if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as { error?: string; code?: string } | null;
-    throw new ApiError(body?.error ?? `Request failed (${res.status})`, res.status, body?.code);
+    const body = (await res.json().catch(() => null)) as { error?: unknown; code?: string } | null;
+    throw new ApiError(errorMessage(body, res.status), res.status, body?.code);
   }
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
