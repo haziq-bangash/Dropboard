@@ -83,6 +83,27 @@ export function boxplotChart(category: string, measure: string): Omit<ChartSpec,
   };
 }
 
+/** Fewest different days a date column needs before a calendar of it is worth drawing. */
+const CALENDAR_MIN_DAYS = 60;
+
+/**
+ * A calendar with one cell per day, shaded by how many rows fall on it, over the latest twelve months of the data.
+ * It counts rows and does not add up a measure, so a day with a single row shows that something happened and never
+ * what its value was. x is the day as text (yyyy-mm-dd), y the number of rows.
+ */
+export function calendarChart(date: string): Omit<ChartSpec, "id" | "layout"> {
+  const d = q(date);
+  return {
+    type: "calendar",
+    title: `Rows per day by ${date}`,
+    query:
+      `WITH days AS (SELECT CAST(${d} AS DATE) AS day FROM data WHERE ${d} IS NOT NULL) ` +
+      `SELECT strftime(day, '%Y-%m-%d') AS x, count(*) AS y FROM days WHERE day >= (SELECT max(day) FROM days) - INTERVAL 365 DAY GROUP BY 1 ORDER BY 1`,
+    x: "x",
+    y: ["y"],
+  };
+}
+
 /** Two categories against each other, each cell shaded by a measure (or by how many rows fall in it). */
 export function heatmapChart(a: string, b: string, measure?: ColumnProfile): Omit<ChartSpec, "id" | "layout"> {
   const value = measure ? `${aggregate(measure)}(${q(measure.name)})` : "count(*)";
@@ -125,7 +146,8 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
 
   const charts: ChartSpec[] = [];
   const add = (c: Omit<ChartSpec, "id" | "layout">) => {
-    if (charts.length >= MAX_CHARTS) return;
+    // up to ten charts, and always one more place for the data preview, so a rich file never pushes it out
+    if (charts.length >= (c.type === "table" ? MAX_CHARTS + 1 : MAX_CHARTS)) return;
     charts.push({ ...c, id: `c${charts.length + 1}`, layout: { x: 0, y: 0, w: 1, h: 1 } });
   };
 
@@ -179,6 +201,9 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
   // Two categories against each other
   const sides = categories.filter((c) => c.distinct <= HEATMAP_MAX_SIDE);
   if (sides.length >= 2) add(heatmapChart(sides[0].name, sides[1].name, measures[0]));
+
+  // Which days are busy, when a date column covers enough days to show a pattern
+  if (dates[0] && dates[0].distinct >= CALENDAR_MIN_DAYS) add(calendarChart(dates[0].name));
 
   // Share of rows for a small category
   const small = categories.find((c) => c.distinct <= 6);

@@ -17,6 +17,7 @@ const KIND: Record<ChartSpec["type"], string> = {
   histogram: "Histogram",
   heatmap: "Heatmap",
   boxplot: "Box plot",
+  calendar: "Calendar",
   kpi: "Headline number",
   table: "Table",
 };
@@ -57,6 +58,17 @@ export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y">
     const high = cells.reduce((m, c) => (c.v > m.v ? c : m));
     const low = cells.reduce((m, c) => (c.v < m.v ? c : m));
     return `${head} ${cells.length} combinations. Highest: ${name(high.x)} and ${name(high.y)}, ${said(high.v)}. Lowest: ${name(low.x)} and ${name(low.y)}, ${said(low.v)}.`;
+  }
+
+  if (spec.type === "calendar") {
+    const days = rows.map((r) => ({ day: name(r.x), n: Number(r.y) })).filter((d) => Number.isFinite(d.n));
+    if (!days.length) return `${head} No data.`;
+    const total = days.reduce((s, d) => s + d.n, 0);
+    const busiest = days.reduce((m, d) => (d.n > m.n ? d : m));
+    const quietest = days.reduce((m, d) => (d.n < m.n ? d : m));
+    const span = `${days.length} day${days.length === 1 ? "" : "s"} with rows, from ${days[0].day} to ${days[days.length - 1].day}`;
+    if (days.length === 1) return `${head} ${span}, ${said(total)} rows.`;
+    return `${head} ${span}, ${said(total)} rows in all. Busiest day ${busiest.day} with ${said(busiest.n)}, quietest day ${quietest.day} with ${said(quietest.n)}.`;
   }
 
   if (spec.type === "boxplot") {

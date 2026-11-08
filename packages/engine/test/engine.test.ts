@@ -31,9 +31,9 @@ const sales: TableProfile = {
 
 describe("suggestDashboard", () => {
   const spec = suggestDashboard("Sales", sales);
-  it("produces a valid spec within the 10-chart cap", () => {
+  it("produces a valid spec within the cap of ten charts and a data preview", () => {
     expect(DashboardSpec.safeParse(spec).success).toBe(true);
-    expect(spec.charts.length).toBeLessThanOrEqual(10);
+    expect(spec.charts.length).toBeLessThanOrEqual(11);
   });
   it("includes trend, breakdown and table", () => {
     const types = spec.charts.map((c) => c.type);

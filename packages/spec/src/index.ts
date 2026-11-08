@@ -4,7 +4,7 @@ export const ColumnType = z.enum(["number", "string", "date", "boolean"]);
 
 export const ChartSpec = z.object({
   id: z.string(),
-  type: z.enum(["bar", "line", "area", "pie", "scatter", "map", "regions", "histogram", "heatmap", "boxplot", "table", "kpi"]),
+  type: z.enum(["bar", "line", "area", "pie", "scatter", "map", "regions", "histogram", "heatmap", "boxplot", "calendar", "table", "kpi"]),
   title: z.string().max(120),
   // SQL run client-side in DuckDB-WASM against table "data"
   query: z.string().max(4000),
