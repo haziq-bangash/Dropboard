@@ -16,6 +16,7 @@ import {
   PieChart,
   Repeat,
   Layers,
+  MessageSquareText,
   ShieldAlert,
   TrendingDown,
   TrendingUp,
@@ -50,6 +51,7 @@ export const KIND: Record<FindingKind, { label: string; icon: LucideIcon }> = {
   contextual: { label: "Out of pattern", icon: Activity },
   quality: { label: "Data quality", icon: ShieldAlert },
   pareto: { label: "Concentration", icon: Layers },
+  text: { label: "Free text", icon: MessageSquareText },
   retention: { label: "Who comes back", icon: Repeat },
   cohorttrend: { label: "Staying power", icon: Repeat },
 };
@@ -88,6 +90,8 @@ function evidenceLines(f: Finding): string[] {
     lines.push(`Ranked #${e.from} at the start and #${e.to} at the end, out of ${e.groups}`);
   if (f.kind === "pareto")
     lines.push(`The top 20% hold ${(Number(e.share20) * 100).toFixed(0)}% of the total, the top 10% hold ${(Number(e.share10) * 100).toFixed(0)}%, across ${e.groups} values; an even spread would give the top 20% a fifth`);
+  if (f.kind === "text")
+    lines.push(`Counted from ${e.filled} values, in your browser: lengths, and the words that are in many rows. The words are never sent anywhere`);
   if (f.kind === "retention")
     lines.push(`${e.returned} of ${e.people} people with at least three months since their first were active in a later month; a count of people, not a test`);
   if (f.kind === "cohorttrend")

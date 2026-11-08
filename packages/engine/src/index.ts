@@ -19,3 +19,5 @@ export * from "./anomaly/ecod";
 export * from "./anomaly/series";
 export * from "./quality";
 export * from "./periods";
+export * from "./cohort";
+export * from "./text";

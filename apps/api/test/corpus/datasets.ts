@@ -103,6 +103,28 @@ function cohorts(id: string, title: string, seed: number, nextMonth: (cohort: nu
   };
 }
 
+/** Product reviews with a free-text comment, a quarter of which talk about delivery. */
+function reviews(): Dataset {
+  const r = seeded(61);
+  const topics = ["the battery lasts all day", "the screen is bright and sharp", "the strap feels cheap", "setup took five minutes", "customer support answered quickly", "the case scratches easily", "sound quality is excellent", "the app keeps crashing"];
+  const openers = ["I bought this last month and", "Honestly,", "After two weeks of use", "My family uses it daily and", "As a first time buyer I think"];
+  const closers = ["Would recommend.", "Not sure I would buy again.", "Good value overall.", "Mixed feelings about it.", "Five stars from me."];
+  const rows = range(900).map((i) => {
+    const delivery = r.uniform() < 0.25;
+    const body = delivery ? "delivery was late and the box arrived damaged" : pick(r, topics);
+    return [i + 1, pick(r, ["Watch", "Speaker", "Phone", "Tablet"]), r.int(1, 5), `${pick(r, openers)} ${body}. ${pick(r, closers)} Order ref ${r.int(1000, 9999)}`];
+  });
+  return {
+    id: "reviews-text",
+    title: "Reviews with comments",
+    csv: csv(["review_id", "product", "rating", "comment"], rows),
+    rows: rows.length,
+    roles: { review_id: "id", product: "category", rating: "rate", comment: "text" },
+    charts: ["bar"],
+    insights: [{ kind: "text", mentions: "delivery" }],
+  };
+}
+
 function hr(): Dataset {
   const r = seeded(3);
   const departments = ["Engineering", "Sales", "Support", "Marketing", "Finance", "Legal", "Operations", "People"];
@@ -435,4 +457,4 @@ function sparse(): Dataset {
   };
 }
 
-export const DATASETS: Dataset[] = [cohorts("cohorts-steady", "Orders where every cohort comes back alike", 51, () => 0.35), cohorts("cohorts-worse", "Orders where newer customers come back less", 52, (join) => (join < 6 ? 0.5 : 0.2)), retailWhales(), textPeriods("text-months-iso", "Revenue with 2021-03 months", (y, m) => `${y}-${String(m + 1).padStart(2, "0")}`), textPeriods("text-months-words", "Revenue with Mar 2021 months", (y, m) => `${MONTHS[m]} ${y}`), textPeriods("text-quarters", "Revenue with 2021-Q1 quarters", (y, m) => `${y}-Q${Math.floor(m / 3) + 1}`, 3), cyclicMonths(), finance(), retail(), retailWithErrors(), monthlySales(), dirtyOrders(), dirtyPanel(), hr(), saas(), web(), survey(), sensors(), marketing(), realEstate(), education(), healthcare(), sports(), tiny(), oneColumn(), allText(), sparse()];
+export const DATASETS: Dataset[] = [reviews(), cohorts("cohorts-steady", "Orders where every cohort comes back alike", 51, () => 0.35), cohorts("cohorts-worse", "Orders where newer customers come back less", 52, (join) => (join < 6 ? 0.5 : 0.2)), retailWhales(), textPeriods("text-months-iso", "Revenue with 2021-03 months", (y, m) => `${y}-${String(m + 1).padStart(2, "0")}`), textPeriods("text-months-words", "Revenue with Mar 2021 months", (y, m) => `${MONTHS[m]} ${y}`), textPeriods("text-quarters", "Revenue with 2021-Q1 quarters", (y, m) => `${y}-Q${Math.floor(m / 3) + 1}`, 3), cyclicMonths(), finance(), retail(), retailWithErrors(), monthlySales(), dirtyOrders(), dirtyPanel(), hr(), saas(), web(), survey(), sensors(), marketing(), realEstate(), education(), healthcare(), sports(), tiny(), oneColumn(), allText(), sparse()];

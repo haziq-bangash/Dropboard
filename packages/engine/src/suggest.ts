@@ -1,6 +1,7 @@
 import type { ChartSpec, DashboardSpec } from "@dropboard/spec";
 import { q, type ColumnProfile, type TableProfile } from "./profile";
 import { periodOrderSql } from "./periods";
+import { freeTextColumns, wordsChartQuery } from "./text";
 import { aggregateFor, looksLikeId, measureKind, timeColumn, timeExpression, valueKind } from "./understand";
 
 const MAX_CHARTS = 10;
@@ -446,6 +447,12 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
       x: "x",
       y: ["y"],
     });
+  }
+
+  // Free text: the words people use most
+  const freeText = freeTextColumns(profile)[0];
+  if (freeText) {
+    add({ type: "bar", title: `Most common words in ${freeText.name}`, query: wordsChartQuery(freeText.name, rows), x: "x", y: ["y"] });
   }
 
   // How the main measure is spread out, when it takes enough different values to have a shape

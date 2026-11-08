@@ -1,5 +1,6 @@
 import { seriesAnomalies } from "./anomaly/series";
 import { cohortFindings, type CohortInput } from "./cohort";
+import { textFindings, type TextInput } from "./text";
 import { clamp01, fmt, observedChange, pct, pctFine } from "./format";
 import { qualityFindings, type QualityInput } from "./quality";
 import { groupFindings, panelChecks, panelTrendCandidates, strongestTrends } from "./panelInsights";
@@ -16,7 +17,7 @@ import { benjaminiHochberg, changePoint, dominance, mannKendall, mean, median, o
  *   3. Findings come back ranked, with a plain sentence and the numbers behind it.
  */
 
-export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "concentration" | "missing" | "seasonal" | "latest" | "duplicates" | "leader" | "standout" | "entitytrend" | "jump" | "rankshift" | "unusualrows" | "contextual" | "quality" | "pareto" | "retention" | "cohorttrend";
+export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "concentration" | "missing" | "seasonal" | "latest" | "duplicates" | "leader" | "standout" | "entitytrend" | "jump" | "rankshift" | "unusualrows" | "contextual" | "quality" | "pareto" | "retention" | "cohorttrend" | "text";
 
 /** The rows or points behind a finding, for a person to look at. They stay in the browser: nothing here is ever sent to a model. */
 export interface FindingDetails {
@@ -98,6 +99,8 @@ export interface InsightInput {
   pareto?: { column: string; measure: string; groups: number; top10: number; top20: number; biggest: number }[];
   /** Who comes back: cohorts of people by the month they first appear, and how many of each are active again later. */
   cohorts?: CohortInput;
+  /** Free-text columns: how long the answers are and which words come up in many rows. The words stay in the browser. */
+  text?: TextInput[];
   /** Checks on the values themselves: spellings, placeholders, numbers as text, impossible dates, empty periods, repeated keys. */
   quality?: QualityInput;
   /** How many rows are exact copies of an earlier row. */
@@ -235,6 +238,12 @@ function describe(f: RawFinding): Pick<Finding, "headline" | "figure" | "next"> 
         next: "Find out what changed for the newer group: how they were found, what they first bought, or what the service was like in their first month.",
       };
     }
+    case "text":
+      return {
+        headline: `${a} is free text`,
+        figure: { value: `${fmt(Number(e.median))} characters`, label: "in a typical answer" },
+        next: e.label ? "Read a sample of the rows that mention the most common words, and group them by hand into the few themes people raise." : "Read a sample of the rows: with no word in common across many of them, the themes may be spread thin.",
+      };
     case "unusualrows":
       return {
         headline: `${fmt(Number(e.flagged))} rows stand out`,
@@ -556,6 +565,7 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
   }
 
   found.push(...cohort.facts);
+  found.push(...textFindings(input.text));
   found.push(...qualityFindings(input.quality, input.rowCount));
   found.push(...groupFindings(input));
 
