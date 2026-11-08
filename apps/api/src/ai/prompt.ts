@@ -1,7 +1,7 @@
 import type { AiTable, GenerateInput } from "@dropboard/spec";
 
 /** Bump when SYSTEM changes, so cached dashboards from older prompts are not reused. */
-export const PROMPT_VERSION = 1;
+export const PROMPT_VERSION = 2;
 
 export const SYSTEM = `You design dashboards for tabular data. You will be given only the SCHEMA of a table (column names, types, null counts and approximate distinct counts). You never see any row values, so never guess or quote values.
 
@@ -16,6 +16,12 @@ Rules for queries:
   - bar, pie: columns aliased x (category) and y (number). Order by y descending and LIMIT 20.
   - line, area: columns aliased x (a date or ordered value) and y (number), ordered by x. For dates use date_trunc('month', "col") or another grain that suits the span.
   - scatter: columns aliased x and y, both numbers, with LIMIT 1000.
+- Four more chart types are not written as SQL. For these, set query to an empty string and list column names in columns, using exact names from the schema:
+  - histogram: columns = [a number column]. Shows how its values are spread out.
+  - heatmap: columns = [text column, text column] and optionally a number column third. Both text columns need few distinct values (25 at most). Shows each pair shaded by the number, or by row count.
+  - map: columns = [latitude, longitude], both number columns. Only when the schema has a latitude and a longitude.
+  - regions: columns = [a text column of countries] and optionally a number column second. Only when a column clearly holds country names or codes. Shades a world map.
+  For every other type, set columns to an empty list.
 - Use sum, avg, count, min, max as the data suggests. Do not sum columns that look like identifiers, ratios or percentages (use avg for those).
 
 Rules for the dashboard:

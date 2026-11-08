@@ -2,11 +2,22 @@ import { z } from "zod";
 
 // What the model returns. The server fills in ids, layout, x/y and the table schema,
 // so the model only has to get titles and SQL right.
+// histogram, heatmap, map and regions are not written as SQL by the model: it names the columns, and the server builds
+// the query with the same tested builders the automatic dashboard uses.
+export const SPECIAL_CHARTS = ["histogram", "heatmap", "map", "regions"] as const;
+
 export const AiChart = z.object({
-  type: z.enum(["kpi", "bar", "line", "area", "pie", "scatter"]),
+  type: z.enum(["kpi", "bar", "line", "area", "pie", "scatter", ...SPECIAL_CHARTS]),
   title: z.string(),
+  /** SQL for kpi, bar, line, area, pie and scatter. An empty string for the four chart types that use columns. */
   query: z.string(),
+  /** Column names for histogram, heatmap, map and regions. An empty list (or null) for the other types. */
+  columns: z.array(z.string()).nullable(),
 });
+
+/** What the server accepts: the same as the model's answer, but a chart may leave out `columns` (older callers and tests). */
+export type AiChartInput = Omit<z.infer<typeof AiChart>, "columns"> & { columns?: string[] | null };
+export type AiDashboardInput = { title: string; charts: AiChartInput[] };
 
 export const AiDashboardOutput = z.object({
   title: z.string(),
