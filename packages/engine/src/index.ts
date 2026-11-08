@@ -15,3 +15,5 @@ export * from "./downsample";
 export * from "./cities";
 export * from "./understand";
 export * from "./profileSql";
+export * from "./anomaly/ecod";
+export * from "./anomaly/series";
