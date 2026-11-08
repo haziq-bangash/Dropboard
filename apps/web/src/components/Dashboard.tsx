@@ -32,6 +32,8 @@ const COLORS = [
   "#3E8E94",
   "#F4D47C",
 ];
+// Lines that must be told apart (one per company): the brand colours first, then four more that stay distinct from them
+const SERIES_COLORS = [...COLORS, "#A64B8F", "#6A9F3C", "#4A6FA5", "#9C6B4E"];
 const MUTED = "#6F7F86";
 // text on a coloured tile: dark on the light sand colour, white on the others
 const inkOn = (i: number) => (COLORS[i % COLORS.length] === "#F4D47C" ? "#233038" : "#FFFFFF");
@@ -107,7 +109,35 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo, cityIndex?: CityIndex)
         ],
       };
     case "line":
-    case "area":
+    case "area": {
+      if (spec.group) {
+        // one line for each value of the group column, in the order of their last value so the legend reads like the picture
+        const g = spec.group;
+        const lines = new Map<string, unknown[][]>();
+        for (const r of rows) {
+          const key = fmt(r[g]);
+          if (!lines.has(key)) lines.set(key, []);
+          lines.get(key)!.push([r[x], r[y]]);
+        }
+        const names = [...lines.keys()].sort((a, b) => Number(lines.get(b)!.at(-1)?.[1] ?? 0) - Number(lines.get(a)!.at(-1)?.[1] ?? 0));
+        return {
+          ...base,
+          color: SERIES_COLORS,
+          legend: { type: "scroll", bottom: 0, textStyle: { color: MUTED }, icon: "roundRect", itemWidth: 14, itemHeight: 4 },
+          grid: { left: 48, right: 16, top: 16, bottom: 48 },
+          xAxis: { ...axis, type: "time", axisLabel: { ...axis.axisLabel, hideOverlap: true } },
+          yAxis: { ...axis, type: "value" },
+          series: names.map((name) => ({
+            name,
+            type: "line",
+            showSymbol: lines.get(name)!.length <= 40,
+            symbolSize: 5,
+            lineStyle: { width: 2 },
+            emphasis: { focus: "series" },
+            data: lines.get(name),
+          })),
+        };
+      }
       return {
         ...base,
         // on a narrow screen the month names would run together: let the chart drop the ones that do not fit
@@ -124,6 +154,7 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo, cityIndex?: CityIndex)
           },
         ],
       };
+    }
     case "scatter":
       return {
         ...base,
@@ -226,15 +257,18 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo, cityIndex?: CityIndex)
         for (const r of rows) t.set(fmt(r[key]), (t.get(fmt(r[key])) ?? 0) + (Number(r.value) || 0));
         return [...t].sort((a, b) => b[1] - a[1]).map(([k]) => k);
       };
-      const xs = total("x");
-      const ys = total("y");
+      // labels that are years or dates read left to right in time; the rest by size
+      const timeLike = (k: string[]) => k.length > 0 && k.every((v) => /^\d{4}(-\d\d){0,2}$/.test(v));
+      const ordered = (k: string[]) => (timeLike(k) ? [...k].sort() : k);
+      const xs = ordered(total("x"));
+      const ys = ordered(total("y"));
       const values = rows.map((r) => Number(r.value)).filter(Number.isFinite);
       return {
         color: COLORS,
         tooltip: { position: "top", formatter: (p: { value: [number, number, number] }) => `${xs[p.value[0]]} and ${ys[p.value[1]]}: ${fmt(p.value[2])}` },
         grid: { left: 88, right: 16, top: 16, bottom: xs.length > 6 ? 84 : 56 },
         xAxis: { ...axis, type: "category", data: xs, splitArea: { show: true }, axisLabel: { ...axis.axisLabel, interval: 0, rotate: xs.length > 6 ? 35 : 0 } },
-        yAxis: { ...axis, type: "category", data: ys, splitArea: { show: true } },
+        yAxis: { ...axis, type: "category", data: ys, splitArea: { show: true }, axisLabel: { ...axis.axisLabel, interval: 0 } },
         visualMap: { min: Math.min(0, ...values), max: Math.max(1, ...values), orient: "horizontal", left: "center", bottom: 0, itemWidth: 12, itemHeight: 120, calculable: false, textStyle: { color: MUTED }, inRange: { color: ["#E3ECED", "#3E8E94", "#075056"] } },
         series: [{ type: "heatmap", data: rows.filter((r) => Number.isFinite(Number(r.value))).map((r) => [xs.indexOf(fmt(r.x)), ys.indexOf(fmt(r.y)), Number(r.value)]), itemStyle: { borderColor: "#FFFFFF", borderWidth: 1 } }],
       };
@@ -476,7 +510,8 @@ export function Table({ rows, label = "Table, scrolls both ways" }: { rows: Rows
             <TableRow key={i}>
               {cols.map((c) => (
                 <TableCell key={c} className="whitespace-nowrap">
-                  {fmt(r[c])}
+                  {/* a year is a label, not an amount: no thousands separator */}
+                  {typeof r[c] === "number" && Number.isInteger(r[c]) && /(^|[^a-z])(year|yr|fy)([^a-z]|$)/i.test(c) ? String(r[c]) : fmt(r[c])}
                 </TableCell>
               ))}
             </TableRow>
@@ -532,7 +567,7 @@ function ChartCard({
             <Hash className="size-5" />
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm text-muted-foreground">{spec.title}</p>
+            <p className="line-clamp-2 text-sm leading-tight text-muted-foreground">{spec.title}</p>
             <div
               className="text-3xl font-semibold tracking-tight text-primary"
               data-testid="kpi-value"

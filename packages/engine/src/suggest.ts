@@ -137,6 +137,82 @@ export function regionsChart(column: string, measure?: ColumnProfile, map: "worl
   };
 }
 
+/** Most lines drawn on one chart: more than this cannot be told apart. */
+const PANEL_LINES = 8;
+
+interface PanelCtx {
+  entity: string;
+  time: { column: ColumnProfile; kind: "date" | "year" };
+}
+
+/** The time of each row at the grain a panel chart uses: the year itself, or the month of a date. */
+const panelAxis = (t: PanelCtx["time"]) => (t.kind === "year" ? timeExpression(t.column, "year") : `date_trunc('month', ${q(t.column.name)})`);
+
+/**
+ * The latest period that most entities reported. The very last period is often only partly in, which would make a total or a
+ * ranking there look like a collapse. This finds the last one with at least four fifths of the entities.
+ */
+const latestFullPeriod = (p: PanelCtx) =>
+  `per AS (SELECT ${panelAxis(p.time)} AS t, count(DISTINCT ${q(p.entity)}) AS n FROM data WHERE ${q(p.time.column.name)} IS NOT NULL GROUP BY 1), ` +
+  `last AS (SELECT max(t) AS t FROM per WHERE n >= 0.8 * (SELECT max(n) FROM per))`;
+
+/** One line for each of the biggest entities, over time, for one measure. */
+export function entityLinesChart(p: PanelCtx, measure: ColumnProfile): Omit<ChartSpec, "id" | "layout"> {
+  const e = q(p.entity);
+  const m = q(measure.name);
+  const agg = aggregate(measure);
+  return {
+    type: "line",
+    title: `${label(measure)} by ${p.entity} over time`,
+    query:
+      `WITH top AS (SELECT ${e} AS e FROM data WHERE ${e} IS NOT NULL GROUP BY 1 ORDER BY ${agg}(${m}) DESC LIMIT ${PANEL_LINES}) ` +
+      `SELECT ${panelAxis(p.time)} AS x, ${e} AS g, ${agg}(${m}) AS y FROM data WHERE ${q(p.time.column.name)} IS NOT NULL AND ${e} IN (SELECT e FROM top) GROUP BY 1, 2 ORDER BY 2, 1`,
+    x: "x",
+    y: ["y"],
+    group: "g",
+  };
+}
+
+/** The entities ranked by a measure in the latest period most of them reported. */
+export function latestRankingChart(p: PanelCtx, measure: ColumnProfile): Omit<ChartSpec, "id" | "layout"> {
+  const e = q(p.entity);
+  const m = q(measure.name);
+  return {
+    type: "bar",
+    title: `${label(measure)} by ${p.entity}, latest full ${p.time.kind === "year" ? "year" : "month"}`,
+    query:
+      `WITH ${latestFullPeriod(p)} SELECT ${e} AS x, ${aggregate(measure)}(${m}) AS y FROM data WHERE ${e} IS NOT NULL AND ${panelAxis(p.time)} = (SELECT t FROM last) GROUP BY 1 ORDER BY 2 DESC LIMIT ${MAX_CATEGORIES}`,
+    x: "x",
+    y: ["y"],
+  };
+}
+
+/** How many entities there are. */
+export function entityCountKpi(p: PanelCtx): Omit<ChartSpec, "id" | "layout"> {
+  return { type: "kpi", title: `${p.entity} count`, query: `SELECT count(DISTINCT ${q(p.entity)}) AS value FROM data` };
+}
+
+/** The measure's total (or average) over all entities in the latest full period. */
+export function latestPeriodKpi(p: PanelCtx, measure: ColumnProfile): Omit<ChartSpec, "id" | "layout"> {
+  return {
+    type: "kpi",
+    title: `${aggregate(measure) === "avg" ? "Average " : "Total "}${measure.name}, latest full ${p.time.kind === "year" ? "year" : "month"}`,
+    query: `WITH ${latestFullPeriod(p)} SELECT ${aggregate(measure)}(${q(measure.name)}) AS value FROM data WHERE ${panelAxis(p.time)} = (SELECT t FROM last)`,
+  };
+}
+
+/** Entities down the side, years across the top, each cell shaded by a measure. Only for years, which are few and whole. */
+export function entityYearHeatmap(p: PanelCtx, measure: ColumnProfile): Omit<ChartSpec, "id" | "layout"> {
+  const e = q(p.entity);
+  return {
+    type: "heatmap",
+    title: `${label(measure)} by ${p.entity} and ${p.time.column.name}`,
+    query: `SELECT CAST(CAST(${q(p.time.column.name)} AS INTEGER) AS VARCHAR) AS x, ${e} AS y, ${aggregate(measure)}(${q(measure.name)}) AS value FROM data WHERE ${e} IS NOT NULL AND ${q(p.time.column.name)} IS NOT NULL GROUP BY 1, 2`,
+    x: "x",
+    y: ["y"],
+  };
+}
+
 const total = (measure?: ColumnProfile) => (measure ? `${aggregate(measure)}(${q(measure.name)})` : "count(*)");
 
 /**
@@ -235,6 +311,52 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
     if (charts.length >= (c.type === "table" ? MAX_CHARTS + 1 : MAX_CHARTS)) return;
     charts.push({ ...c, id: `c${charts.length + 1}`, layout: { x: 0, y: 0, w: 1, h: 1 } });
   };
+
+  // One row per entity per period (a company by year): each entity's own story, and who leads, in place of the totals of a plain table
+  const panel: PanelCtx | null = profile.panel && time && time.column.name === profile.panel.time ? { entity: profile.panel.entity, time } : null;
+  if (panel && measures.length) {
+    const kind = (k: "flow" | "level" | "rate") => measures.filter((c) => valueKind(c) === k);
+    const [flows, levels, rates] = [kind("flow"), kind("level"), kind("rate")];
+    const main = flows[0] ?? levels[0] ?? rates[0];
+    const second = flows[1] ?? levels[0] ?? rates[0];
+    const ratio = rates[0] ?? levels[0];
+    const entity = columns.find((c) => c.name === panel.entity)!;
+
+    add(entityCountKpi(panel));
+    add(latestPeriodKpi(panel, main));
+    if (second && second !== main) add(latestPeriodKpi(panel, second));
+    add(entityLinesChart(panel, main));
+    add(latestRankingChart(panel, main));
+    if (ratio && ratio !== main) {
+      add(entityLinesChart(panel, ratio));
+      add({
+        type: "bar",
+        title: `${label(ratio)} by ${panel.entity}`,
+        query: `SELECT ${q(panel.entity)} AS x, ${aggregate(ratio)}(${q(ratio.name)}) AS y FROM data WHERE ${q(panel.entity)} IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT ${MAX_CATEGORIES}`,
+        x: "x",
+        y: ["y"],
+      });
+    }
+    if (panel.time.kind === "year" && panel.time.column.distinct <= 20 && entity.distinct <= 20) add(entityYearHeatmap(panel, main));
+    const group = categories.find((c) => c.name !== panel.entity);
+    if (group) {
+      add({
+        type: "bar",
+        title: `${label(main)} by ${group.name}`,
+        query: `SELECT ${q(group.name)} AS x, ${aggregate(main)}(${q(main.name)}) AS y FROM data GROUP BY 1 ORDER BY 2 DESC LIMIT ${MAX_CATEGORIES}`,
+        x: "x",
+        y: ["y"],
+      });
+    }
+    if (second && second !== main) {
+      const a = q(main.name);
+      const b = q(second.name);
+      add({ type: "scatter", title: `${main.name} vs ${second.name}`, query: `SELECT ${a} AS x, ${b} AS y FROM data WHERE ${a} IS NOT NULL AND ${b} IS NOT NULL LIMIT 2000`, x: "x", y: ["y"] });
+    }
+    if (main.distinct > HISTOGRAM_BINS) add(histogramChart(main.name));
+    add({ type: "table", title: "Data preview", query: "SELECT * FROM data LIMIT 100" });
+    return { version: 1, title, schema: columns.map((c) => ({ name: c.name, type: c.type })), charts };
+  }
 
   // KPIs: row count + totals of the first measures
   add({ type: "kpi", title: profile.sample ? "Rows in the sample" : "Rows", query: "SELECT count(*) AS value FROM data" });

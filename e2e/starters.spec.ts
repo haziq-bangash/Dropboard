@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import path from "node:path";
+import { companiesByYear } from "./helpers";
 import { signUp } from "./helpers";
 
 test("a new account sees the getting-started card, and dismissing it sticks", async ({ page }) => {
@@ -363,4 +364,17 @@ test("a column of cities opens with a bubble map, and the city list is fetched o
   await expect(map).toHaveAttribute("aria-label", /10 cities drawn, biggest first: .+\. 1 other value is not a known city and is not shown\./);
   await expect(map.locator("canvas").first()).toBeVisible();
   expect(requested.some((u) => u.includes("/geo/cities.json"))).toBe(true);
+});
+
+test("a table of companies by year shows each company's own line, a ranking, and the latest full period", async ({ page }) => {
+  await page.goto("/");
+  await page.setInputFiles('input[type="file"]', { name: "financials.csv", mimeType: "text/csv", buffer: Buffer.from(companiesByYear()) });
+  const lines = page.getByRole("img", { name: /^Line chart: Revenue by Company over time\. 8 lines over 10 periods from 2014-01-01 to 2023-01-01\. Highest at the end: .+\. Biggest rise: .+/ });
+  await expect(lines).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("img", { name: /^Bar chart: Revenue by Company, latest full year\./ })).toBeVisible();
+  await expect(page.getByRole("img", { name: /^Line chart: Average ROE by Company over time\./ })).toBeVisible();
+  // the years are never added up as if they were an amount
+  await expect(page.getByTestId("kpi").filter({ hasText: "Total Year" })).toHaveCount(0);
+  await expect(page.getByTestId("kpi").filter({ hasText: "Company count" })).toContainText("10");
+  await expect(lines.locator("canvas").first()).toBeVisible();
 });

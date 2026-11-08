@@ -65,7 +65,7 @@ describe.each(DATASETS)("corpus: $title ($rows rows)", (dataset) => {
       expect(guarded, `${chart.title} passes the query guard`).toBe(true);
       expect(rows.length, `${chart.title} returns rows`).toBeGreaterThan(0);
       // never a total of something that is not an amount
-      const total = /^Total (.+)$/.exec(chart.title);
+      const total = /^Total ([^,]+)/.exec(chart.title);
       if (total) expect(roles.get(total[1])?.role, `"${chart.title}" adds up something that is not an amount`).toBe("flow");
       // never a chart of a year, an identifier or a flag as if it were a measure
       for (const [name, u] of roles) {
@@ -75,6 +75,13 @@ describe.each(DATASETS)("corpus: $title ($rows rows)", (dataset) => {
       }
     }
     for (const type of dataset.charts ?? []) expect(spec.charts.map((c) => c.type), `a ${type} chart`).toContain(type);
+    if (dataset.panel) {
+      // a table of entities over periods shows each entity's own line, and ranks them in the latest full period
+      const lines = charts.filter((c) => c.chart.group);
+      expect(lines.length, "a line for each entity").toBeGreaterThan(0);
+      for (const l of lines) expect(new Set(l.rows.map((r) => r.g)).size, `${l.chart.title} has several lines`).toBeGreaterThan(1);
+      expect(spec.charts.some((c) => c.type === "bar" && /latest full (year|month)$/.test(c.title)), "a ranking of the entities").toBe(true);
+    }
     if (dataset.rows >= 50 && roles.size >= 3) expect(spec.charts.length).toBeGreaterThanOrEqual(4);
   });
 

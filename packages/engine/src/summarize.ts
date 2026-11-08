@@ -1,7 +1,7 @@
 import type { InsightInput, SeriesInput } from "./insights";
 import { aggregate, isCategory, isMeasure, label } from "./suggest";
 import { q, type TableProfile } from "./profile";
-import { timeColumn, timeExpression } from "./understand";
+import { timeColumn, timeExpression, valueKind } from "./understand";
 
 /** Run one query against the table `data` and return its rows. The browser and the tests each supply their own. */
 export type RunSql = (sql: string) => Promise<Record<string, unknown>[]>;
@@ -13,6 +13,8 @@ const SAMPLE_ROWS = 5000;
 const MIN_POINTS = 8;
 const MIN_YEAR_POINTS = 6;
 const MAX_POINTS = 400;
+const MAX_ENTITIES = 40;
+const MAX_PANEL_MEASURES = 3;
 const MAX_DUPLICATE_ROWS = 2_000_000;
 
 type Unit = "day" | "week" | "month" | "year";
@@ -77,7 +79,10 @@ export async function gatherInsightInput(profile: TableProfile, run: RunSql): Pr
           const most = Math.max(...counts.map((r) => Number(r.n)));
           complete = new Set(counts.filter((r) => Number(r.n) >= most * 0.8).map((r) => Number(r.x)));
         }
+        const inPanel = !!profile.panel && profile.panel.time === time.column.name;
         for (const m of measures.slice(0, MAX_SERIES)) {
+          // a pooled average of a level or a rate across entities moves when entities join or leave: each entity's own series says it better
+          if (inPanel && valueKind(m) !== "flow") continue;
           const agg = aggregate(m);
           const rows = await run(
             `SELECT CAST(epoch_ms(CAST(date_trunc('${unit}', ${d}) AS TIMESTAMP)) AS DOUBLE) AS x, CAST(${agg}(${q(m.name)}) AS DOUBLE) AS y FROM data WHERE ${d} IS NOT NULL AND ${q(m.name)} IS NOT NULL GROUP BY 1 ORDER BY 1`,
@@ -95,6 +100,40 @@ export async function gatherInsightInput(profile: TableProfile, run: RunSql): Pr
           }
         }
         if (series.length) input.series = series;
+
+        // each entity's own values, period by period, for the measures people read first: an amount, then a level, then a rate
+        if (profile.panel && profile.panel.time === time.column.name) {
+          const kinds = ["flow", "level", "rate"] as const;
+          const picks = kinds.map((k) => measures.find((m) => valueKind(m) === k)).filter((m): m is NonNullable<typeof m> => !!m).slice(0, MAX_PANEL_MEASURES);
+          const entity = q(profile.panel.entity);
+          const panels: NonNullable<InsightInput["panel"]> = [];
+          for (const m of picks) {
+            const rows = await run(
+              `WITH top AS (SELECT ${entity} AS e FROM data WHERE ${entity} IS NOT NULL GROUP BY 1 ORDER BY count(*) DESC LIMIT ${MAX_ENTITIES}) ` +
+                `SELECT CAST(epoch_ms(CAST(date_trunc('${unit}', ${d}) AS TIMESTAMP)) AS DOUBLE) AS x, CAST(${entity} AS VARCHAR) AS e, CAST(${aggregate(m)}(${q(m.name)}) AS DOUBLE) AS y ` +
+                `FROM data WHERE ${present} IS NOT NULL AND ${entity} IN (SELECT e FROM top) AND ${q(m.name)} IS NOT NULL GROUP BY 1, 2`,
+            );
+            const periods = [...new Set(rows.map((r) => Number(r.x)).filter((x) => Number.isFinite(x) && (!complete || complete.has(x))))].sort((a, b) => a - b);
+            if (periods.length < MIN_YEAR_POINTS) continue;
+            const at = new Map(periods.map((x, i) => [x, i]));
+            const byEntity = new Map<string, (number | null)[]>();
+            for (const r of rows) {
+              const i = at.get(Number(r.x));
+              const y = Number(r.y);
+              if (i === undefined || !Number.isFinite(y)) continue;
+              if (!byEntity.has(String(r.e))) byEntity.set(String(r.e), new Array(periods.length).fill(null));
+              byEntity.get(String(r.e))![i] = y;
+            }
+            panels.push({
+              entity: profile.panel.entity,
+              measure: m.name,
+              kind: valueKind(m),
+              periods: periods.map((x) => ({ x, label: labelFor(x, unit) })),
+              entities: [...byEntity].map(([name, y]) => ({ label: name, y })),
+            });
+          }
+          if (panels.length) input.panel = panels;
+        }
       }
     }
   }

@@ -1,3 +1,5 @@
+import { clamp01, fmt, observedChange, pct } from "./format";
+import { panelChecks, panelTrendCandidates, strongestTrends } from "./panelInsights";
 import { latestChange, seasonality } from "./stats/season";
 import { benjaminiHochberg, changePoint, dominance, mannKendall, mean, median, outliers, pearson, type Trend } from "./stats/tests";
 
@@ -11,7 +13,7 @@ import { benjaminiHochberg, changePoint, dominance, mannKendall, mean, median, o
  *   3. Findings come back ranked, with a plain sentence and the numbers behind it.
  */
 
-export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "concentration" | "missing" | "seasonal" | "latest" | "duplicates";
+export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "concentration" | "missing" | "seasonal" | "latest" | "duplicates" | "leader" | "standout" | "entitytrend" | "jump" | "rankshift";
 
 export interface Finding {
   kind: FindingKind;
@@ -59,6 +61,14 @@ export interface InsightInput {
   contributions?: { column: string; measure: string; parts: { label: string; value: number }[] }[];
   /** Columns and how many rows are empty. */
   missing?: { column: string; nullCount: number }[];
+  /** One row per entity per period: each entity's own values for a measure, period by period (null where it has none). */
+  panel?: {
+    entity: string;
+    measure: string;
+    kind: "flow" | "level" | "rate";
+    periods: { x: number; label: string }[];
+    entities: { label: string; y: (number | null)[] }[];
+  }[];
   /** How many rows are exact copies of an earlier row. */
   duplicates?: { rows: number };
 }
@@ -92,18 +102,8 @@ export const FLOORS = {
   changeRelative: 0.1, // and the level moves at least 10%
 } as const;
 
-const fmt = (n: number) => {
-  const a = Math.abs(n);
-  if (a >= 1e9) return `${(n / 1e9).toPrecision(3)}bn`;
-  if (a >= 1e6) return `${(n / 1e6).toPrecision(3)}m`;
-  if (a >= 1e4) return `${Math.round(n / 100) / 10}k`;
-  if (a >= 100) return String(Math.round(n));
-  return String(Number(n.toPrecision(3)));
-};
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const pct = (x: number) => `${Math.round(Math.abs(x) * 100)}%`;
-const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 /** Fold how unlikely the result is by chance into the ranking, without letting it overrule how big the effect is. */
 const confidence = (p: number | null) => (p === null ? 0.7 : clamp01(0.5 + -Math.log10(Math.max(p, 1e-300)) / 20));
 
@@ -158,6 +158,40 @@ function describe(f: RawFinding): Pick<Finding, "headline" | "figure" | "next"> 
         next: "Check whether these are mistakes (a typo, an extra zero) or real events worth a closer look.",
       };
     }
+    case "entitytrend": {
+      const change = Number(e.relativeChange);
+      return {
+        headline: `${e.label}'s ${b} ${change > 0 ? "rose" : "fell"} ${pct(change)}`,
+        figure: { value: `${change >= 0 ? "+" : "-"}${pct(change)}`, label: `through ${e.at}` },
+        next: `Look at what sets this ${a} apart from the others: its products, prices, costs or market, and whether the rest of the group moved too.`,
+      };
+    }
+    case "leader":
+      return {
+        headline: `${e.label} leads on ${b}`,
+        figure: { value: pct(Number(e.share)), label: `of the total in ${e.at}` },
+        next: `Ask whether relying on one ${a} is a risk, and what the others would need to close the gap.`,
+      };
+    case "standout":
+      return {
+        headline: `${e.label} stands out on ${b}`,
+        figure: { value: fmt(Number(e.value)), label: `against a typical ${fmt(Number(e.typical))}` },
+        next: "Check whether this is a real difference or a different way of measuring or reporting, before building on it.",
+      };
+    case "jump": {
+      const change = Number(e.change);
+      return {
+        headline: `${e.label}'s ${b} ${change > 0 ? "jumped" : "fell"} ${pct(change)} in ${e.at}`,
+        figure: { value: `${change >= 0 ? "+" : "-"}${pct(change)}`, label: `in ${e.at}` },
+        next: "Check for an acquisition, a change in how the figure is reported, or a data error before reading it as growth or decline.",
+      };
+    }
+    case "rankshift":
+      return {
+        headline: `${e.label} moved from #${e.from} to #${e.to} on ${b}`,
+        figure: { value: `${e.places} places`, label: `out of ${e.groups}` },
+        next: "Look at who it overtook, or who overtook it, and what changed in between.",
+      };
     case "seasonal": {
       const yearly = Number(e.period) === 12;
       return {
@@ -209,13 +243,16 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
     const m = mannKendall(s.x, s.y);
     if (!m) continue;
     const big = Math.abs(m.relativeChange) >= FLOORS.trendChange && Math.abs(m.noiseUnits) >= FLOORS.trendNoise;
+    // shown: what the series did from its start to its end; the fitted line only decides whether it is real
+    const seen = observedChange(s.y);
+    const shown = seen !== null && Math.sign(seen) === Math.sign(m.slope) ? seen : m.relativeChange;
     const c: Candidate = {
       kind: "trend",
       columns: [s.column],
-      sentence: `${s.column} ${m.slope > 0 ? "rose" : "fell"} about ${pct(m.relativeChange)} from start to end.`,
+      sentence: `${s.column} ${m.slope > 0 ? "rose" : "fell"} about ${pct(shown)} from start to end.`,
       p: m.p,
       strength: clamp01(Math.abs(m.relativeChange)) * confidence(m.p),
-      evidence: { slopePerStep: Number(fmt(m.slope)), relativeChange: Number(m.relativeChange.toFixed(3)), noiseUnits: Number(m.noiseUnits.toFixed(1)), points: s.y.length },
+      evidence: { slopePerStep: Number(fmt(m.slope)), relativeChange: Number(shown.toFixed(3)), noiseUnits: Number(m.noiseUnits.toFixed(1)), points: s.y.length },
       tested: true,
       passesFloor: big,
     };
@@ -292,6 +329,9 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
       passesFloor: d.share >= FLOORS.dominanceShare && d.times >= FLOORS.dominanceTimes,
     });
   }
+
+  // each entity's own series is one more test in the same correction
+  for (const c of panelTrendCandidates(input.panel ?? [])) candidates.push({ ...c.finding, tested: true, passesFloor: c.passesFloor });
 
   const kept = benjaminiHochberg(
     candidates.map((c) => c.p ?? 1),
@@ -392,6 +432,11 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
       evidence: { duplicateRows: copies, share: Number(copyShare.toFixed(3)) },
     });
   }
+
+  // an entity whose own series has a trend that held up: only those can have changed rank for a real reason
+  const trending = new Set(found.filter((x) => x.kind === "entitytrend").map((x) => `${x.columns[1]}|${x.evidence.label}`));
+  found.push(...panelChecks(input.panel ?? [], trending));
+  found = strongestTrends(found);
 
   // a yearly or weekly pattern already explains why the latest period is high or low, so the pattern is said instead
   const seasonal = new Set(found.filter((x) => x.kind === "seasonal").map((x) => x.columns[0]));
