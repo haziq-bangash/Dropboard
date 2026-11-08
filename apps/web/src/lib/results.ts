@@ -1,4 +1,4 @@
-import { guardSql } from "@dropboard/engine";
+import { applyPrivacyFloor, guardSql } from "@dropboard/engine";
 import type { ChartSpec, DashboardSpec, ShareResults } from "@dropboard/spec";
 import { SHARE_MAX_ROWS_PER_CHART } from "@dropboard/spec";
 import { runQuery } from "./duckdb";
@@ -34,7 +34,7 @@ function toCell(v: unknown): Cell {
 export async function collectResults(spec: DashboardSpec): Promise<ShareResults> {
   const entries = await Promise.all(
     spec.charts.map(async (chart) => {
-      const rows = (await liveSource(chart)).slice(0, SHARE_MAX_ROWS_PER_CHART);
+      const rows = applyPrivacyFloor(chart, await liveSource(chart)).slice(0, SHARE_MAX_ROWS_PER_CHART);
       return [chart.id, rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, toCell(v)])))] as const;
     }),
   );

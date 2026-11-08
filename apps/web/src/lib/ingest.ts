@@ -1,4 +1,4 @@
-import { mapDuckDbType, q, type TableProfile } from "@dropboard/engine";
+import { detectCoordinates, mapDuckDbType, q, type Range, type TableProfile } from "@dropboard/engine";
 import { DuckDBDataProtocol } from "@duckdb/duckdb-wasm";
 import { getDb, runQuery } from "./duckdb";
 
@@ -67,13 +67,24 @@ export async function profileTable(): Promise<TableProfile> {
     .join(", ");
   const [row] = await runQuery(`SELECT ${stats} FROM data`);
 
-  return {
-    rowCount: n,
-    columns: cols.map((c, i) => ({
-      name: String(c.column_name),
-      type: mapDuckDbType(String(c.column_type)),
-      nullCount: Number(row[`nulls_${i}`]),
-      distinct: Number(row[`dist_${i}`]),
-    })),
-  };
+  const columns = cols.map((c, i) => ({
+    name: String(c.column_name),
+    type: mapDuckDbType(String(c.column_type)),
+    nullCount: Number(row[`nulls_${i}`]),
+    distinct: Number(row[`dist_${i}`]),
+  }));
+
+  // only number columns with a latitude or longitude style name need their range read
+  const named = columns.filter((c) => c.type === "number" && /^(lat|latitude|lon|lng|long|longitude)$/i.test(c.name.trim().replace(/[ -]+/g, "_")));
+  let coordinates: TableProfile["coordinates"];
+  if (named.length >= 2) {
+    const spans = named.map((c, i) => `min(${q(c.name)}) AS lo_${i}, max(${q(c.name)}) AS hi_${i}`).join(", ");
+    const [r] = await runQuery(`SELECT ${spans} FROM data`);
+    const ranges: Record<string, Range> = {};
+    named.forEach((c, i) => (ranges[c.name] = { min: Number(r[`lo_${i}`]), max: Number(r[`hi_${i}`]) }));
+    const found = detectCoordinates(ranges);
+    if (found) coordinates = { lat: found.lat, lon: found.lon };
+  }
+
+  return { rowCount: n, columns, ...(coordinates ? { coordinates } : {}) };
 }
