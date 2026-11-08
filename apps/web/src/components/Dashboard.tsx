@@ -1,6 +1,6 @@
 "use client";
 
-import { chartSummary, countryCode } from "@dropboard/engine";
+import { chartSummary, countryCode, usStateCode } from "@dropboard/engine";
 import type { ChartSpec, DashboardSpec } from "@dropboard/spec";
 import * as echarts from "echarts";
 import { useQuery } from "@tanstack/react-query";
@@ -40,13 +40,14 @@ const fmt = (v: unknown) =>
 
 type Geo = { features: { properties: { name: string; label: string }; geometry: { coordinates: unknown } }[] };
 
-/** Country shapes from Natural Earth (public domain), fetched once, only when a region map is on the page. */
-async function loadWorld(): Promise<Geo> {
-  const res = await fetch("/geo/world.json");
+/** Country and US state shapes from Natural Earth (public domain), fetched once each, only when a region map is on the page. */
+async function loadGeo(map: "world" | "us"): Promise<Geo> {
+  const res = await fetch(map === "us" ? "/geo/us-states.json" : "/geo/world.json");
   if (!res.ok) throw new Error("Could not load the map shapes.");
-  const world = await res.json();
-  echarts.registerMap("world", world);
-  return world;
+  const shapes = await res.json();
+  // Alaska and Hawaii sit far from the other states: draw them in boxes below the map so it is not mostly empty sea
+  echarts.registerMap(map, shapes, map === "us" ? { AK: { left: -131, top: 25, width: 15 }, HI: { left: -110, top: 28, width: 5 } } : undefined);
+  return shapes;
 }
 
 /** The box around some countries, so a map of one region fills the chart. Skipped when it would wrap the whole globe. */
@@ -235,10 +236,11 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo): echarts.EChartsCoreOp
       };
     }
     case "regions": {
-      // Rows name countries however the file spells them; turn each into a country code and add up repeats.
+      // Rows name places however the file spells them; turn each into a code and add up repeats.
+      const us = spec.map === "us";
       const totals = new Map<string, number>();
       for (const r of rows) {
-        const code = countryCode(r[x]);
+        const code = us ? usStateCode(r[x]) : countryCode(r[x]);
         const v = Number(r[y]);
         if (code && Number.isFinite(v)) totals.set(code, (totals.get(code) ?? 0) + v);
       }
@@ -262,9 +264,10 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo): echarts.EChartsCoreOp
         series: [
           {
             type: "map",
-            map: "world",
+            map: us ? "us" : "world",
             roam: false,
-            boundingCoords: geo ? boundsOf(geo, new Set(totals.keys())) : undefined,
+            // zoom to the countries present; the US map is already laid out to fit
+            boundingCoords: geo && !us ? boundsOf(geo, new Set(totals.keys())) : undefined,
             itemStyle: { areaColor: "#F1F3F4", borderColor: "#FFFFFF", borderWidth: 0.6 },
             emphasis: { label: { show: false }, itemStyle: { areaColor: "#FF5B04" } },
             data: [...totals].map(([name, value]) => ({ name, value })),
@@ -369,7 +372,8 @@ function ChartCard({
   });
   const cardRef = useRef<HTMLDivElement>(null);
   // a region map also needs the country shapes, loaded once and shared by every such chart
-  const world = useQuery({ queryKey: ["geo", "world"], queryFn: loadWorld, enabled: spec.type === "regions", staleTime: Infinity, retry: false, refetchOnWindowFocus: false });
+  const mapKind = spec.map === "us" ? "us" : "world";
+  const world = useQuery({ queryKey: ["geo", mapKind], queryFn: () => loadGeo(mapKind), enabled: spec.type === "regions", staleTime: Infinity, retry: false, refetchOnWindowFocus: false });
   const rows: Rows | null = query.data ?? null;
   const error = (query.error ?? world.error)
     ? query.error instanceof Error || world.error instanceof Error

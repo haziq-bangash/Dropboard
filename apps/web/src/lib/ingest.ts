@@ -88,14 +88,14 @@ export async function profileTable(): Promise<TableProfile> {
 
   // a text column with a modest number of distinct values might be countries: look at the distinct values only
   let countries: string | undefined;
+  let states: string | undefined;
   for (const c of columns.filter((c) => c.type === "string" && c.distinct >= 2 && c.distinct <= 300).slice(0, 12)) {
     const values = (await runQuery(`SELECT DISTINCT ${q(c.name)} AS v FROM data WHERE ${q(c.name)} IS NOT NULL LIMIT 300`)).map((v) => v.v);
     const found = detectPlaceColumn(c.name, values, c.distinct);
-    if (found?.kind === "country") {
-      countries = c.name;
-      break;
-    }
+    if (found?.kind === "country" && !countries) countries = c.name;
+    if (found?.kind === "us-state" && !states) states = c.name;
+    if (countries && states) break;
   }
 
-  return { rowCount: n, columns, ...(coordinates ? { coordinates } : {}), ...(countries ? { countries } : {}) };
+  return { rowCount: n, columns, ...(coordinates ? { coordinates } : {}), ...(countries ? { countries } : {}), ...(states ? { states } : {}) };
 }
