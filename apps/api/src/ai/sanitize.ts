@@ -1,4 +1,4 @@
-import { guardSql, boxplotChart, heatmapChart, histogramChart, mapChart, regionsChart, tidySql, type ColumnProfile } from "@dropboard/engine";
+import { guardSql, boxplotChart, calendarChart, heatmapChart, histogramChart, mapChart, regionsChart, tidySql, type ColumnProfile } from "@dropboard/engine";
 import { DashboardSpec, type AiTable } from "@dropboard/spec";
 import { AiBadOutput, SPECIAL_CHARTS, type AiChartInput, type AiDashboardInput } from "./schema";
 
@@ -51,6 +51,11 @@ function fromColumns(table: AiTable, c: AiChartInput): Built | string {
       if (!isType(names[1], "number")) return `${names[1]} is not a number column`;
       if ((find(names[0])?.distinct ?? 0) > HEATMAP_MAX_SIDE) return "a box plot needs a column with few distinct values";
       return boxplotChart(names[0], names[1]);
+    }
+    case "calendar": {
+      const e = need(1);
+      if (e) return e;
+      return find(names[0])?.type === "date" ? calendarChart(names[0]) : `${names[0]} is not a date column`;
     }
     case "map": {
       const e = need(2);

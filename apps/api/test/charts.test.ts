@@ -1,4 +1,4 @@
-import { applyPrivacyFloor, boxplotChart, chartSummary, guardSql, heatmapChart, histogramChart, STARTERS, suggestDashboard } from "@dropboard/engine";
+import { applyPrivacyFloor, boxplotChart, calendarChart, chartSummary, guardSql, heatmapChart, histogramChart, STARTERS, suggestDashboard } from "@dropboard/engine";
 import { describe, expect, it } from "vitest";
 import { createSql } from "../eval/duckdb";
 
@@ -50,7 +50,7 @@ describe("histogram and heatmap on real data", () => {
     const types = suggestDashboard("Orders", sql.profile()).charts.map((c) => c.type);
     expect(types).toContain("histogram");
     expect(types).toContain("heatmap");
-    expect(types.length).toBeLessThanOrEqual(10);
+    expect(types.length).toBeLessThanOrEqual(11);
   });
 });
 
@@ -98,5 +98,48 @@ describe("box plot on real data", () => {
     expect(suggestDashboard("Orders", sql.profile()).charts.map((c) => c.type)).toContain("boxplot");
     const rows = [{ x: "a", n: 4 }, { x: "b", n: 5 }, { x: "c", n: 90 }];
     expect(applyPrivacyFloor({ type: "boxplot" }, rows).map((r) => r.x)).toEqual(["b", "c"]);
+  });
+});
+
+describe("calendar on real data", () => {
+  it("counts the rows on each day, one cell per day, and every row is in a cell", async () => {
+    const sql = await createSql();
+    const starter = STARTERS.find((s) => s.id === "ecommerce-orders")!;
+    sql.load(starter.csv());
+    const spec = { ...calendarChart("order_date"), id: "k", layout: { x: 0, y: 0, w: 1, h: 1 } };
+    const days = rowsOf(sql, spec.query);
+    expect(days.length).toBeGreaterThan(300);
+    expect(days.length).toBeLessThanOrEqual(366);
+    expect(days.every((d) => /^\d{4}-\d\d-\d\d$/.test(String(d.x)))).toBe(true);
+    expect(days.reduce((s, d) => s + Number(d.y), 0)).toBe(starter.rows);
+    expect(chartSummary(spec, days)).toMatch(/^Calendar: Rows per day by order_date\. \d+ days with rows, from 2025-\d\d-\d\d to 2025-\d\d-\d\d, .+ rows in all\. Busiest day .+ with .+, quietest day .+ with .+\.$/);
+  });
+
+  it("shows only the latest twelve months when the data runs longer", async () => {
+    const sql = await createSql();
+    const lines = ["day,v"];
+    for (let i = 0; i < 1100; i++) lines.push(`${new Date(Date.UTC(2022, 0, 1) + i * 86_400_000).toISOString().slice(0, 10)},1`);
+    sql.load(lines.join("\n") + "\n");
+    const days = rowsOf(sql, calendarChart("day").query);
+    expect(days.length).toBe(366);
+    expect(String(days[days.length - 1].x)).toBe("2025-01-04");
+  });
+
+  it("is suggested for a date column that covers many days, and not for one that covers few", async () => {
+    const sql = await createSql();
+    sql.load(STARTERS.find((s) => s.id === "ecommerce-orders")!.csv());
+    expect(suggestDashboard("Orders", sql.profile()).charts.map((c) => c.type)).toContain("calendar");
+    sql.load("day,v,w\n2025-01-01,1,5\n2025-01-02,2,6\n2025-01-03,3,7\n");
+    expect(suggestDashboard("Few", sql.profile()).charts.map((c) => c.type)).not.toContain("calendar");
+  });
+});
+
+describe("the data preview is always kept", () => {
+  it("is the last chart even when a rich file fills the dashboard", async () => {
+    const sql = await createSql();
+    sql.load(STARTERS.find((s) => s.id === "ecommerce-orders")!.csv());
+    const types = suggestDashboard("Orders", sql.profile()).charts.map((c) => c.type);
+    expect(types.length).toBe(11);
+    expect(types.at(-1)).toBe("table");
   });
 });

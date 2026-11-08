@@ -187,3 +187,21 @@ describe("buildSpec with a box plot", () => {
     expect(dropped.map((d) => d.reason)).toEqual(["score is not a text column", "a box plot needs a column with few distinct values", "boxplot needs 2 column names"]);
   });
 });
+
+describe("buildSpec with a calendar", () => {
+  const t = {
+    rowCount: 100,
+    columns: [
+      { name: "when", type: "date" as const, nullCount: 0, distinct: 90 },
+      { name: "team", type: "string" as const, nullCount: 0, distinct: 6 },
+    ],
+  };
+  it("needs a date column", () => {
+    const { spec, dropped } = buildSpec(t, {
+      title: "x",
+      charts: [{ type: "calendar", title: "", query: "", columns: ["when"] }, { type: "calendar", title: "", query: "", columns: ["team"] }, { type: "kpi", title: "k", query: "SELECT 1 AS value", columns: [] }],
+    });
+    expect(spec.charts.map((c) => c.type)).toEqual(["calendar", "kpi"]);
+    expect(dropped.map((d) => d.reason)).toEqual(["team is not a date column"]);
+  });
+});

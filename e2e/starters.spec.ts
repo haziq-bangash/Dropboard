@@ -94,7 +94,7 @@ test("every chart has a text description for screen readers, built from its own 
   expect(count).toBeGreaterThanOrEqual(3);
   for (let i = 0; i < count; i++) {
     const label = (await charts.nth(i).getAttribute("aria-label"))!;
-    expect(label, label).toMatch(/^(Bar chart|Line chart|Area chart|Pie chart|Scatter plot|Map|Region map|Histogram|Heatmap|Box plot): .+\./);
+    expect(label, label).toMatch(/^(Bar chart|Line chart|Area chart|Pie chart|Scatter plot|Map|Region map|Histogram|Heatmap|Box plot|Calendar): .+\./);
     expect(label, label).not.toMatch(/undefined|NaN|null/);
   }
   // the bar chart of revenue by region reads out the regions, biggest first
@@ -174,4 +174,28 @@ test("a sample opens with a box plot of how its main measure varies by group, an
   await expect(box).toBeVisible();
   await expect(box).toHaveAttribute("aria-label", /4 groups\. Highest median: .+, middle half from .+ to .+\. Lowest median:/);
   await expect(box.locator("canvas").first()).toBeVisible();
+});
+
+test("a sample with many days opens with a calendar of its busy days", async ({ page }) => {
+  await signUp(page);
+  await page.goto("/app/new");
+  await page.getByTestId("starter").filter({ hasText: "Online store orders" }).click();
+  await expect(page).toHaveURL(/\/app\/p\//, { timeout: 30_000 });
+  await expect(page.getByTestId("kpi-value").first()).not.toHaveText("", { timeout: 30_000 });
+  const calendar = page.getByRole("img", { name: /^Calendar: Rows per day by order_date/ });
+  await expect(calendar).toBeVisible();
+  await expect(calendar).toHaveAttribute("aria-label", /\d+ days with rows, from 2025-\d\d-\d\d to 2025-\d\d-\d\d, .+ rows in all\. Busiest day/);
+  await expect(calendar.locator("canvas").first()).toBeVisible();
+});
+
+test("the data preview is kept on a rich file, and a keyboard can reach it", async ({ page }) => {
+  await signUp(page);
+  await page.goto("/app/new");
+  await page.getByTestId("starter").filter({ hasText: "Online store orders" }).click();
+  await expect(page).toHaveURL(/\/app\/p\//, { timeout: 30_000 });
+  await expect(page.getByTestId("kpi-value").first()).not.toHaveText("", { timeout: 30_000 });
+  const preview = page.getByRole("region", { name: "Data preview, table that scrolls" });
+  await expect(preview).toBeVisible();
+  await preview.focus();
+  await expect(preview).toBeFocused();
 });

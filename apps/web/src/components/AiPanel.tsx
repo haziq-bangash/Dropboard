@@ -144,7 +144,7 @@ export function AiPanel({
             {answer && (
               <div className="flex flex-col gap-3 rounded-lg border p-4" data-testid="ai-answer">
                 <p className="font-medium">{answer.explanation}</p>
-                {answer.rows.length ? <Table rows={answer.rows} /> : <p className="text-sm text-muted-foreground">The query returned no rows.</p>}
+                {answer.rows.length ? <Table rows={answer.rows} label="Answer, table that scrolls" /> : <p className="text-sm text-muted-foreground">The query returned no rows.</p>}
                 <details className="text-sm">
                   <summary className="cursor-pointer text-muted-foreground">Show SQL</summary>
                   <pre className="mt-2 overflow-auto rounded-md bg-muted p-3 text-xs">{answer.sql}</pre>
