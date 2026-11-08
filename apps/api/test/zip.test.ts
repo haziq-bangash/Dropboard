@@ -1,6 +1,9 @@
 import { understandColumns, chartSummary, detectZipColumn, guardSql, suggestDashboard, usRegionCode, zipRegionsChart, zipState, ZIP_PREFIXES, type ColumnProfile } from "@dropboard/engine";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createSql } from "../eval/duckdb";
+
+// DuckDB takes a few seconds to start when the whole suite is running
+vi.setConfig({ testTimeout: 60_000 });
 
 describe("ZIP codes", () => {
   it("know the state of well-known codes, and of the same code written in different ways", () => {

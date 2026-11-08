@@ -1,5 +1,5 @@
 import { guardSql, templateChart, type TemplateColumn } from "@dropboard/engine";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildSpec } from "../src/ai/sanitize";
 import { createSql } from "../eval/duckdb";
 
@@ -21,6 +21,9 @@ async function run(query: string) {
   const r = sql.run(query);
   return r.rows.map((row) => Object.fromEntries(r.columns.map((c, i) => [c, row[i]])));
 }
+
+// DuckDB takes a few seconds to start when the whole suite is running
+vi.setConfig({ testTimeout: 60_000 });
 
 describe("chart templates", () => {
   it("builds a headline number, summing a number column unless told otherwise", async () => {
