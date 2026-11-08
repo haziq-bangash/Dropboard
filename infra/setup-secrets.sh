@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-time (and re-runnable) Secret Manager setup for one environment.
 # Usage: PROJECT_ID=travelcompanion-341011 DATABASE_URL='postgres://user:pass@host/db?sslmode=require' ./infra/setup-secrets.sh
-# Optional: ANTHROPIC_API_KEY=... and/or GOOGLE_API_KEY=... also store provider keys. With AI_PROVIDER=google no key is
+# Optional: ANTHROPIC_API_KEY=..., OPENAI_API_KEY=..., XAI_API_KEY=... and/or GOOGLE_API_KEY=... also store provider keys. With AI_PROVIDER=google no key is
 # needed at all when the service runs as the account from infra/setup-runtime-sa.sh.
 # Re-running adds a new secret version; set ROTATE_AUTH_SECRET=1 to also rotate BETTER_AUTH_SECRET
 # (this signs every user out). By default an existing auth secret is kept.
@@ -44,6 +44,15 @@ names="database-url better-auth-secret proxy-secret"
 if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
   put_secret anthropic-api-key "$ANTHROPIC_API_KEY"
   names="$names anthropic-api-key"
+fi
+# Optional: OpenAI and xAI keys (set AI_PROVIDER=openai or xai as a GitHub variable to use them)
+if [ -n "${OPENAI_API_KEY:-}" ]; then
+  put_secret openai-api-key "$OPENAI_API_KEY"
+  names="$names openai-api-key"
+fi
+if [ -n "${XAI_API_KEY:-}" ]; then
+  put_secret xai-api-key "$XAI_API_KEY"
+  names="$names xai-api-key"
 fi
 # Optional: a Google API key, only if you do not use the service identity for Vertex AI
 if [ -n "${GOOGLE_API_KEY:-}" ]; then

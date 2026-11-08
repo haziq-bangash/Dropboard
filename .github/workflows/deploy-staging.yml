@@ -141,6 +141,12 @@ jobs:
               if gcloud secrets describe anthropic-api-key >/dev/null 2>&1; then
                 LIST="$LIST,ANTHROPIC_API_KEY=anthropic-api-key:latest"
               fi
+              if gcloud secrets describe openai-api-key >/dev/null 2>&1; then
+                LIST="$LIST,OPENAI_API_KEY=openai-api-key:latest"
+              fi
+              if gcloud secrets describe xai-api-key >/dev/null 2>&1; then
+                LIST="$LIST,XAI_API_KEY=xai-api-key:latest"
+              fi
               if gcloud secrets describe google-api-key >/dev/null 2>&1; then
                 LIST="$LIST,GOOGLE_API_KEY=google-api-key:latest"
               fi
