@@ -70,7 +70,7 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo): echarts.EChartsCoreOp
   const base = {
     color: COLORS,
     tooltip: { trigger: spec.type === "pie" ? "item" : "axis" },
-    grid: { left: 48, right: 16, top: 16, bottom: 32 },
+    grid: { left: 48, right: 16, top: 16, bottom: spec.type === "bar" && rows.length > 6 ? 64 : 32 },
   };
   switch (spec.type) {
     case "bar":
@@ -83,9 +83,10 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo): echarts.EChartsCoreOp
           axisLabel: {
             ...axis.axisLabel,
             interval: 0,
-            hideOverlap: true,
             width: 84,
             overflow: "truncate",
+            // many bars: tilt the names so every one is shown instead of some being dropped
+            rotate: rows.length > 6 ? 35 : 0,
           },
         },
         yAxis: { ...axis, type: "value" },
@@ -147,6 +148,37 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo): echarts.EChartsCoreOp
             data: rows.map((r) => [r[x], r[y], r.n]),
           },
         ],
+      };
+    }
+    case "histogram":
+      // touching bars, one per range of values, labelled by where the range starts
+      return {
+        ...base,
+        xAxis: { ...axis, type: "category", data: rows.map((r) => fmt(r[x])), axisLabel: { ...axis.axisLabel, hideOverlap: true } },
+        yAxis: { ...axis, type: "value" },
+        tooltip: { trigger: "axis", formatter: (p: { dataIndex: number }[]) => {
+          const r = rows[p[0].dataIndex];
+          return `${fmt(r[x])} to ${fmt(Number(r[x]) + Number(r.w))}: ${fmt(r[y])} rows`;
+        } },
+        series: [{ type: "bar", barCategoryGap: "6%", data: rows.map((r) => r[y]), itemStyle: { borderRadius: [2, 2, 0, 0] } }],
+      };
+    case "heatmap": {
+      const total = (key: string) => {
+        const t = new Map<string, number>();
+        for (const r of rows) t.set(fmt(r[key]), (t.get(fmt(r[key])) ?? 0) + (Number(r.value) || 0));
+        return [...t].sort((a, b) => b[1] - a[1]).map(([k]) => k);
+      };
+      const xs = total("x");
+      const ys = total("y");
+      const values = rows.map((r) => Number(r.value)).filter(Number.isFinite);
+      return {
+        color: COLORS,
+        tooltip: { position: "top", formatter: (p: { value: [number, number, number] }) => `${xs[p.value[0]]} and ${ys[p.value[1]]}: ${fmt(p.value[2])}` },
+        grid: { left: 88, right: 16, top: 16, bottom: xs.length > 6 ? 84 : 56 },
+        xAxis: { ...axis, type: "category", data: xs, splitArea: { show: true }, axisLabel: { ...axis.axisLabel, interval: 0, rotate: xs.length > 6 ? 35 : 0 } },
+        yAxis: { ...axis, type: "category", data: ys, splitArea: { show: true } },
+        visualMap: { min: Math.min(0, ...values), max: Math.max(1, ...values), orient: "horizontal", left: "center", bottom: 0, itemWidth: 12, itemHeight: 120, calculable: false, textStyle: { color: MUTED }, inRange: { color: ["#E3ECED", "#3E8E94", "#075056"] } },
+        series: [{ type: "heatmap", data: rows.filter((r) => Number.isFinite(Number(r.value))).map((r) => [xs.indexOf(fmt(r.x)), ys.indexOf(fmt(r.y)), Number(r.value)]), itemStyle: { borderColor: "#FFFFFF", borderWidth: 1 } }],
       };
     }
     case "regions": {
