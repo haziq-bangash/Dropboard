@@ -154,3 +154,31 @@ test("the free plan stops at three projects", async ({ page }) => {
   await page.setInputFiles('input[type="file"]', CSV);
   await expect(page.locator('[data-slot="alert"]')).toContainText("allows 3 saved projects", { timeout: 30_000 });
 });
+
+test("a column the detector missed can be mapped by hand, and a chart can be removed", async ({ page }) => {
+  await signUp(page);
+  // 70% of the "area" values are US states, below the share automatic detection needs, so no map is drawn on its own
+  await page.goto("/app/new");
+  await page.setInputFiles('input[type="file"]', path.join(__dirname, "fixtures", "mixed-areas.csv"));
+  await expect(page).toHaveURL(/\/app\/p\//, { timeout: 30_000 });
+  await expect(page.getByTestId("kpi-value").first()).not.toHaveText("", { timeout: 30_000 });
+  await expect(page.getByRole("img", { name: /^Region map/ })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Map a column" }).click();
+  const states = page.getByRole("group").filter({ hasText: "Column of US states" });
+  await states.getByRole("menuitem", { name: "area" }).click();
+  const map = page.getByRole("img", { name: /^Region map/ });
+  await expect(map).toBeVisible({ timeout: 30_000 });
+  await expect(map).toHaveAttribute("aria-label", /6 places shaded.* 3 other values do not match a state/);
+
+  // asking for the same map again says so instead of adding a second one
+  await page.getByRole("button", { name: "Map a column" }).click();
+  await page.getByRole("group").filter({ hasText: "Column of US states" }).getByRole("menuitem", { name: "area" }).click();
+  await expect(page.getByRole("status")).toContainText("already mapped");
+
+  // the map comes off with the chart's remove button
+  const before = await page.getByTestId("chart-card").count();
+  await page.getByTestId("chart-card").filter({ has: map }).getByRole("button", { name: /^Remove .* from the dashboard$/ }).click();
+  await expect(page.getByTestId("chart-card")).toHaveCount(before - 1);
+  await expect(page.getByRole("img", { name: /^Region map/ })).toHaveCount(0);
+});
