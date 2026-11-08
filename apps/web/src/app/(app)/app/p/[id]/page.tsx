@@ -16,6 +16,8 @@ import { AiPanel } from "@/components/AiPanel";
 import { Dashboard } from "@/components/Dashboard";
 import { PublishButton } from "@/components/PublishButton";
 import { DropZone } from "@/components/app/DropZone";
+import { InsightsPanel } from "@/components/app/InsightsPanel";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -203,19 +205,28 @@ export default function ProjectPage() {
           onFile={(file) => attach.mutate(file)}
         />
       ) : (
-        <>
-          <AiPanel
-            profile={data.profile}
-            spec={project.spec}
-            onSpec={(spec) => actions.saveSpec.mutate({ id, spec })}
-          />
-          <Dashboard
-            spec={project.spec}
-            source={liveSource}
-            dataKey={data.loadId}
-            showTitle={false}
-          />
-        </>
+        <Tabs defaultValue="dashboard">
+          <TabsList variant="line">
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="insights">Insights</TabsTrigger>
+          </TabsList>
+          <TabsContent value="dashboard" className="flex flex-col gap-6 pt-4">
+            <AiPanel
+              profile={data.profile}
+              spec={project.spec}
+              onSpec={(spec) => actions.saveSpec.mutate({ id, spec })}
+            />
+            <Dashboard
+              spec={project.spec}
+              source={liveSource}
+              dataKey={data.loadId}
+              showTitle={false}
+            />
+          </TabsContent>
+          <TabsContent value="insights" className="pt-4">
+            <InsightsPanel profile={data.profile} dataKey={data.loadId} />
+          </TabsContent>
+        </Tabs>
       )}
 
       <PublishedLinks
