@@ -78,6 +78,8 @@ export interface InsightInput {
     measure: string;
     kind: "flow" | "level" | "rate";
     periods: { x: number; label: string }[];
+    /** The step between periods, so a yearly or weekly pattern can be taken into account. */
+    unit?: "day" | "week" | "month" | "year";
     entities: { label: string; y: (number | null)[] }[];
   }[];
   /** Rows that are unusual across several measures, found on the rows themselves (see anomaly/ecod). */
@@ -544,7 +546,12 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
         }
       });
       if (p.kind === "rate") continue;
-      for (const a of seriesAnomalies(ys).slice(0, 1)) contextual.push(contextualFinding(p.measure, e.label, p.periods[idx[a.index]].label, a, false));
+      // a monthly or daily panel has its season: the same dip in every December is the pattern, not an anomaly
+      const phases = p.unit === "month" ? idx.map((i) => new Date(p.periods[i].x).getUTCMonth()) : p.unit === "day" ? idx.map((i) => new Date(p.periods[i].x).getUTCDay()) : null;
+      const period = p.unit === "month" ? 12 : p.unit === "day" ? 7 : 0;
+      for (const a of seriesAnomalies(ys, phases && period ? { season: { phases, period } } : {}).slice(0, 1)) {
+        contextual.push(contextualFinding(p.measure, e.label, p.periods[idx[a.index]].label, a, !!phases));
+      }
     }
   }
   // a one-period jump among peers already tells the same story about that entity

@@ -323,6 +323,42 @@ function dirtyPanel(): Dataset {
   };
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Revenue by region and month, with the month written as text in the given way. */
+function textPeriods(id: string, title: string, label: (year: number, month: number) => string, step = 1): Dataset {
+  const r = seeded(41);
+  const rows: (string | number)[][] = [];
+  for (let year = 2021; year <= 2023; year++) for (let m = 0; m < 12; m += step) for (const region of ["North", "South", "East", "West", "Central"]) rows.push([label(year, m), region, Math.round(1000 * step * (1 + (year - 2021) * 0.2 + (m === 11 ? 0.5 : 0)) * (0.85 + r.uniform() * 0.3))]);
+  return {
+    id,
+    title,
+    csv: csv(["period", "region", "revenue"], rows),
+    rows: rows.length,
+    roles: { period: "time", region: "category", revenue: "flow" },
+    time: "period",
+    panel: { entity: "region", time: "period" },
+    charts: ["line"],
+  };
+}
+
+/** Orders where the month is only a name: it follows the calendar, not the size of the numbers. */
+function cyclicMonths(): Dataset {
+  const r = seeded(42);
+  const names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const rows = range(720).map(() => {
+    const m = r.int(0, 11);
+    return [names[m], pick(r, ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]), pick(r, ["North", "South", "East"]), Math.round(100 + (m === 11 ? 200 : m === 2 ? -50 : 0) + r.uniform() * 80)];
+  });
+  return {
+    id: "cyclic-months",
+    title: "Sales by month name",
+    csv: csv(["month", "weekday", "region", "sales"], rows),
+    rows: rows.length,
+    roles: { month: "category", weekday: "category", region: "category", sales: "flow" },
+  };
+}
+
 function tiny(): Dataset {
   return { id: "edge-tiny", title: "Five rows", csv: csv(["item", "qty", "note"], [["a", 1, "x"], ["b", 2, "y"], ["c", 3, "z"], ["d", 4, "w"], ["e", 5, "v"]]), rows: 5, roles: {} };
 }
@@ -347,4 +383,4 @@ function sparse(): Dataset {
   };
 }
 
-export const DATASETS: Dataset[] = [finance(), retail(), retailWithErrors(), monthlySales(), dirtyOrders(), dirtyPanel(), hr(), saas(), web(), survey(), sensors(), marketing(), realEstate(), education(), healthcare(), sports(), tiny(), oneColumn(), allText(), sparse()];
+export const DATASETS: Dataset[] = [textPeriods("text-months-iso", "Revenue with 2021-03 months", (y, m) => `${y}-${String(m + 1).padStart(2, "0")}`), textPeriods("text-months-words", "Revenue with Mar 2021 months", (y, m) => `${MONTHS[m]} ${y}`), textPeriods("text-quarters", "Revenue with 2021-Q1 quarters", (y, m) => `${y}-Q${Math.floor(m / 3) + 1}`, 3), cyclicMonths(), finance(), retail(), retailWithErrors(), monthlySales(), dirtyOrders(), dirtyPanel(), hr(), saas(), web(), survey(), sensors(), marketing(), realEstate(), education(), healthcare(), sports(), tiny(), oneColumn(), allText(), sparse()];

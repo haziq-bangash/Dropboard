@@ -378,3 +378,23 @@ test("a table of companies by year shows each company's own line, a ranking, and
   await expect(page.getByTestId("kpi").filter({ hasText: "Company count" })).toContainText("10");
   await expect(lines.locator("canvas").first()).toBeVisible();
 });
+
+test("months written as text ('2023-04', 'Apr 2023', '2023-Q2') become a time axis with a line over time", async ({ page }) => {
+  const make = (label: (y: number, m: number) => string, step: number) => {
+    const rows = ["period,region,revenue"];
+    for (let y = 2021; y <= 2023; y++) for (let m = 0; m < 12; m += step) for (const [i, region] of ["North", "South", "East"].entries()) rows.push(`${label(y, m)},${region},${Math.round(1000 * step * (1 + (y - 2021) * 0.2 + i * 0.3))}`);
+    return rows.join("\n") + "\n";
+  };
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const cases: [string, string, number][] = [
+    ["iso.csv", make((y, m) => `${y}-${String(m + 1).padStart(2, "0")}`, 1), 36],
+    ["words.csv", make((y, m) => `${months[m]} ${y}`, 1), 36],
+    ["quarters.csv", make((y, m) => `${y}-Q${Math.floor(m / 3) + 1}`, 3), 12],
+  ];
+  for (const [name, csv, periods] of cases) {
+    await page.goto("/");
+    await page.setInputFiles('input[type="file"]', { name, mimeType: "text/csv", buffer: Buffer.from(csv) });
+    const line = page.getByRole("img", { name: new RegExp(`^Line chart: revenue by region over time\. 3 lines over ${periods} periods from 2021-01-01 to 2023-`) });
+    await expect(line, name).toBeVisible({ timeout: 30_000 });
+  }
+});

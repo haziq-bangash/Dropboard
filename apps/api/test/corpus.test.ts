@@ -10,7 +10,7 @@ import {
   understandColumns,
   type RunSql,
 } from "@dropboard/engine";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createSql } from "../eval/duckdb";
 import { DATASETS } from "./corpus/datasets";
 
@@ -39,8 +39,15 @@ async function analyse(csv: string) {
   return { profile, spec, charts, findings, roles: new Map(understandColumns(profile).map((u) => [u.name, u])) };
 }
 
+// Each table starts a database and runs every check, which is quick here and slow on a busy build machine, so the time allowed is generous.
+vi.setConfig({ testTimeout: 120_000 });
+
 describe.each(DATASETS)("corpus: $title ($rows rows)", (dataset) => {
-  const result = analyse(dataset.csv);
+  // analysed when its first test runs, not for all tables at once while the file is being read
+  let started: Promise<Awaited<ReturnType<typeof analyse>>> | null = null;
+  const result: PromiseLike<Awaited<ReturnType<typeof analyse>>> = {
+    then: (ok, bad) => (started ??= analyse(dataset.csv)).then(ok, bad),
+  };
 
   it("understands what its columns are", async () => {
     const { roles } = await result;

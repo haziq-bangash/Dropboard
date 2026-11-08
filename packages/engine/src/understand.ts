@@ -1,3 +1,4 @@
+import { isDatedPeriod, periodDateSql } from "./periods";
 import { q, type ColumnProfile, type TableProfile } from "./profile";
 
 /**
@@ -18,7 +19,7 @@ export interface Understood {
   /** A short, plain reason, so a person can see why and correct it. */
   reason: string;
   /** For a time column: dates, or a year stored as a whole number. */
-  time?: "date" | "year";
+  time?: "date" | "year" | "period";
 }
 
 const words = (name: string) => name.toLowerCase().replace(/[_\-./()]+/g, " ").replace(/\s+/g, " ").trim();
@@ -80,7 +81,7 @@ export const aggregateFor = (kind: MeasureKind) => (kind === "flow" ? "sum" : "a
 export function understandColumns(profile: TableProfile): Understood[] {
   const rows = profile.rowCount;
   return profile.columns.map((c): Understood => {
-    const done = (role: Role, reason: string, time?: "date" | "year"): Understood => ({ name: c.name, role, reason, ...(time ? { time } : {}) });
+    const done = (role: Role, reason: string, time?: "date" | "year" | "period"): Understood => ({ name: c.name, role, reason, ...(time ? { time } : {}) });
     if (c.distinct <= 1) return done("constant", "has one value");
     if (profile.coordinates?.lat === c.name) return done("latitude", "a latitude paired with a longitude");
     if (profile.coordinates?.lon === c.name) return done("longitude", "a longitude paired with a latitude");
@@ -91,6 +92,9 @@ export function understandColumns(profile: TableProfile): Understood[] {
       if (/^(lon|lng|long|longitude)$/.test(w) && c.min >= -180 && c.max <= 180) return done("longitude", "named like a longitude, with values in range");
     }
     if (c.type === "date") return done("time", "holds dates", "date");
+    if (c.period) {
+      return isDatedPeriod(c.period) ? done("time", "months or quarters written as text, each with its year", "period") : done("category", "months, weekdays or quarters, which follow the calendar and not the size of the numbers");
+    }
     if (c.type === "boolean") return done("flag", "true or false");
     if (c.type === "number") {
       if (isYearColumn(c, rows)) return done("time", "whole numbers that are calendar years", "year");
@@ -116,15 +120,20 @@ const clockScore = (name: string) => {
   return 0;
 };
 
-export function timeColumn(profile: TableProfile): { column: ColumnProfile; kind: "date" | "year" } | null {
+export function timeColumn(profile: TableProfile): { column: ColumnProfile; kind: "date" | "year" | "period" } | null {
   const rows = profile.rowCount;
-  const dates = profile.columns.filter((c) => c.type === "date" && c.distinct > 1).sort((a, b) => clockScore(b.name) - clockScore(a.name) || b.distinct - a.distinct);
-  if (dates[0]) return { column: dates[0], kind: "date" };
+  // a date column, or a text column of months or quarters that each carry a year: whichever is named like the clock, then the one with most values
+  const dates = profile.columns
+    .filter((c) => c.distinct > 1 && (c.type === "date" || (c.period && isDatedPeriod(c.period))))
+    .sort((a, b) => clockScore(b.name) - clockScore(a.name) || b.distinct - a.distinct);
+  if (dates[0]) return { column: dates[0], kind: dates[0].type === "date" ? "date" : "period" };
   const years = profile.columns.filter((c) => isYearColumn(c, rows)).sort((a, b) => b.distinct - a.distinct);
   return years[0] ? { column: years[0], kind: "year" } : null;
 }
 
 /** SQL that turns a time column into a date, so every chart over time can use the same date axis. A year becomes 1 January of it. */
-export function timeExpression(column: ColumnProfile, kind: "date" | "year"): string {
-  return kind === "year" ? `make_date(CAST(${q(column.name)} AS INTEGER), 1, 1)` : q(column.name);
+export function timeExpression(column: ColumnProfile, kind: "date" | "year" | "period"): string {
+  if (kind === "year") return `make_date(CAST(${q(column.name)} AS INTEGER), 1, 1)`;
+  if (kind === "period" && column.period) return periodDateSql(column.period, q(column.name)) ?? q(column.name);
+  return q(column.name);
 }
