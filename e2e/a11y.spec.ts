@@ -165,6 +165,19 @@ test.describe("signed in", () => {
     await expectClean(page, "a project's action menu");
   });
 
+  test("present mode, on the headline numbers and on a chart", async ({ page }) => {
+    await signUp(page);
+    await sampleProject(page, "Delivery drops");
+    await page.getByRole("button", { name: "Present", exact: true }).click();
+    await expect(page.getByTestId("present")).toBeVisible();
+    await page.waitForTimeout(600);
+    await expectClean(page, "present mode on the headline numbers");
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("present").getByRole("img").first()).toBeVisible();
+    await page.waitForTimeout(600);
+    await expectClean(page, "present mode on a chart");
+  });
+
   test("the attach-your-file step", async ({ page }) => {
     await signUp(page);
     await sampleProject(page);
