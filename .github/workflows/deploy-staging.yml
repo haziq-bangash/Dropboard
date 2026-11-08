@@ -205,5 +205,7 @@ jobs:
       - name: Verify
         run: |
           url=$(gcloud run services describe dropboard-${{ matrix.app }} --region "${{ vars.GCP_REGION }}" --format='value(status.url)')
-          path=/health; [ "${{ matrix.app }}" = web ] && path=/
+          path=/health
+          # The web service only accepts traffic through the load balancer, so it is checked at its public address, which is what people use
+          if [ "${{ matrix.app }}" = web ]; then url="${{ vars.WEB_URL }}"; path=/; fi
           curl -fsS --retry 5 --retry-delay 3 "$url$path" >/dev/null
