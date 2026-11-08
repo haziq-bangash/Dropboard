@@ -111,3 +111,27 @@ test("the findings never leave the browser: opening the tab makes no request tha
   expect(posts.filter((u) => /\/api\/ai\//.test(u))).toEqual([]);
   expect(posts).toEqual([]);
 });
+
+test("a file with three years of monthly sales shows its yearly pattern, and repeated rows are called out", async ({ page }) => {
+  await signUp(page);
+  // sales that peak every December and dip every July, one row a day, with every 20th row copied
+  let seed = 3;
+  const noise = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296 - 0.5) * 30;
+  const lines = ["date,sales"];
+  for (let d = 0; d < 1095; d++) {
+    const date = new Date(Date.UTC(2022, 0, 1 + d));
+    const month = date.getUTCMonth();
+    const sales = Math.round(300 + (month === 11 ? 220 : 0) + (month === 6 ? -140 : 0) + noise());
+    const line = `${date.toISOString().slice(0, 10)},${sales}`;
+    lines.push(line);
+    if (d % 20 === 0) lines.push(line);
+  }
+  await page.goto("/app/new");
+  await page.setInputFiles('input[type="file"]', { name: "seasonal.csv", mimeType: "text/csv", buffer: Buffer.from(lines.join("\n") + "\n") });
+  await expect(page).toHaveURL(/\/app\/p\//, { timeout: 30_000 });
+  await expect(page.getByTestId("kpi-value").first()).not.toHaveText("", { timeout: 30_000 });
+  await page.getByRole("tab", { name: "Insights" }).click();
+  const findings = page.getByTestId("finding");
+  await expect(findings.filter({ hasText: "yearly pattern" })).toContainText("highest in December, lowest in July", { timeout: 30_000 });
+  await expect(findings.filter({ hasText: "exact copies" })).toContainText("5%");
+});

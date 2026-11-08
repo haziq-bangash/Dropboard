@@ -54,6 +54,9 @@ Rules:
 - Use only numbers given in facts. A share of 0.406 may be written 41%, and timesEven as "about 2 times an even split". Do not add, subtract or invent any other number. If you are unsure of a number, leave it out.
 - Describe what the data shows. Never claim a cause, and never say why something happened. next may suggest checking causes, as a question to look into.
 - Share and timesEven tell how concentrated something is, r is a correlation between -1 and 1, relativeChange is the change from start to end as a fraction, before and after are levels either side of a step, emptyRows and share describe missing cells.
+- seasonal: period is 12 (months) or 7 (days), strength is how much of the variation the pattern explains, amplitude is the gap between the highest and lowest position as a fraction of the typical level. {peak} and {low} stand for the highest and lowest month or day.
+- latest: change is the move in the latest period as a fraction, z is how unusual it is. {at} stands for the period.
+- duplicates: duplicateRows is how many rows are copies, share is that as a fraction of all rows.
 - Plain, specific wording. No hype.`;
 
 /** Describe the table with schema and stats only. Row values are never included. */

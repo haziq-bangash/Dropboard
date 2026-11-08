@@ -1,6 +1,6 @@
 "use client";
 
-import { chartSummary, countryCode, removeChart, usStateCode } from "@dropboard/engine";
+import { chartSummary, countryCode, minMaxDownsample, removeChart, usStateCode } from "@dropboard/engine";
 import type { ChartSpec, DashboardSpec } from "@dropboard/spec";
 import * as echarts from "echarts";
 import { useQuery } from "@tanstack/react-query";
@@ -116,7 +116,8 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo): echarts.EChartsCoreOp
             smooth: true,
             showSymbol: false,
             areaStyle: spec.type === "area" ? { opacity: 0.15 } : undefined,
-            data: rows.map((r) => [r[x], r[y]]),
+            // thousands of points are drawn as their highs and lows, so a long line stays quick and keeps every peak
+            data: minMaxDownsample(rows, (r) => Number(r[y])).map((r) => [r[x], r[y]]),
           },
         ],
       };

@@ -10,7 +10,7 @@ import type { Finding, FindingKind } from "./insights";
  */
 
 /** Evidence entries that are values from the rows. They stay in the browser. */
-const HELD_BACK = ["label", "at", "worstValue"] as const;
+const HELD_BACK = ["label", "at", "worstValue", "peak", "low"] as const;
 
 export interface NarrateFinding {
   id: string;

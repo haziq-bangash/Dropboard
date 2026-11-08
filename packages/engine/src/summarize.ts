@@ -11,6 +11,7 @@ const MAX_CATEGORIES = 4;
 const SAMPLE_ROWS = 5000;
 const MIN_POINTS = 8;
 const MAX_POINTS = 400;
+const MAX_DUPLICATE_ROWS = 2_000_000;
 
 type Unit = "day" | "week" | "month";
 
@@ -30,12 +31,20 @@ function labelFor(ms: number, unit: Unit): string {
  */
 export async function gatherInsightInput(profile: TableProfile, run: RunSql): Promise<InsightInput> {
   const { rowCount, columns } = profile;
-  const measures = columns.filter((c) => isMeasure(c, rowCount));
+  // a latitude or longitude is a position: totalling or averaging it means nothing
+  const measures = columns.filter((c) => isMeasure(c, rowCount) && c.name !== profile.coordinates?.lat && c.name !== profile.coordinates?.lon);
   const categories = columns.filter((c) => isCategory(c, rowCount));
   const input: InsightInput = {
     rowCount,
     missing: columns.map((c) => ({ column: c.name, nullCount: c.nullCount })),
   };
+
+  // ---- rows that repeat an earlier row exactly (about half a second at a million rows, so very large files skip it) ----
+  if (rowCount >= 2 && rowCount <= MAX_DUPLICATE_ROWS) {
+    const [row] = await run(`SELECT CAST(count(*) - (SELECT count(*) FROM (SELECT DISTINCT * FROM data)) AS DOUBLE) AS copies FROM data`);
+    const copies = Number(row?.copies);
+    if (Number.isFinite(copies) && copies > 0) input.duplicates = { rows: copies };
+  }
 
   // ---- measures over time ----
   const date = [...columns.filter((c) => c.type === "date")].sort((a, b) => b.distinct - a.distinct)[0];
@@ -65,7 +74,7 @@ export async function gatherInsightInput(profile: TableProfile, run: RunSql): Pr
             points = points.slice(startsMidPeriod ? 1 : 0, endsMidPeriod ? points.length - 1 : undefined);
           }
           if (points.length >= MIN_POINTS) {
-            series.push({ column: label(m), x: points.map((p) => p.x), y: points.map((p) => p.y), labels: points.map((p) => labelFor(p.x, unit)) });
+            series.push({ column: label(m), x: points.map((p) => p.x), y: points.map((p) => p.y), labels: points.map((p) => labelFor(p.x, unit)), unit });
           }
         }
         if (series.length) input.series = series;
