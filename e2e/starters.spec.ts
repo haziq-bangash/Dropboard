@@ -343,3 +343,24 @@ test("a file with US states opens with a shaded map of the United States", async
   expect(loaded.some((n) => n.endsWith("/geo/us-states.json"))).toBe(true);
   expect(loaded.some((n) => n.endsWith("/geo/world.json"))).toBe(false);
 });
+
+test("a column of cities opens with a bubble map, and the city list is fetched only when it is needed", async ({ page }) => {
+  const requested: string[] = [];
+  page.on("request", (r) => requested.push(r.url()));
+  const cities = ["London", "Paris", "Berlin", "Madrid", "Rome", "Toronto", "Sydney", "Mumbai", "Lagos", "Tokyo"];
+  const rows = ["delivery_city,orders,note"];
+  for (let i = 0; i < 200; i++) rows.push(`${i % 12 === 0 ? "Smallville" : cities[i % cities.length]},${5 + (i * 7) % 40},x`);
+  // a file with no place-like column never loads the list
+  await page.goto("/");
+  await page.setInputFiles('input[type="file"]', path.join(__dirname, "fixtures", "sales.csv"));
+  await expect(page.getByTestId("kpi-value").first()).toHaveText("500", { timeout: 30_000 });
+  expect(requested.some((u) => u.includes("/geo/cities.json"))).toBe(false);
+
+  await page.goto("/");
+  await page.setInputFiles('input[type="file"]', { name: "deliveries.csv", mimeType: "text/csv", buffer: Buffer.from(rows.join("\n") + "\n") });
+  const map = page.getByRole("img", { name: /^City map: orders by delivery_city/ });
+  await expect(map).toBeVisible({ timeout: 30_000 });
+  await expect(map).toHaveAttribute("aria-label", /10 cities drawn, biggest first: .+\. 1 other value is not a known city and is not shown\./);
+  await expect(map.locator("canvas").first()).toBeVisible();
+  expect(requested.some((u) => u.includes("/geo/cities.json"))).toBe(true);
+});

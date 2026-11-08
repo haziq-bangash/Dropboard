@@ -287,3 +287,24 @@ describe("buildSpec with a treemap, a funnel and a flow diagram", () => {
     ]);
   });
 });
+
+describe("buildSpec with a city map", () => {
+  const t = {
+    rowCount: 300,
+    columns: [
+      { name: "city", type: "string" as const, nullCount: 0, distinct: 40 },
+      { name: "customer", type: "string" as const, nullCount: 0, distinct: 5000 },
+      { name: "revenue", type: "number" as const, nullCount: 0, distinct: 200 },
+    ],
+  };
+  it("builds from a text column and an optional number, and drops the wrong shapes", () => {
+    const c = (columns: string[]) => ({ type: "cities" as const, title: "", query: "", columns });
+    const { spec, dropped } = buildSpec(t, {
+      title: "x",
+      charts: [c(["city", "revenue"]), c(["revenue"]), c(["customer"]), c(["city", "city"]), c([]), { type: "kpi", title: "k", query: "SELECT 1 AS value", columns: [] }],
+    });
+    expect(spec.charts.map((x) => x.type)).toEqual(["cities", "kpi"]);
+    expect(spec.charts[0].title).toBe("revenue by city");
+    expect(dropped.map((d) => d.reason)).toEqual(["revenue is not a text column", "a city map needs a column with fewer different values", "city is not a number column", "cities needs 1 column name"]);
+  });
+});

@@ -1,6 +1,6 @@
 "use client";
 
-import { chartSummary, countryCode, minMaxDownsample, removeChart, usStateCode } from "@dropboard/engine";
+import { chartSummary, countryCode, minMaxDownsample, removeChart, usStateCode, type CityIndex } from "@dropboard/engine";
 import type { ChartSpec, DashboardSpec } from "@dropboard/spec";
 import * as echarts from "echarts";
 import { useQuery } from "@tanstack/react-query";
@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ChevronLeft, ChevronRight, Download, Hash, Presentation, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { loadCities } from "@/lib/cities";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -66,7 +67,7 @@ function boundsOf(geo: Geo, codes: Set<string>): [[number, number], [number, num
   return [[minX - 2, maxY + 2], [maxX + 2, minY - 2]];
 }
 
-function toOption(spec: ChartSpec, rows: Rows, geo?: Geo): echarts.EChartsCoreOption {
+function toOption(spec: ChartSpec, rows: Rows, geo?: Geo, cityIndex?: CityIndex): echarts.EChartsCoreOption {
   const x = spec.x ?? "x";
   const y = spec.y?.[0] ?? "y";
   const axis = {
@@ -289,6 +290,45 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo): echarts.EChartsCoreOp
           },
         ],
       };
+    case "cities": {
+      // each name is looked up in the city list; repeats of a city add up, names that are not cities are left off
+      const found = new Map<string, { name: string; lon: number; lat: number; value: number }>();
+      for (const r of rows) {
+        const city = cityIndex?.find(r[x]);
+        const v = Number(r[y]);
+        if (!city || !Number.isFinite(v)) continue;
+        const key = `${city.name}|${city.country}`;
+        const at = found.get(key);
+        if (at) at.value += v;
+        else found.set(key, { name: city.name, lon: city.lon, lat: city.lat, value: v });
+      }
+      const points = [...found.values()];
+      const biggest = Math.max(1, ...points.map((p) => Math.abs(p.value)));
+      const lons = points.map((p) => p.lon);
+      const lats = points.map((p) => p.lat);
+      const wide = points.length > 0 && Math.max(...lons) - Math.min(...lons) < 250;
+      return {
+        color: COLORS,
+        tooltip: { trigger: "item", formatter: (p: { name: string; value: number[] }) => `${p.name}: ${fmt(p.value[2])}` },
+        geo: {
+          map: "world",
+          roam: false,
+          silent: true,
+          // zoom to where the cities are, unless they are spread around the whole globe
+          boundingCoords: wide ? [[Math.min(...lons) - 6, Math.max(...lats) + 6], [Math.max(...lons) + 6, Math.min(...lats) - 6]] : undefined,
+          itemStyle: { areaColor: "#F1F3F4", borderColor: "#FFFFFF", borderWidth: 0.6 },
+        },
+        series: [
+          {
+            type: "scatter",
+            coordinateSystem: "geo",
+            symbolSize: (value: number[]) => 7 + 25 * Math.sqrt(Math.max(0, value[2]) / biggest),
+            itemStyle: { color: "#FF5B04", opacity: 0.72, borderColor: "#FFFFFF", borderWidth: 1 },
+            data: points.map((p) => ({ name: p.name, value: [p.lon, p.lat, p.value] })),
+          },
+        ],
+      };
+    }
     case "treemap": {
       const two = rows.some((r) => r.child !== undefined && r.child !== null);
       const groups = new Map<string, { name: string; value: number; children: { name: string; value: number }[] }>();
@@ -400,22 +440,22 @@ function saveImage(card: HTMLElement | null, title: string) {
   link.click();
 }
 
-function Chart({ spec, rows, geo, tall }: { spec: ChartSpec; rows: Rows; geo?: Geo; tall?: boolean }) {
+function Chart({ spec, rows, geo, cities, tall }: { spec: ChartSpec; rows: Rows; geo?: Geo; cities?: CityIndex; tall?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   // ECharts owns a canvas outside React: create it, resize it with the window, and dispose it. Nothing else fits here.
   useEffect(() => {
     if (!ref.current) return;
     const chart = echarts.init(ref.current);
-    chart.setOption(toOption(spec, rows, geo));
+    chart.setOption(toOption(spec, rows, geo, cities));
     const onResize = () => chart.resize();
     window.addEventListener("resize", onResize);
     return () => {
       window.removeEventListener("resize", onResize);
       chart.dispose();
     };
-  }, [spec, rows, geo]);
+  }, [spec, rows, geo, cities]);
   // the picture is a canvas, which a screen reader cannot read: give it a sentence built from the same rows
-  return <div ref={ref} className={tall ? "h-[min(62vh,640px)] w-full" : "h-64 w-full"} role="img" aria-label={chartSummary(spec, rows)} />;
+  return <div ref={ref} className={tall ? "h-[min(62vh,640px)] w-full" : "h-64 w-full"} role="img" aria-label={chartSummary(spec, rows, cities ? (v) => cities.find(v) !== null : undefined)} />;
 }
 
 export function Table({ rows, label = "Table, scrolls both ways" }: { rows: Rows; label?: string }) {
@@ -474,11 +514,13 @@ function ChartCard({
   const cardRef = useRef<HTMLDivElement>(null);
   // a region map also needs the country shapes, loaded once and shared by every such chart
   const mapKind = spec.map === "us" ? "us" : "world";
-  const world = useQuery({ queryKey: ["geo", mapKind], queryFn: () => loadGeo(mapKind), enabled: spec.type === "regions", staleTime: Infinity, retry: false, refetchOnWindowFocus: false });
+  const world = useQuery({ queryKey: ["geo", mapKind], queryFn: () => loadGeo(mapKind), enabled: spec.type === "regions" || spec.type === "cities", staleTime: Infinity, retry: false, refetchOnWindowFocus: false });
+  // a city map also needs the city list, loaded once and shared by every such chart
+  const cityList = useQuery({ queryKey: ["cities"], queryFn: loadCities, enabled: spec.type === "cities", staleTime: Infinity, retry: false, refetchOnWindowFocus: false });
   const rows: Rows | null = query.data ?? null;
-  const error = (query.error ?? world.error)
-    ? query.error instanceof Error || world.error instanceof Error
-      ? ((query.error ?? world.error) as Error).message
+  const error = (query.error ?? world.error ?? cityList.error)
+    ? query.error instanceof Error || world.error instanceof Error || cityList.error instanceof Error
+      ? ((query.error ?? world.error ?? cityList.error) as Error).message
       : "Could not load this chart."
     : null;
 
@@ -537,12 +579,12 @@ function ChartCard({
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
-        ) : !rows || (spec.type === "regions" && !world.data) ? (
+        ) : !rows || ((spec.type === "regions" || spec.type === "cities") && !world.data) || (spec.type === "cities" && !cityList.data) ? (
           <Skeleton className="h-64 w-full" />
         ) : spec.type === "table" ? (
           <Table rows={rows} label={`${spec.title}, table that scrolls`} />
         ) : (
-          <Chart spec={spec} rows={rows} geo={world.data} tall={tall} />
+          <Chart spec={spec} rows={rows} geo={world.data} cities={cityList.data} tall={tall} />
         )}
       </CardContent>
     </Card>

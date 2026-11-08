@@ -1,6 +1,6 @@
 "use client";
 
-import { addPlaceChart, placeColumnChoices, type PlaceKind, type TableProfile } from "@dropboard/engine";
+import { addCityChart, addPlaceChart, cityColumnChoices, placeColumnChoices, type PlaceKind, type TableProfile } from "@dropboard/engine";
 import type { DashboardSpec } from "@dropboard/spec";
 import { MapPin } from "lucide-react";
 import { useState } from "react";
@@ -23,15 +23,16 @@ import {
 export function PlacesMenu({ profile, spec, onSpec }: { profile: TableProfile; spec: DashboardSpec; onSpec: (spec: DashboardSpec) => void }) {
   const [message, setMessage] = useState<string | null>(null);
   const choices = placeColumnChoices(profile);
+  const cityChoices = cityColumnChoices(profile);
 
-  const add = (kind: PlaceKind, column: string) => {
-    const next = addPlaceChart(spec, profile, kind, column);
+  const add = (kind: PlaceKind | "city", column: string) => {
+    const next = kind === "city" ? addCityChart(spec, profile, column) : addPlaceChart(spec, profile, kind, column);
     if (typeof next === "string") return setMessage(next[0].toUpperCase() + next.slice(1) + ".");
     setMessage(null);
     onSpec(next);
   };
 
-  if (choices.length === 0) return null;
+  if (choices.length === 0 && cityChoices.length === 0) return null;
   return (
     <div className="flex flex-wrap items-center gap-3">
       <DropdownMenu>
@@ -43,6 +44,15 @@ export function PlacesMenu({ profile, spec, onSpec }: { profile: TableProfile; s
             <DropdownMenuLabel>Column of countries</DropdownMenuLabel>
             {choices.map((c) => (
               <DropdownMenuItem key={`country-${c.name}`} onClick={() => add("country", c.name)}>
+                {c.name}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Column of cities</DropdownMenuLabel>
+            {cityChoices.map((c) => (
+              <DropdownMenuItem key={`city-${c.name}`} onClick={() => add("city", c.name)}>
                 {c.name}
               </DropdownMenuItem>
             ))}

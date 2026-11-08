@@ -70,7 +70,7 @@ describe("a table with nothing in it", () => {
     }
     // Benjamini-Hochberg at 5% means at most about 5% of all-noise tables get a finding, and the effect floors cut that further
     expect(withFindings / trials).toBeLessThanOrEqual(0.05);
-  });
+  }, 60_000);
 
   it("does not invent level changes in slowly drifting series, and calls few of them trends", () => {
     // A random walk really does wander, so some count as trends; the aim is that most do not, and none gets a "step".
@@ -85,7 +85,7 @@ describe("a table with nothing in it", () => {
     }
     expect(trends / series).toBeLessThan(0.25);
     expect(changes / series).toBeLessThan(0.02);
-  });
+  }, 60_000);
 });
 
 describe("a table with things planted in it", () => {

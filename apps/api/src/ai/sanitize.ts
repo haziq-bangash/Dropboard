@@ -1,4 +1,4 @@
-import { guardSql, boxplotChart, calendarChart, funnelChart, heatmapChart, histogramChart, mapChart, regionsChart, sankeyChart, treemapChart, tidySql, type ColumnProfile } from "@dropboard/engine";
+import { guardSql, boxplotChart, calendarChart, citiesChart, funnelChart, heatmapChart, histogramChart, mapChart, regionsChart, sankeyChart, treemapChart, tidySql, type ColumnProfile } from "@dropboard/engine";
 import { DashboardSpec, type AiTable } from "@dropboard/spec";
 import { AiBadOutput, SPECIAL_CHARTS, type AiChartInput, type AiDashboardInput } from "./schema";
 
@@ -14,6 +14,7 @@ const HEATMAP_MAX_SIDE = 25;
 // a treemap tile per value, and a funnel stage per value, stay readable only up to about this many
 const TREEMAP_MAX = 40;
 const FUNNEL_MAX = 12;
+const MAX_CITY_VALUES = 2000;
 
 type Built = Omit<DashboardSpec["charts"][number], "id" | "layout">;
 
@@ -66,6 +67,14 @@ function fromColumns(table: AiTable, c: AiChartInput): Built | string {
       const e = need(1);
       if (e) return e;
       return find(names[0])?.type === "date" ? calendarChart(names[0]) : `${names[0]} is not a date column`;
+    }
+    case "cities": {
+      const e = need(1);
+      if (e) return e;
+      if (!isType(names[0], "string")) return `${names[0]} is not a text column`;
+      if ((find(names[0])?.distinct ?? 0) > MAX_CITY_VALUES) return "a city map needs a column with fewer different values";
+      if (names[1] !== undefined && !isType(names[1], "number")) return `${names[1]} is not a number column`;
+      return citiesChart(names[0], names[1] ? profile(names[1]) : undefined);
     }
     case "treemap": {
       const e = need(1);
