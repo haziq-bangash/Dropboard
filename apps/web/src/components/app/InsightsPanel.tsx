@@ -6,10 +6,12 @@ import {
   CalendarClock,
   CircleDashed,
   Copy,
+  Activity,
   Crown,
   Flag,
   GitCompareArrows,
   ArrowUpDown,
+  ScanSearch,
   Zap,
   PieChart,
   Repeat,
@@ -21,6 +23,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Table } from "@/components/Dashboard";
 import { useInsights } from "@/lib/insights";
 
 const KIND: Record<FindingKind, { label: string; icon: LucideIcon }> = {
@@ -39,6 +42,8 @@ const KIND: Record<FindingKind, { label: string; icon: LucideIcon }> = {
   entitytrend: { label: "Trend", icon: TrendingUp },
   jump: { label: "Biggest move", icon: Zap },
   rankshift: { label: "Changed rank", icon: ArrowUpDown },
+  unusualrows: { label: "Unusual rows", icon: ScanSearch },
+  contextual: { label: "Out of pattern", icon: Activity },
 };
 
 /** The numbers behind a finding, in plain words, so a claim can be traced. */
@@ -73,6 +78,10 @@ function evidenceLines(f: Finding): string[] {
     lines.push(`${e.spreadsAway} times the usual spread away from how entities normally move from one period to the next`);
   if (f.kind === "rankshift")
     lines.push(`Ranked #${e.from} at the start and #${e.to} at the end, out of ${e.groups}`);
+  if (f.kind === "unusualrows")
+    lines.push(`Found by comparing each row with the rest across ${e.measures} measures, and checked so that only about 5% of what is listed could be chance. The most unusual is ${e.strongestZ} times the usual spread away`);
+  if (f.kind === "contextual")
+    lines.push(`${e.spreadsAway} times the usual spread away from what the points around it, and the season, would give`);
   if (f.kind === "seasonal")
     lines.push(
       `The pattern explains ${(Number(e.strength) * 100).toFixed(0)}% of what is left once the trend is taken out, over at least two full cycles`,
@@ -221,6 +230,15 @@ export function InsightsPanel({
                             ))}
                           </ul>
                         </details>
+                        {f.details && (
+                          <div className="mt-3 flex flex-col gap-1.5" data-testid="finding-details">
+                            <p className="text-xs text-muted-foreground">{f.details.caption}</p>
+                            <Table
+                              label="The rows behind this finding, table that scrolls"
+                              rows={f.details.rows.map((row) => Object.fromEntries(f.details!.columns.map((c, i) => [c, row[i]])))}
+                            />
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

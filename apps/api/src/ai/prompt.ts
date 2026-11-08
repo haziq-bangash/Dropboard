@@ -65,6 +65,8 @@ Rules:
 - standout: value, typical and spreadsAway compare one entity with its peers in the latest period.
 - jump: change is the fraction by which one entity's figure moved in one period, spreadsAway how unusual that is.
 - rankshift: from and to are rank places, places how many, groups how many entities were ranked.
+- unusualrows: flagged rows out of scored, share as a fraction, strongestZ how far out the most unusual one is in robust spreads. Never say anything about what is in the rows.
+- contextual: change is how far a point was from what its trend and season predict, as a fraction (0 when not meaningful), actual and expected are the two values, spreadsAway how unusual. {at} is the period; {label} the entity when there is one.
 - duplicates: duplicateRows is how many rows are copies, share is that as a fraction of all rows.
 - Plain, specific wording. No hype.`;
 
