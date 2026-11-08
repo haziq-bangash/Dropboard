@@ -1,6 +1,6 @@
-import type { AskInput, GenerateInput, RepairInput } from "@dropboard/spec";
+import type { AskInput, GenerateInput, NarrateInput, RepairInput } from "@dropboard/spec";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { AiBadOutput, AiRefusal, type AiAskOutput, type AiDashboardOutput } from "../src/ai/schema";
+import { AiBadOutput, AiRefusal, type AiAskOutput, type AiDashboardOutput, type AiNarrateOutput } from "../src/ai/schema";
 import type { AiService } from "../src/ai/service";
 import { createApp } from "../src/app";
 import { createAuth } from "../src/auth";
@@ -22,8 +22,8 @@ const goodOutput: AiDashboardOutput = {
 };
 
 /** A scripted stand-in for the model. */
-function fakeAi(opts: { generate?: () => AiDashboardOutput; ask?: () => AiAskOutput; repair?: (input: RepairInput) => AiAskOutput; fail?: Error } = {}) {
-  const calls = { generate: 0, ask: 0, repair: 0, repairInputs: [] as RepairInput[] };
+function fakeAi(opts: { generate?: () => AiDashboardOutput; ask?: () => AiAskOutput; repair?: (input: RepairInput) => AiAskOutput; narrate?: (input: NarrateInput) => AiNarrateOutput; fail?: Error } = {}) {
+  const calls = { generate: 0, ask: 0, repair: 0, narrate: 0, repairInputs: [] as RepairInput[], narrateInputs: [] as NarrateInput[] };
   const usage = { inputTokens: 100, outputTokens: 50, cacheReadTokens: 0 };
   const service: AiService = {
     provider: "fake",
@@ -32,6 +32,12 @@ function fakeAi(opts: { generate?: () => AiDashboardOutput; ask?: () => AiAskOut
       calls.generate++;
       if (opts.fail) throw opts.fail;
       return { output: (opts.generate ?? (() => goodOutput))(), usage };
+    },
+    async narrate(input: NarrateInput) {
+      calls.narrate++;
+      calls.narrateInputs.push(input);
+      if (opts.fail) throw opts.fail;
+      return { output: (opts.narrate ?? (() => ({ items: [{ id: "f0", headline: "{label} leads", sentence: "{label} makes up 41% of region.", next: "Check the reliance on one value." }] })))(input), usage };
     },
     async repair(input: RepairInput) {
       calls.repair++;
@@ -193,6 +199,43 @@ describe("POST /api/ai/generate", () => {
     const user = await prisma.user.findFirstOrThrow({ where: { name: "usage", email: { in: emails } } });
     const row = await prisma.aiGeneration.findFirstOrThrow({ where: { userId: user.id } });
     expect(row).toMatchObject({ kind: "generate", cached: false, model: "fake/fake-model", inputTokens: 100, outputTokens: 50 });
+  });
+});
+
+describe("POST /api/ai/narrate", () => {
+  const body = { findings: [{ id: "f0", kind: "dominance", columns: ["region"], facts: { share: 0.406, timesEven: 2.03 }, tokens: ["{label}"] }] };
+
+  it("requires a session and a configured model", async () => {
+    expect((await post(createApp({ prisma, auth, ai: fakeAi().service }), "/api/ai/narrate", null, body)).status).toBe(401);
+    const cookie = await signUp("narno");
+    expect((await post(createApp({ prisma, auth }), "/api/ai/narrate", cookie, body)).status).toBe(503);
+  });
+
+  it("returns checked story text, with the placeholders left for the browser, and uses one request", async () => {
+    const f = fakeAi();
+    const app = createApp({ prisma, auth, ai: f.service, aiDailyLimit: 3 });
+    const res = await post(app, "/api/ai/narrate", await signUp("nar"), body);
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { items: { id: string; headline: string }[]; remaining: number };
+    expect(json.items[0].headline).toBe("{label} leads");
+    expect(json.remaining).toBe(2);
+  });
+
+  it("drops text that names a number it was not given, and fails when nothing usable is left", async () => {
+    const bad = fakeAi({ narrate: () => ({ items: [{ id: "f0", headline: "{label} leads", sentence: "{label} makes up 88% of region.", next: "Look." }] }) });
+    const app = createApp({ prisma, auth, ai: bad.service });
+    expect((await post(app, "/api/ai/narrate", await signUp("narbad"), body)).status).toBe(502);
+  });
+
+  it("refuses a request that carries anything but numbers and placeholders, and stops at the daily limit", async () => {
+    const app = createApp({ prisma, auth, ai: fakeAi().service, aiDailyLimit: 1 });
+    const cookie = await signUp("narv");
+    const withText = { findings: [{ ...body.findings[0], facts: { share: "North" } }] };
+    expect((await post(app, "/api/ai/narrate", cookie, withText)).status).toBe(400);
+    const withToken = { findings: [{ ...body.findings[0], tokens: ["North"] }] };
+    expect((await post(app, "/api/ai/narrate", cookie, withToken)).status).toBe(400);
+    expect((await post(app, "/api/ai/generate", cookie, tableInput())).status).toBe(200);
+    expect((await post(app, "/api/ai/narrate", cookie, body)).status).toBe(429);
   });
 });
 
