@@ -39,7 +39,7 @@ test("the guide is remembered per account, not per browser", async ({ page }) =>
 test("an empty workspace offers the samples", async ({ page }) => {
   await signUp(page);
   await expect(page.getByText("No projects yet")).toBeVisible();
-  await expect(page.getByTestId("starter")).toHaveCount(4);
+  await expect(page.getByTestId("starter")).toHaveCount(5);
   await expect(page.getByTestId("starter").first()).toContainText("rows");
 });
 
@@ -94,7 +94,7 @@ test("every chart has a text description for screen readers, built from its own 
   expect(count).toBeGreaterThanOrEqual(3);
   for (let i = 0; i < count; i++) {
     const label = (await charts.nth(i).getAttribute("aria-label"))!;
-    expect(label, label).toMatch(/^(Bar chart|Line chart|Area chart|Pie chart|Scatter plot): .+\./);
+    expect(label, label).toMatch(/^(Bar chart|Line chart|Area chart|Pie chart|Scatter plot|Map): .+\./);
     expect(label, label).not.toMatch(/undefined|NaN|null/);
   }
   // the bar chart of revenue by region reads out the regions, biggest first
@@ -103,4 +103,37 @@ test("every chart has a text description for screen readers, built from its own 
   expect(await bar.getAttribute("aria-label")).toMatch(/4 bars, highest first: South .* and /);
   // and the line says where it starts and ends
   await expect(page.getByRole("img", { name: /^Line chart: revenue over time/ })).toHaveAttribute("aria-label", /It starts at .* and ends (higher|lower)/);
+});
+
+test("a file with latitude and longitude opens with a map, and a published map holds only busy areas", async ({ page, browser }) => {
+  await signUp(page);
+  await page.goto("/app/new");
+  await page.getByTestId("starter").filter({ hasText: "Delivery drops" }).click();
+  await expect(page).toHaveURL(/\/app\/p\//, { timeout: 30_000 });
+  await expect(page.getByTestId("kpi-value").first()).not.toHaveText("", { timeout: 30_000 });
+
+  const map = page.getByRole("img", { name: /^Map: Where the rows are/ });
+  await expect(map).toBeVisible();
+  const own = (await map.getAttribute("aria-label"))!;
+  const areasOwn = Number(own.match(/(\d+) areas? with rows/)![1]);
+  expect(areasOwn).toBeGreaterThan(5);
+
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Create link" }).click();
+  const link = dialog.getByTestId("share-link");
+  await expect(link).toBeVisible({ timeout: 30_000 });
+  const url = await link.inputValue();
+
+  const stranger = await browser.newContext();
+  const view = await stranger.newPage();
+  await view.goto(url);
+  const shared = view.getByRole("img", { name: /^Map: Where the rows are/ });
+  await expect(shared).toBeVisible({ timeout: 30_000 });
+  const label = (await shared.getAttribute("aria-label"))!;
+  const areasShared = Number(label.match(/(\d+) areas? with rows/)![1]);
+  // sparse bins are left out of what a stranger sees, so the published map has fewer areas than the owner's
+  expect(areasShared).toBeLessThan(areasOwn);
+  expect(areasShared).toBeGreaterThan(0);
+  await stranger.close();
 });

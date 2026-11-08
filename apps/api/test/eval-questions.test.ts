@@ -46,6 +46,9 @@ describe("the evaluation question set", () => {
       ["support-tickets", "s3", "SELECT avg(satisfaction) m FROM data GROUP BY channel ORDER BY 1 ASC LIMIT 2"],
       ["support-tickets", "s5", "SELECT count(*) m FROM data GROUP BY category ORDER BY 1 ASC LIMIT 2"],
       ["support-tickets", "s7", "SELECT count(*) m FROM data GROUP BY dayname(created_date) ORDER BY 1 DESC LIMIT 2"],
+      ["delivery-drops", "d2", "SELECT count(*) m FROM data GROUP BY city ORDER BY 1 DESC LIMIT 2"],
+      ["delivery-drops", "d5", "SELECT avg(delivery_minutes) m FROM data GROUP BY vehicle ORDER BY 1 DESC LIMIT 2"],
+      ["delivery-drops", "d8", "SELECT avg(delivery_minutes) m FROM data GROUP BY city ORDER BY 1 DESC LIMIT 2"],
       ["support-tickets", "s10", "SELECT abs(avg(resolution_hours) - median(resolution_hours)) m FROM data GROUP BY priority ORDER BY 1 DESC LIMIT 2"],
     ];
     let loaded = "";

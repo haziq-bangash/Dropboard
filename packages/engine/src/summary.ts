@@ -12,6 +12,7 @@ const KIND: Record<ChartSpec["type"], string> = {
   area: "Area chart",
   pie: "Pie chart",
   scatter: "Scatter plot",
+  map: "Map",
   kpi: "Headline number",
   table: "Table",
 };
@@ -75,6 +76,20 @@ export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y">
       const high = points.reduce((m, p) => (p.y > m.y ? p : m));
       const direction = last.y > first.y ? "ends higher" : last.y < first.y ? "ends lower" : "ends where it started";
       return `${head} ${points.length} points from ${name(first.x)} to ${name(last.x)}. It starts at ${said(first.y)} and ${direction}, at ${said(last.y)}. Lowest ${said(low.y)} on ${name(low.x)}, highest ${said(high.y)} on ${name(high.x)}.`;
+    }
+
+    case "map": {
+      // the rows are bins: n says how many table rows fall in each
+      const bins = rows.map((r) => ({ lon: Number(r[xKey]), lat: Number(r[yKey]), n: Number(r.n) })).filter((b) => Number.isFinite(b.lon) && Number.isFinite(b.lat));
+      if (!bins.length) return `${head} No places to show.`;
+      const counted = bins.filter((b) => Number.isFinite(b.n));
+      const total = counted.reduce((s, b) => s + b.n, 0);
+      const busiest = counted.length ? counted.reduce((m, b) => (b.n > m.n ? b : m)) : null;
+      const lats = bins.map((b) => b.lat);
+      const lons = bins.map((b) => b.lon);
+      const range = `Latitude runs from ${said(Math.min(...lats))} to ${said(Math.max(...lats))} and longitude from ${said(Math.min(...lons))} to ${said(Math.max(...lons))}.`;
+      const where = busiest ? ` Busiest area, near ${said(busiest.lat)} latitude and ${said(busiest.lon)} longitude, holds ${said(busiest.n)} of ${said(total)} rows.` : "";
+      return `${head} ${bins.length} area${bins.length === 1 ? "" : "s"} with rows. ${range}${where}`;
     }
 
     case "scatter": {

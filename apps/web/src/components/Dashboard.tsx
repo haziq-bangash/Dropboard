@@ -101,6 +101,29 @@ function toOption(spec: ChartSpec, rows: Rows): echarts.EChartsCoreOption {
           },
         ],
       };
+    case "map": {
+      // No street map behind the points: longitude across, latitude up, one circle per bin sized by its row count.
+      // That keeps it free of tile requests, and nothing about where the data is leaves the browser.
+      const most = Math.max(1, ...rows.map((r) => Number(r.n) || 0));
+      return {
+        ...base,
+        tooltip: {
+          trigger: "item",
+          formatter: (p: { value: number[] }) => `${fmt(p.value[2])} rows near ${fmt(p.value[1])}, ${fmt(p.value[0])}`,
+        },
+        xAxis: { ...axis, type: "value", scale: true, name: "Longitude", nameLocation: "middle", nameGap: 24 },
+        yAxis: { ...axis, type: "value", scale: true, name: "Latitude" },
+        series: [
+          {
+            type: "scatter",
+            large: rows.length > 2000,
+            symbolSize: (v: number[]) => 6 + 22 * Math.sqrt((Number(v[2]) || 0) / most),
+            itemStyle: { opacity: 0.6 },
+            data: rows.map((r) => [r[x], r[y], r.n]),
+          },
+        ],
+      };
+    }
     case "pie":
       return {
         ...base,

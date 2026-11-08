@@ -7,3 +7,4 @@ export * from "./insights";
 export * from "./bind";
 export * from "./summarize";
 export * from "./summary";
+export * from "./places";

@@ -4,9 +4,9 @@ import { STARTERS } from "../src/starters";
 const parse = (csv: string) => csv.trimEnd().split("\n").map((line) => line.split(","));
 
 describe("starter datasets", () => {
-  it("offers four distinct samples", () => {
-    expect(STARTERS.map((s) => s.id)).toEqual(["ecommerce-orders", "household-spending", "marketing-performance", "support-tickets"]);
-    expect(new Set(STARTERS.map((s) => s.fileName)).size).toBe(4);
+  it("offers five distinct samples", () => {
+    expect(STARTERS.map((s) => s.id)).toEqual(["ecommerce-orders", "household-spending", "marketing-performance", "support-tickets", "delivery-drops"]);
+    expect(new Set(STARTERS.map((s) => s.fileName)).size).toBe(5);
   });
 
   for (const starter of STARTERS) {

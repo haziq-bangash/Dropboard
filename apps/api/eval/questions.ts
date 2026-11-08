@@ -1,10 +1,10 @@
 /**
- * Plain-language questions about the four sample datasets, each with the SQL that answers it. A model is right if its
+ * Plain-language questions about the sample datasets, each with the SQL that answers it. A model is right if its
  * query returns the same answer as any of the gold queries (see compare.ts), however it writes the SQL.
  * Where a question can be answered in more than one form (a month as a date, a number or a name), each form is listed.
  */
 export interface Question {
-  dataset: "ecommerce-orders" | "household-spending" | "marketing-performance" | "support-tickets";
+  dataset: "ecommerce-orders" | "household-spending" | "marketing-performance" | "support-tickets" | "delivery-drops";
   id: string;
   ask: string;
   gold: string[];
@@ -89,4 +89,15 @@ export const QUESTIONS: Question[] = [
   { dataset: "support-tickets", id: "s8", ask: "What share of tickets were resolved within 8 hours?", gold: ["SELECT count(*) FILTER (WHERE resolution_hours <= 8) * 1.0 / count(*) FROM data"], scales: [1, 100] },
   { dataset: "support-tickets", id: "s9", ask: "What is the median resolution time in hours for each priority?", gold: ["SELECT priority, median(resolution_hours) FROM data GROUP BY 1"] },
   { dataset: "support-tickets", id: "s10", ask: "Which priority has the biggest gap between its average and its median resolution time?", gold: ["SELECT priority FROM data GROUP BY 1 ORDER BY abs(avg(resolution_hours) - median(resolution_hours)) DESC LIMIT 1"] },
+
+  // ---- delivery drops ----
+  { dataset: "delivery-drops", id: "d1", ask: "How many deliveries are there?", gold: ["SELECT count(*) FROM data"] },
+  { dataset: "delivery-drops", id: "d2", ask: "Which city has the most deliveries?", gold: ["SELECT city FROM data GROUP BY 1 ORDER BY count(*) DESC LIMIT 1"] },
+  { dataset: "delivery-drops", id: "d3", ask: "What is the average delivery time in minutes for Bike deliveries?", gold: ["SELECT avg(delivery_minutes) FROM data WHERE vehicle = 'Bike'"] },
+  { dataset: "delivery-drops", id: "d4", ask: "How many deliveries were Late?", gold: ["SELECT count(*) FROM data WHERE status = 'Late'"] },
+  { dataset: "delivery-drops", id: "d5", ask: "Which vehicle has the longest average delivery time?", gold: ["SELECT vehicle FROM data GROUP BY 1 ORDER BY avg(delivery_minutes) DESC LIMIT 1"] },
+  { dataset: "delivery-drops", id: "d6", ask: "How many kilometres were driven in total?", gold: ["SELECT sum(distance_km) FROM data"] },
+  { dataset: "delivery-drops", id: "d7", ask: "What share of deliveries have the status Delivered?", gold: ["SELECT count(*) FILTER (WHERE status = 'Delivered') * 1.0 / count(*) FROM data"], scales: [1, 100] },
+  { dataset: "delivery-drops", id: "d8", ask: "Which city has the highest average delivery time?", gold: ["SELECT city FROM data GROUP BY 1 ORDER BY avg(delivery_minutes) DESC LIMIT 1"] },
+  { dataset: "delivery-drops", id: "d9", ask: "How many different cities are there?", gold: ["SELECT count(DISTINCT city) FROM data"] },
 ];

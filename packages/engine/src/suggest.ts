@@ -19,6 +19,35 @@ export const isMeasure = (c: ColumnProfile, rows: number) =>
 export const isCategory = (c: ColumnProfile, rows: number) =>
   c.type === "string" && !looksLikeId(c, rows) && c.distinct > 1 && c.distinct <= MAX_CATEGORIES;
 
+/** Rows per map bin below which a bin is not shown on a published map, so no single place can be picked out. */
+export const MAP_MIN_ROWS = 5;
+const MAP_MAX_BINS = 2000;
+
+/**
+ * A map of where the rows are. Points are counted into a grid whose cell is a fortieth of the area they cover, so a
+ * city and a continent both read well, and the chart never holds more than a couple of thousand bins however many
+ * rows there are. x is the longitude, y the latitude, n the number of rows in the bin.
+ */
+export function mapChart(lat: string, lon: string): Omit<ChartSpec, "id" | "layout"> {
+  const la = q(lat);
+  const lo = q(lon);
+  const ok = `${la} IS NOT NULL AND ${lo} IS NOT NULL`;
+  return {
+    type: "map",
+    title: "Where the rows are",
+    query:
+      `WITH r AS (SELECT greatest(max(${la}) - min(${la}), (max(${lo}) - min(${lo})) / 2, 0.01) / 40 AS c FROM data WHERE ${ok}) ` +
+      `SELECT round(${lo} / c) * c AS x, round(${la} / c) * c AS y, count(*) AS n FROM data, r WHERE ${ok} GROUP BY 1, 2 ORDER BY n DESC LIMIT ${MAP_MAX_BINS}`,
+    x: "x",
+    y: ["y"],
+  };
+}
+
+/** Drop the bins on a map that hold too few rows to publish. Other charts are returned as they are. */
+export function applyPrivacyFloor<T extends Record<string, unknown>>(chart: Pick<ChartSpec, "type">, rows: T[]): T[] {
+  return chart.type === "map" ? rows.filter((r) => Number(r.n) >= MAP_MIN_ROWS) : rows;
+}
+
 export function suggestDashboard(title: string, profile: TableProfile): DashboardSpec {
   const { rowCount: rows, columns } = profile;
   const measures = columns.filter((c) => isMeasure(c, rows));
@@ -51,6 +80,9 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
       y: ["y"],
     });
   }
+
+  // Places: a latitude and longitude pair becomes a map of where the rows are
+  if (profile.coordinates) add(mapChart(profile.coordinates.lat, profile.coordinates.lon));
 
   // Category breakdowns
   for (const cat of categories.slice(0, 2)) {
