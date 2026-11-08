@@ -225,7 +225,7 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
   };
 
   // KPIs: row count + totals of the first measures
-  add({ type: "kpi", title: "Rows", query: "SELECT count(*) AS value FROM data" });
+  add({ type: "kpi", title: profile.sample ? "Rows in the sample" : "Rows", query: "SELECT count(*) AS value FROM data" });
   for (const m of measures.slice(0, 2)) {
     add({
       type: "kpi",
