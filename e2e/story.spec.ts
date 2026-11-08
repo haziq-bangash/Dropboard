@@ -189,3 +189,30 @@ test("rows that were keyed in wrongly are listed with why, and nothing from thos
   expect(sent).not.toContain("900");
   expect(sent).not.toContain("details");
 });
+
+test("the story can be saved as one picture, drawn in the browser, and nothing is uploaded", async ({ page }) => {
+  const sent: string[] = [];
+  page.on("request", (r) => sent.push(`${r.method()} ${new URL(r.url()).pathname}`));
+  await signUp(page);
+  await openSample(page, "Household spending");
+  await openStory(page);
+  await expect(page.getByTestId("story-headline")).toBeVisible({ timeout: 30_000 });
+  const before = sent.length;
+
+  const download = page.waitForEvent("download");
+  await page.getByTestId("story-save").click();
+  const file = await download;
+  expect(file.suggestedFilename()).toMatch(/^story-.*\.png$/);
+  const path = await file.path();
+  const { readFileSync, writeFileSync } = await import("node:fs");
+  const bytes = readFileSync(path);
+  // a real PNG, twice the width of the 1080 px page so it stays sharp, and tall enough to hold the whole story
+  expect([...bytes.subarray(0, 8)]).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const width = bytes.readUInt32BE(16);
+  const height = bytes.readUInt32BE(20);
+  expect(width).toBe(2160);
+  expect(height).toBeGreaterThan(2400);
+  if (process.env.KEEP_STORY_IMAGE) writeFileSync(process.env.KEEP_STORY_IMAGE, bytes);
+  // saving drew the picture here: no request left the page
+  expect(sent.slice(before)).toEqual([]);
+});
