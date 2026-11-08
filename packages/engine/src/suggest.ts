@@ -1,7 +1,9 @@
 import type { ChartSpec, DashboardSpec } from "@dropboard/spec";
 import { q, type ColumnProfile, type TableProfile } from "./profile";
 
-const MAX_CHARTS = 8;
+const MAX_CHARTS = 10;
+const HISTOGRAM_BINS = 20;
+const HEATMAP_MAX_SIDE = 12;
 const MAX_CATEGORIES = 20;
 
 // Columns that look like identifiers make poor measures or categories.
@@ -43,6 +45,36 @@ export function mapChart(lat: string, lon: string): Omit<ChartSpec, "id" | "layo
   };
 }
 
+/**
+ * How a measure is spread out: twenty equal bins from its lowest to its highest value, every bin present even when
+ * empty so a gap shows as a gap. x is where a bin starts, w how wide it is, y how many rows fall in it.
+ */
+export function histogramChart(measure: string): Omit<ChartSpec, "id" | "layout"> {
+  const m = q(measure);
+  return {
+    type: "histogram",
+    title: `How ${measure} is spread out`,
+    query:
+      `WITH r AS (SELECT min(${m}) AS lo, greatest(max(${m}) - min(${m}), 0.000000001) / ${HISTOGRAM_BINS} AS w FROM data WHERE ${m} IS NOT NULL) ` +
+      `SELECT lo + t.i * w AS x, w AS w, count(data.${m}) AS y FROM r CROSS JOIN range(${HISTOGRAM_BINS}) AS t(i) ` +
+      `LEFT JOIN data ON data.${m} IS NOT NULL AND least(floor((data.${m} - lo) / w), ${HISTOGRAM_BINS - 1}) = t.i GROUP BY t.i, lo, w ORDER BY t.i`,
+    x: "x",
+    y: ["y"],
+  };
+}
+
+/** Two categories against each other, each cell shaded by a measure (or by how many rows fall in it). */
+export function heatmapChart(a: string, b: string, measure?: ColumnProfile): Omit<ChartSpec, "id" | "layout"> {
+  const value = measure ? `${aggregate(measure)}(${q(measure.name)})` : "count(*)";
+  return {
+    type: "heatmap",
+    title: measure ? `${label(measure)} by ${a} and ${b}` : `Rows by ${a} and ${b}`,
+    query: `SELECT ${q(a)} AS x, ${q(b)} AS y, ${value} AS value FROM data WHERE ${q(a)} IS NOT NULL AND ${q(b)} IS NOT NULL GROUP BY 1, 2`,
+    x: "x",
+    y: ["y"],
+  };
+}
+
 /** A world map with each country shaded by a measure (or by how many rows it has). The names are read by the renderer. */
 export function regionsChart(column: string, measure?: ColumnProfile): Omit<ChartSpec, "id" | "layout"> {
   const col = q(column);
@@ -63,7 +95,8 @@ export function applyPrivacyFloor<T extends Record<string, unknown>>(chart: Pick
 
 export function suggestDashboard(title: string, profile: TableProfile): DashboardSpec {
   const { rowCount: rows, columns } = profile;
-  const measures = columns.filter((c) => isMeasure(c, rows));
+  // a latitude or longitude is a position, not an amount: adding them up or averaging them means nothing
+  const measures = columns.filter((c) => isMeasure(c, rows) && c.name !== profile.coordinates?.lat && c.name !== profile.coordinates?.lon);
   const categories = columns.filter((c) => isCategory(c, rows));
   const dates = columns.filter((c) => c.type === "date");
 
@@ -111,6 +144,14 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
       y: ["y"],
     });
   }
+
+  // How the main measure is spread out, when it takes enough different values to have a shape
+  const spread = measures.find((m) => m.distinct > HISTOGRAM_BINS);
+  if (spread) add(histogramChart(spread.name));
+
+  // Two categories against each other
+  const sides = categories.filter((c) => c.distinct <= HEATMAP_MAX_SIDE);
+  if (sides.length >= 2) add(heatmapChart(sides[0].name, sides[1].name, measures[0]));
 
   // Share of rows for a small category
   const small = categories.find((c) => c.distinct <= 6);

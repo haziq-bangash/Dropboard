@@ -14,6 +14,8 @@ const KIND: Record<ChartSpec["type"], string> = {
   scatter: "Scatter plot",
   map: "Map",
   regions: "Region map",
+  histogram: "Histogram",
+  heatmap: "Heatmap",
   kpi: "Headline number",
   table: "Table",
 };
@@ -46,6 +48,23 @@ export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y">
   if (spec.type === "kpi") {
     const v = rows[0] && Number(rows[0].value);
     return v === undefined || !Number.isFinite(v) ? `${head} No value.` : `${head} ${said(v)}.`;
+  }
+
+  if (spec.type === "heatmap") {
+    const cells = rows.map((r) => ({ x: r.x, y: r.y, v: Number(r.value) })).filter((c) => Number.isFinite(c.v));
+    if (!cells.length) return `${head} No data.`;
+    const high = cells.reduce((m, c) => (c.v > m.v ? c : m));
+    const low = cells.reduce((m, c) => (c.v < m.v ? c : m));
+    return `${head} ${cells.length} combinations. Highest: ${name(high.x)} and ${name(high.y)}, ${said(high.v)}. Lowest: ${name(low.x)} and ${name(low.y)}, ${said(low.v)}.`;
+  }
+
+  if (spec.type === "histogram") {
+    const bins = rows.map((r) => ({ from: Number(r.x), width: Number(r.w), n: Number(r.y) })).filter((b) => Number.isFinite(b.from) && Number.isFinite(b.n));
+    const total = bins.reduce((s, b) => s + b.n, 0);
+    if (!bins.length || total === 0) return `${head} No data.`;
+    const top = bins.reduce((m, b) => (b.n > m.n ? b : m));
+    const end = (b: { from: number; width: number }) => (Number.isFinite(b.width) ? b.from + b.width : b.from);
+    return `${head} ${bins.length} bins from ${said(bins[0].from)} to ${said(end(bins[bins.length - 1]))}. The most rows, ${said(top.n)} of ${said(total)}, fall between ${said(top.from)} and ${said(end(top))}.`;
   }
 
   const xKey = spec.x ?? "x";
