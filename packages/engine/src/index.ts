@@ -11,3 +11,4 @@ export * from "./places";
 export { scrubDbError } from "./dbError";
 export * from "./narrate";
 export * from "./edit";
+export * from "./downsample";
