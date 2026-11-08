@@ -1,3 +1,4 @@
+import { ecod } from "./anomaly/ecod";
 import type { InsightInput, SeriesInput } from "./insights";
 import { aggregate, isCategory, isMeasure, label } from "./suggest";
 import { q, type TableProfile } from "./profile";
@@ -14,6 +15,11 @@ const MIN_POINTS = 8;
 const MIN_YEAR_POINTS = 6;
 const MAX_POINTS = 400;
 const MAX_ENTITIES = 40;
+/** A measure needs this many different values for rows to be unusual on it: a rating of one to five has no tails to speak of. */
+const MIN_UNUSUAL_DISTINCT = 20;
+const MAX_UNUSUAL_MEASURES = 8;
+const MAX_UNUSUAL_ROWS = 50_000;
+const MAX_UNUSUAL_SHOWN = 8;
 const MAX_PANEL_MEASURES = 3;
 const MAX_DUPLICATE_ROWS = 2_000_000;
 
@@ -113,7 +119,13 @@ export async function gatherInsightInput(profile: TableProfile, run: RunSql): Pr
                 `SELECT CAST(epoch_ms(CAST(date_trunc('${unit}', ${d}) AS TIMESTAMP)) AS DOUBLE) AS x, CAST(${entity} AS VARCHAR) AS e, CAST(${aggregate(m)}(${q(m.name)}) AS DOUBLE) AS y ` +
                 `FROM data WHERE ${present} IS NOT NULL AND ${entity} IN (SELECT e FROM top) AND ${q(m.name)} IS NOT NULL GROUP BY 1, 2`,
             );
-            const periods = [...new Set(rows.map((r) => Number(r.x)).filter((x) => Number.isFinite(x) && (!complete || complete.has(x))))].sort((a, b) => a - b);
+            let periods = [...new Set(rows.map((r) => Number(r.x)).filter((x) => Number.isFinite(x) && (!complete || complete.has(x))))].sort((a, b) => a - b);
+            // the first and last period of a table of dates are usually only partly covered, which would read as a collapse in a sum
+            if (aggregate(m) === "sum" && time.kind === "date" && unit !== "day" && periods.length > MIN_YEAR_POINTS + 2) {
+              const startsMidPeriod = lo > periods[0];
+              const endsMidPeriod = hi < periods[periods.length - 1] + (unit === "month" ? 28 : 6) * 86_400_000;
+              periods = periods.slice(startsMidPeriod ? 1 : 0, endsMidPeriod ? periods.length - 1 : undefined);
+            }
             if (periods.length < MIN_YEAR_POINTS) continue;
             const at = new Map(periods.map((x, i) => [x, i]));
             const byEntity = new Map<string, (number | null)[]>();
@@ -151,6 +163,39 @@ export async function gatherInsightInput(profile: TableProfile, run: RunSql): Pr
         return v === null || v === undefined ? null : Number(v);
       }),
     }));
+  }
+
+  // ---- rows that are unusual across several measures, found on the rows themselves (a sample, for a very big table) ----
+  const spread = measures.filter((m) => m.distinct >= MIN_UNUSUAL_DISTINCT && m.nullCount <= rowCount * 0.2).slice(0, MAX_UNUSUAL_MEASURES);
+  if (spread.length >= 2 && rowCount >= 100) {
+    const cols = spread.map((m, i) => `CAST(${q(m.name)} AS DOUBLE) AS c${i}`).join(", ");
+    const present = spread.map((m) => `${q(m.name)} IS NOT NULL`).join(" AND ");
+    const sample = rowCount > MAX_UNUSUAL_ROWS ? ` USING SAMPLE reservoir(${MAX_UNUSUAL_ROWS} ROWS) REPEATABLE (42)` : "";
+    const rows = await run(`SELECT id, ${spread.map((_, i) => `c${i}`).join(", ")} FROM (SELECT CAST(rowid AS DOUBLE) AS id, ${cols} FROM data WHERE ${present})${sample}`);
+    const columns = spread.map((_, i) => rows.map((r) => Number(r[`c${i}`])));
+    const result = ecod(columns);
+    if (result.unusual.length) {
+      const top = result.unusual.slice(0, MAX_UNUSUAL_SHOWN);
+      const ids = top.map((u) => Number(rows[u.index].id));
+      const full = await run(`SELECT CAST(rowid AS DOUBLE) AS "__id", * FROM data WHERE rowid IN (${ids.join(", ")})`);
+      const byId = new Map(full.map((r) => [Number(r.__id), r]));
+      input.unusual = {
+        scored: rows.length,
+        flagged: result.unusual.length,
+        measures: result.measures.map((j) => spread[j].name),
+        considered: spread.map((m) => m.name),
+        top: top.map((u, k) => {
+          const { __id: _drop, ...row } = byId.get(ids[k]) ?? {};
+          return {
+            id: ids[k],
+            source: u.source,
+            score: u.score,
+            reasons: u.reasons.map((r) => ({ measure: spread[r.measure].name, side: r.side, z: r.z })),
+            row,
+          };
+        }),
+      };
+    }
   }
 
   // ---- how many rows each category value has ----
