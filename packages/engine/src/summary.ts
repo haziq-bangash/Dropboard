@@ -22,6 +22,7 @@ const KIND: Record<ChartSpec["type"], string> = {
   treemap: "Treemap",
   funnel: "Funnel",
   sankey: "Flow diagram",
+  cities: "City map",
   kpi: "Headline number",
   table: "Table",
 };
@@ -47,7 +48,11 @@ function name(v: unknown): string {
 
 const list = (items: string[]) => (items.length <= 2 ? items.join(" and ") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`);
 
-export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y" | "map">, rows: Row[]): string {
+/**
+ * A sentence for a screen reader that says what a chart shows. `known` says whether a value is a place the picture can
+ * draw; a city map needs it, since the city list lives outside the engine, and without it every value counts as drawn.
+ */
+export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y" | "map">, rows: Row[], known?: (value: unknown) => boolean): string {
   const head = `${KIND[spec.type]}: ${spec.title}.`;
   if (spec.type === "table") return `${head} ${rows.length} row${rows.length === 1 ? "" : "s"} shown.`;
 
@@ -93,6 +98,19 @@ export function chartSummary(spec: Pick<ChartSpec, "type" | "title" | "x" | "y" 
     const top = bins.reduce((m, b) => (b.n > m.n ? b : m));
     const end = (b: { from: number; width: number }) => (Number.isFinite(b.width) ? b.from + b.width : b.from);
     return `${head} ${bins.length} bins from ${said(bins[0].from)} to ${said(end(bins[bins.length - 1]))}. The most rows, ${said(top.n)} of ${said(total)}, fall between ${said(top.from)} and ${said(end(top))}.`;
+  }
+
+  if (spec.type === "cities") {
+    const all = rows.map((r) => ({ x: name(r[spec.x ?? "x"]), v: Number(r[spec.y?.[0] ?? "y"]), raw: r[spec.x ?? "x"] })).filter((c) => Number.isFinite(c.v));
+    const drawn = known ? all.filter((c) => known(c.raw)) : all;
+    const left = all.length - drawn.length;
+    if (!all.length) return `${head} No data.`;
+    if (!drawn.length) return `${head} No value is a city in the list, so nothing is drawn.`;
+    const top = [...drawn].sort((a, b) => b.v - a.v);
+    const shown = top.slice(0, 5).map((c) => `${c.x} ${said(c.v)}`);
+    const more = top.length - shown.length;
+    const unmatched = left > 0 ? ` ${left} other value${left === 1 ? " is" : "s are"} not a known city and ${left === 1 ? "is" : "are"} not shown.` : "";
+    return `${head} ${top.length} cit${top.length === 1 ? "y" : "ies"} drawn, biggest first: ${list(shown)}${more > 0 ? `, and ${more} more` : ""}.${unmatched}`;
   }
 
   if (spec.type === "treemap") {

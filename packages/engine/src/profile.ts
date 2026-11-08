@@ -18,6 +18,8 @@ export interface TableProfile {
   countries?: string;
   /** A column of US states (names or abbreviations), when there is one */
   states?: string;
+  /** A column of cities, when there is one (needs a column name that points at places, and the city list) */
+  cities?: string;
 }
 
 /** Map a DuckDB type name (e.g. "BIGINT", "DECIMAL(18,3)", "TIMESTAMP WITH TIME ZONE") to our simple types. */

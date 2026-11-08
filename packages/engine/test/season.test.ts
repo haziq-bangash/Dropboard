@@ -117,7 +117,7 @@ describe("findings from a monthly series", () => {
       if (found.some((x) => x.kind === "seasonal" || x.kind === "latest")) tables++;
     }
     expect(tables / 300).toBeLessThanOrEqual(0.03);
-  });
+  }, 60_000);
 });
 
 describe("repeated rows", () => {

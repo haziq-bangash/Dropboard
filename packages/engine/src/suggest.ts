@@ -187,11 +187,27 @@ export function sankeyChart(from: string, to: string, measure?: ColumnProfile): 
 }
 
 /**
- * Drop the bins on a map, the groups in a box plot and the bands in a flow diagram that hold too few rows to publish: a
+ * Bubbles on a world map, one per city, sized by a measure or by how many rows the city has. The renderer looks each name
+ * up in the city list. x is the city name, y the size and n the rows behind it, so a city with a few rows can be left out
+ * of a published copy.
+ */
+export function citiesChart(column: string, measure?: ColumnProfile): Omit<ChartSpec, "id" | "layout"> {
+  const c = q(column);
+  return {
+    type: "cities",
+    title: measure ? `${label(measure)} by ${column}` : `Rows by ${column}`,
+    query: `SELECT ${c} AS x, ${total(measure)} AS y, count(*) AS n FROM data WHERE ${c} IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 300`,
+    x: "x",
+    y: ["y"],
+  };
+}
+
+/**
+ * Drop the bins on a map, the groups in a box plot, the bands in a flow diagram and the cities that hold too few rows to publish: a
  * box or a band over one or two rows would show the values themselves. Other charts are returned as they are.
  */
 export function applyPrivacyFloor<T extends Record<string, unknown>>(chart: Pick<ChartSpec, "type">, rows: T[]): T[] {
-  return chart.type === "map" || chart.type === "boxplot" || chart.type === "sankey" ? rows.filter((r) => Number(r.n) >= MAP_MIN_ROWS) : rows;
+  return chart.type === "map" || chart.type === "boxplot" || chart.type === "sankey" || chart.type === "cities" ? rows.filter((r) => Number(r.n) >= MAP_MIN_ROWS) : rows;
 }
 
 export function suggestDashboard(title: string, profile: TableProfile): DashboardSpec {
@@ -234,6 +250,7 @@ export function suggestDashboard(title: string, profile: TableProfile): Dashboar
 
   if (profile.states) add(regionsChart(profile.states, measures[0], "us"));
   else if (profile.countries) add(regionsChart(profile.countries, measures[0]));
+  if (profile.cities) add(citiesChart(profile.cities, measures[0]));
 
   // Category breakdowns
   for (const cat of categories.slice(0, 2)) {

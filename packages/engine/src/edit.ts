@@ -1,7 +1,8 @@
 import type { ChartSpec, DashboardSpec } from "@dropboard/spec";
 import type { ColumnProfile, TableProfile } from "./profile";
 import type { PlaceKind } from "./places";
-import { funnelChart, isMeasure, regionsChart, sankeyChart, treemapChart } from "./suggest";
+import { MAX_CITIES } from "./cities";
+import { citiesChart, funnelChart, isMeasure, regionsChart, sankeyChart, treemapChart } from "./suggest";
 
 /**
  * Small, exact edits to a saved dashboard, for the cases where automatic detection gets a place wrong: take a map off,
@@ -45,6 +46,22 @@ export function addPlaceChart(spec: DashboardSpec, profile: TableProfile, kind: 
   if (spec.charts.some((c) => c.type === "regions" && c.query === built.query && (c.map ?? "world") === (built.map ?? "world"))) {
     return `${column} is already mapped on this dashboard`;
   }
+  return insertChart(spec, built);
+}
+
+/** Text columns a person could choose as a column of cities. */
+export function cityColumnChoices(profile: TableProfile): ColumnProfile[] {
+  return profile.columns.filter((c) => c.type === "string" && c.distinct >= 2 && c.distinct <= MAX_CITIES);
+}
+
+/** Add a city map for a column the person says holds cities. Returns the new dashboard, or a short reason it was not added. */
+export function addCityChart(spec: DashboardSpec, profile: TableProfile, column: string): DashboardSpec | string {
+  const col = profile.columns.find((c) => c.name === column);
+  if (!col || col.type !== "string") return `${column} is not a text column`;
+  if (col.distinct > MAX_CITIES) return `${column} has too many different values for a map`;
+  const measure = profile.columns.find((c) => isMeasure(c, profile.rowCount) && c.name !== profile.coordinates?.lat && c.name !== profile.coordinates?.lon);
+  const built = citiesChart(column, measure);
+  if (spec.charts.some((c) => c.type === "cities" && c.query === built.query)) return `${column} is already mapped on this dashboard`;
   return insertChart(spec, built);
 }
 
