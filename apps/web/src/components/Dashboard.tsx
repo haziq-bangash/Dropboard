@@ -6,9 +6,11 @@ import * as echarts from "echarts";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ChevronLeft, ChevronRight, Download, Hash, Presentation, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Presentation, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { loadCities } from "@/lib/cities";
+import { Grain } from "@/components/art/Grain";
+import { bentoTile, Stat, TONES } from "@/components/marketing/bento";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,6 +37,8 @@ const COLORS = [
 // Lines that must be told apart (one per company): the brand colours first, then four more that stay distinct from them
 const SERIES_COLORS = [...COLORS, "#A64B8F", "#6A9F3C", "#4A6FA5", "#9C6B4E"];
 const MUTED = "#6F7F86";
+/** The tile colours the headline numbers take, in turn, as on the homepage. */
+const KPI_TONES = ["teal", "yellow", "grey", "orange"] as const;
 // text on a coloured tile: dark on the light sand colour, white on the others
 const inkOn = (i: number) => (COLORS[i % COLORS.length] === "#F4D47C" ? "#233038" : "#FFFFFF");
 
@@ -528,6 +532,7 @@ function ChartCard({
   dataKey,
   tall,
   onRemove,
+  kpiTone = "yellow",
 }: {
   spec: ChartSpec;
   source: RowSource;
@@ -536,6 +541,8 @@ function ChartCard({
   tall?: boolean;
   /** When given (the owner's page), a button takes this chart off the dashboard */
   onRemove?: () => void;
+  /** The tile colour, for a headline number */
+  kpiTone?: keyof typeof TONES;
 }) {
   // Keyed by which rows are loaded, so the same SQL on a different file is never answered from the old rows
   const query = useQuery({
@@ -561,39 +568,27 @@ function ChartCard({
 
   if (spec.type === "kpi") {
     return (
-      <Card size="sm" data-testid="kpi">
-        <CardHeader className="flex items-center gap-3">
-          <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-lg bg-secondary/60 text-brand-text">
-            <Hash className="size-5" />
+      <div className={`${bentoTile} ${TONES[kpiTone]} min-h-[150px] p-5`} data-testid="kpi">
+        {kpiTone === "teal" && <div aria-hidden="true" className="absolute inset-0 -z-10 bg-cover bg-center opacity-20" style={{ backgroundImage: "url(/art/topo-lines-light.svg)" }} />}
+        <Grain className="-z-10 opacity-40" />
+        <p className="line-clamp-2 text-sm font-medium leading-tight opacity-80">{spec.title}</p>
+        <Stat>
+          <span className="mt-1 block text-5xl" data-testid="kpi-value">
+            {error ? "–" : rows ? fmt(rows[0]?.value) : <Skeleton className="h-11 w-28 bg-current/20" />}
           </span>
-          <div className="min-w-0">
-            <p className="line-clamp-2 text-sm leading-tight text-muted-foreground">{spec.title}</p>
-            <div
-              className="text-3xl font-semibold tracking-tight text-primary"
-              data-testid="kpi-value"
-            >
-              {error ? (
-                "–"
-              ) : rows ? (
-                fmt(rows[0]?.value)
-              ) : (
-                <Skeleton className="h-9 w-24" />
-              )}
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
+        </Stat>
+      </div>
     );
   }
 
   return (
     <Card
-      className={spec.type === "table" ? "md:col-span-2" : undefined}
+      className={`rounded-3xl ${spec.type === "table" ? "md:col-span-2" : ""}`}
       data-testid="chart-card"
       ref={cardRef}
     >
       <CardHeader>
-        <CardTitle>{spec.title}</CardTitle>
+        <CardTitle className="font-serif text-xl font-normal tracking-normal">{spec.title}</CardTitle>
         {(onRemove || (spec.type !== "table" && rows && !error)) && (
           <CardAction className="flex items-center gap-1">
             {spec.type !== "table" && rows && !error && (
@@ -673,8 +668,8 @@ function Present({ spec, source, dataKey }: { spec: DashboardSpec; source: RowSo
           <div className="min-h-0 overflow-auto" data-testid="present-slide">
             {slide === "numbers" ? (
               <div className="grid h-full grid-cols-2 content-center gap-4 lg:grid-cols-4">
-                {kpis.map((c) => (
-                  <ChartCard key={c.id} spec={c} source={source} dataKey={dataKey} />
+                {kpis.map((c, i) => (
+                  <ChartCard key={c.id} spec={c} source={source} dataKey={dataKey} kpiTone={KPI_TONES[i % KPI_TONES.length]} />
                 ))}
               </div>
             ) : (
@@ -726,8 +721,8 @@ export function Dashboard({
       </div>
       {kpis.length > 0 && (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {kpis.map((c) => (
-            <ChartCard key={c.id} spec={c} source={source} dataKey={dataKey} />
+          {kpis.map((c, i) => (
+            <ChartCard key={c.id} spec={c} source={source} dataKey={dataKey} kpiTone={KPI_TONES[i % KPI_TONES.length]} />
           ))}
         </div>
       )}
