@@ -70,6 +70,7 @@ Rules:
 - pareto: share20 and share10 are the fractions of a total held by the top 20% and top 10% of values, groups how many values there are, biggestShare the largest single value's fraction.
 - retention: share is the fraction of people (of people counted) who were active in a later month after their first, nextMonth the fraction who came back the very next month, cohorts how many monthly groups were followed.
 - cohorttrend: earlier and later are the fractions of older and newer groups who came back the next month, change their difference as a fraction; earlierPeople and laterPeople are the sizes. {at} stands for the span of newer groups.
+- shape: one stretch of a series whose pattern is unlike every other stretch though its values are not out of range. length is how many points it spans, similarity how well its closest match fits (1 is the same shape), spreadsAway how unusual that is. {at} stands for the stretch.
 - text: a column of free text. median and p90 are lengths in characters, topShare the fraction of rows containing the most common word, repeated the fraction of values that duplicate another row. {label} stands for that most common word. Never guess what the text says.
 - quality: a problem in the data itself. count and share say how much of it; label stands for an example value. Describe the problem and what to fix, not what the values mean.
 - duplicates: duplicateRows is how many rows are copies, share is that as a fraction of all rows.

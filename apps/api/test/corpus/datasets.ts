@@ -19,7 +19,7 @@ export interface Dataset {
   /** Charts that must be present, by type. */
   charts?: string[];
   /** Anomalies planted in the data: the kind of finding that must appear, and words its sentence must contain. Tables without this must produce none. */
-  anomalies?: { kind: "unusualrows" | "contextual"; mentions: string }[];
+  anomalies?: { kind: "unusualrows" | "contextual" | "shape"; mentions: string }[];
   /** Findings that must appear, by kind, with words their sentence must contain. Tables that are not panels and list none must produce no concentration or standout. */
   insights?: { kind: string; mentions: string }[];
   /** Problems planted in the data: the issue codes of the data-quality findings that must appear. Tables without this must have none. */
@@ -328,6 +328,25 @@ function monthlySales(): Dataset {
   };
 }
 
+/** Eight years of monthly sales with a clear yearly wave, and one year in which the wave never came: every value is ordinary, the shape is not. */
+function flatYear(): Dataset {
+  const r = seeded(23);
+  const rows = range(96).map((i) => {
+    const wave = Math.floor(i / 12) === 5 ? 0 : Math.sin((2 * Math.PI * (i % 12)) / 12);
+    return [iso(new Date(Date.UTC(2016, i, 1))), Math.round(8000 * (1 + 0.35 * wave) * (1 + r.normal() * 0.03)), 300 + r.int(0, 40)];
+  });
+  return {
+    id: "monthly-flat-year",
+    title: "Monthly sales with a year that lost its season",
+    csv: csv(["month", "sales", "orders"], rows),
+    rows: rows.length,
+    roles: { month: "time", sales: "flow" },
+    time: "month",
+    charts: ["line"],
+    anomalies: [{ kind: "shape", mentions: "unlike any other" }],
+  };
+}
+
 /** Orders exported from a messy system: spellings, placeholders, a text number column, wrong dates, and two months missing. */
 function dirtyOrders(): Dataset {
   const r = seeded(31);
@@ -457,4 +476,4 @@ function sparse(): Dataset {
   };
 }
 
-export const DATASETS: Dataset[] = [reviews(), cohorts("cohorts-steady", "Orders where every cohort comes back alike", 51, () => 0.35), cohorts("cohorts-worse", "Orders where newer customers come back less", 52, (join) => (join < 6 ? 0.5 : 0.2)), retailWhales(), textPeriods("text-months-iso", "Revenue with 2021-03 months", (y, m) => `${y}-${String(m + 1).padStart(2, "0")}`), textPeriods("text-months-words", "Revenue with Mar 2021 months", (y, m) => `${MONTHS[m]} ${y}`), textPeriods("text-quarters", "Revenue with 2021-Q1 quarters", (y, m) => `${y}-Q${Math.floor(m / 3) + 1}`, 3), cyclicMonths(), finance(), retail(), retailWithErrors(), monthlySales(), dirtyOrders(), dirtyPanel(), hr(), saas(), web(), survey(), sensors(), marketing(), realEstate(), education(), healthcare(), sports(), tiny(), oneColumn(), allText(), sparse()];
+export const DATASETS: Dataset[] = [flatYear(), reviews(), cohorts("cohorts-steady", "Orders where every cohort comes back alike", 51, () => 0.35), cohorts("cohorts-worse", "Orders where newer customers come back less", 52, (join) => (join < 6 ? 0.5 : 0.2)), retailWhales(), textPeriods("text-months-iso", "Revenue with 2021-03 months", (y, m) => `${y}-${String(m + 1).padStart(2, "0")}`), textPeriods("text-months-words", "Revenue with Mar 2021 months", (y, m) => `${MONTHS[m]} ${y}`), textPeriods("text-quarters", "Revenue with 2021-Q1 quarters", (y, m) => `${y}-Q${Math.floor(m / 3) + 1}`, 3), cyclicMonths(), finance(), retail(), retailWithErrors(), monthlySales(), dirtyOrders(), dirtyPanel(), hr(), saas(), web(), survey(), sensors(), marketing(), realEstate(), education(), healthcare(), sports(), tiny(), oneColumn(), allText(), sparse()];

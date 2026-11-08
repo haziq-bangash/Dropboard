@@ -1,3 +1,4 @@
+import { shapeDiscord } from "./anomaly/discord";
 import { seriesAnomalies } from "./anomaly/series";
 import { cohortFindings, type CohortInput } from "./cohort";
 import { textFindings, type TextInput } from "./text";
@@ -17,7 +18,7 @@ import { benjaminiHochberg, changePoint, dominance, mannKendall, mean, median, o
  *   3. Findings come back ranked, with a plain sentence and the numbers behind it.
  */
 
-export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "concentration" | "missing" | "seasonal" | "latest" | "duplicates" | "leader" | "standout" | "entitytrend" | "jump" | "rankshift" | "unusualrows" | "contextual" | "quality" | "pareto" | "retention" | "cohorttrend" | "text";
+export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "concentration" | "missing" | "seasonal" | "latest" | "duplicates" | "leader" | "standout" | "entitytrend" | "jump" | "rankshift" | "unusualrows" | "contextual" | "quality" | "pareto" | "retention" | "cohorttrend" | "text" | "shape";
 
 /** The rows or points behind a finding, for a person to look at. They stay in the browser: nothing here is ever sent to a model. */
 export interface FindingDetails {
@@ -238,6 +239,12 @@ function describe(f: RawFinding): Pick<Finding, "headline" | "figure" | "next"> 
         next: "Find out what changed for the newer group: how they were found, what they first bought, or what the service was like in their first month.",
       };
     }
+    case "shape":
+      return {
+        headline: `${a} broke its usual shape`,
+        figure: { value: `${e.length} points`, label: "that match no other stretch" },
+        next: "Check whether something changed during that stretch (a closure, a campaign, a change in how it was recorded) before reading the rest of the series as a pattern.",
+      };
     case "text":
       return {
         headline: `${a} is free text`,
@@ -576,6 +583,22 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
     const period = s.unit === "month" ? 12 : s.unit === "day" ? 7 : 0;
     for (const a of seriesAnomalies(s.y, phases && period ? { season: { phases, period } } : {}).slice(0, 2)) {
       contextual.push(contextualFinding(s.column, null, s.labels?.[a.index] ?? `point ${a.index + 1}`, a, !!phases));
+    }
+    // a stretch with a shape of its own that no single point gives away (a summer without its peak), only where no point was out of pattern
+    if (!contextual.some((c) => c.columns[0] === s.column && !c.evidence.label)) {
+      const d = shapeDiscord(s.y, period ? { length: period } : {});
+      if (d) {
+        const from = s.labels?.[d.index] ?? `point ${d.index + 1}`;
+        const to = s.labels?.[d.index + d.length - 1] ?? `point ${d.index + d.length}`;
+        contextual.push({
+          kind: "shape",
+          columns: [s.column],
+          sentence: `${s.column} has a stretch with a shape unlike any other, ${from} to ${to}: it does not follow the pattern the rest of the series repeats, even though its values are not out of range.`,
+          p: null,
+          strength: 0.5 + clamp01((d.z - 7) / 40) * 0.25,
+          evidence: { at: `${from} to ${to}`, length: d.length, similarity: Number(Math.max(0, d.similarity).toFixed(2)), spreadsAway: Number(d.z.toFixed(1)) },
+        });
+      }
     }
   }
   for (const p of input.panel ?? []) {
