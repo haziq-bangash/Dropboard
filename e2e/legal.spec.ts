@@ -57,6 +57,18 @@ test("the trust center states what is in place, and says plainly what is not", a
   await expect(page.getByRole("link", { name: "privacy@dropboard.de" }).first()).toBeVisible();
 });
 
+test("each service that handles data has its logo, and every logo loads", async ({ page }) => {
+  await page.goto("/trust");
+  const list = page.getByRole("listitem").filter({ has: page.getByRole("heading", { name: /OpenAI|Resend|Google|PostgreSQL/ }) });
+  const logos = list.locator("img[src^=\"/brand/partners/\"]");
+  await expect(logos).toHaveCount(5);
+  // decorative: the service is named in text next to it
+  for (const img of await logos.all()) {
+    await expect(img).toHaveAttribute("alt", "");
+    expect(await img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
+  }
+});
+
 test("signing up shows that it means agreeing to the terms and the privacy policy", async ({ page }) => {
   await page.goto("/login");
   await page.getByRole("button", { name: "No account? Sign up" }).click();

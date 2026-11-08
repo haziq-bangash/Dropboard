@@ -52,12 +52,12 @@ const BADGES: { icon: LucideIcon; status: Status; title: string; text: string }[
   { icon: ShieldCheck, status: "Not yet", title: "SOC 2 and ISO 27001", text: "Not certified. We do not claim them." },
 ];
 
-const PROCESSORS: { name: string; job: string; sees: string }[] = [
-  { name: "Google Cloud", job: "Hosts the site and the service, in Frankfurt", sees: "Everything the service handles, as the host" },
-  { name: "A managed PostgreSQL database", job: "Stores accounts and saved dashboards", sees: "Account details, dashboards and published snapshots, never rows" },
-  { name: "OpenAI", job: `Runs ${ASSISTANT}`, sees: "Column names, counts and what you type, never rows" },
-  { name: "Resend", job: "Sends confirmation and password-reset emails", sees: "Your email address and the message" },
-  { name: "Google sign-in", job: "Optional sign-in", sees: "That you signed in; it tells us your name and email" },
+const PROCESSORS: { name: string; logo: string; job: string; sees: string }[] = [
+  { name: "Google Cloud", logo: "googlecloud", job: "Hosts the site and the service, in Frankfurt", sees: "Everything the service handles, as the host" },
+  { name: "A managed PostgreSQL database", logo: "postgresql", job: "Stores accounts and saved dashboards", sees: "Account details, dashboards and published snapshots, never rows" },
+  { name: "OpenAI", logo: "openai", job: `Runs ${ASSISTANT}`, sees: "Column names, counts and what you type, never rows" },
+  { name: "Resend", logo: "resend", job: "Sends confirmation and password-reset emails", sees: "Your email address and the message" },
+  { name: "Google sign-in", logo: "google", job: "Optional sign-in", sees: "That you signed in; it tells us your name and email" },
 ];
 
 export default function Trust() {
@@ -171,10 +171,16 @@ export default function Trust() {
         </div>
         <ul className="flex flex-col gap-3">
           {PROCESSORS.map((p) => (
-            <li key={p.name} className="grid gap-1 rounded-2xl border bg-card p-5 sm:grid-cols-[1fr_1.4fr] sm:gap-6">
-              <div>
-                <h3 className="font-serif text-xl font-normal tracking-normal">{p.name}</h3>
-                <p className="text-sm text-muted-foreground">{p.job}</p>
+            <li key={p.name} className="grid items-center gap-4 rounded-2xl border bg-card p-5 sm:grid-cols-[1fr_1.4fr] sm:gap-6">
+              <div className="flex items-center gap-4">
+                <span className="grid size-14 shrink-0 place-items-center rounded-xl border bg-background">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/brand/partners/${p.logo}.svg`} alt="" width={28} height={28} className="size-7 object-contain" />
+                </span>
+                <div>
+                  <h3 className="font-serif text-xl font-normal tracking-normal">{p.name}</h3>
+                  <p className="text-sm text-muted-foreground">{p.job}</p>
+                </div>
               </div>
               <p className="text-sm">
                 <span className="font-medium">Sees: </span>
