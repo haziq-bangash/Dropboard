@@ -72,16 +72,16 @@ async function findPanel(profile: TableProfile, run: RunSql): Promise<TableProfi
   const candidates = profile.columns
     .filter((c) => c.type === "string" && c.distinct >= 2 && c.distinct <= MAX_ENTITIES && !looksLikeId(c, rows) && rows / c.distinct >= 3 && !isYearColumn(c, rows))
     .slice(0, 6);
-  let best: { name: string; distinct: number } | undefined;
+  let best: { name: string; distinct: number; repeated: number } | undefined;
   for (const c of candidates) {
     const [r] = await run(`SELECT count(*) AS n, count(DISTINCT (${q(c.name)}, ${t})) AS k, count(DISTINCT ${q(c.name)}) AS e, count(DISTINCT ${t}) AS p FROM data WHERE ${q(c.name)} IS NOT NULL AND ${q(time.column.name)} IS NOT NULL`);
     const n = Number(r?.n);
     const k = Number(r?.k);
     const grid = Number(r?.e) * Number(r?.p);
     // one row per entity per period, and most of the entity-by-period grid filled: a table of events that happens to rarely repeat a pair is not a panel
-    if (n > 0 && k / n >= 0.9 && grid > 0 && k / grid >= 0.5 && (!best || c.distinct > best.distinct)) best = { name: c.name, distinct: c.distinct };
+    if (n > 0 && k / n >= 0.9 && grid > 0 && k / grid >= 0.5 && (!best || c.distinct > best.distinct)) best = { name: c.name, distinct: c.distinct, repeated: n - k };
   }
-  return best ? { entity: best.name, time: time.column.name } : undefined;
+  return best ? { entity: best.name, time: time.column.name, ...(best.repeated > 0 ? { repeated: best.repeated } : {}) } : undefined;
 }
 
 /**

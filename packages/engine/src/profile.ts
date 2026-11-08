@@ -25,7 +25,7 @@ export interface TableProfile {
   /** A column of US states (names or abbreviations), when there is one */
   states?: string;
   /** Set when the table is one row per entity per period (a company by year): which columns, found by testing that they identify a row. */
-  panel?: { entity: string; time: string };
+  panel?: { entity: string; time: string; /** Rows beyond the first for an entity and period that appear more than once. */ repeated?: number };
   /** Set when the file was too big to hold, so the table is a random sample: how many rows it holds, and how many the file has. */
   sample?: { rows: number; of: number };
   /** A column of cities, when there is one (needs a column name that points at places, and the city list) */
