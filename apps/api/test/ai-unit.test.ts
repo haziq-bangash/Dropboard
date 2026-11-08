@@ -229,3 +229,61 @@ describe("buildSpec with a state map", () => {
     expect(dropped.map((d) => d.reason)).toEqual(["sales is not a text column", "state is not a number column"]);
   });
 });
+
+describe("buildSpec with a treemap, a funnel and a flow diagram", () => {
+  const t = {
+    rowCount: 500,
+    columns: [
+      { name: "region", type: "string" as const, nullCount: 0, distinct: 4 },
+      { name: "product", type: "string" as const, nullCount: 0, distinct: 30 },
+      { name: "stage", type: "string" as const, nullCount: 0, distinct: 5 },
+      { name: "step", type: "string" as const, nullCount: 0, distinct: 8 },
+      { name: "customer", type: "string" as const, nullCount: 0, distinct: 400 },
+      { name: "revenue", type: "number" as const, nullCount: 0, distinct: 300 },
+    ],
+  };
+  const c = (type: "treemap" | "funnel" | "sankey", columns: string[]) => ({ type, title: "", query: "", columns });
+
+  it("builds each from column names, with the measure where it was named", () => {
+    const { spec, dropped } = buildSpec(t, {
+      title: "x",
+      charts: [c("treemap", ["region", "product", "revenue"]), c("treemap", ["region", "revenue"]), c("funnel", ["stage", "revenue"]), c("sankey", ["stage", "step", "revenue"]), { type: "kpi", title: "k", query: "SELECT 1 AS value", columns: [] }],
+    });
+    expect(dropped).toEqual([]);
+    expect(spec.charts.map((x) => x.type)).toEqual(["treemap", "treemap", "funnel", "sankey", "kpi"]);
+    expect(spec.charts[0].query).toContain('"product" AS child');
+    expect(spec.charts[1].query).not.toContain("AS child");
+    expect(spec.charts[3].title).toBe("revenue from stage to step");
+  });
+
+  it("drops the wrong shapes with a reason, and never builds from a name that is not a column", () => {
+    const { dropped } = buildSpec(t, {
+      title: "x",
+      charts: [
+        c("treemap", ["customer"]),
+        c("treemap", ["revenue"]),
+        c("treemap", ["region", "region"]),
+        c("funnel", ["product"]),
+        c("funnel", ["stage", "region"]),
+        c("sankey", ["stage"]),
+        c("sankey", ["stage", "stage"]),
+        c("sankey", ["customer", "stage"]),
+        c("sankey", ["stage", "revenue"]),
+        c("funnel", ['stage") FROM data; --']),
+        { type: "kpi", title: "k", query: "SELECT 1 AS value", columns: [] },
+      ],
+    });
+    expect(dropped.map((d) => d.reason)).toEqual([
+      "a treemap needs a column with fewer different values",
+      "revenue is not a text column",
+      "a treemap needs two different columns",
+      "a funnel needs a column with few stages (12 at most)",
+      "region is not a number column",
+      "sankey needs 2 column names",
+      "a flow diagram needs two different columns",
+      "a flow diagram needs columns with few distinct values",
+      "a flow diagram needs two text columns",
+      expect.stringMatching(/^no column called/),
+    ]);
+  });
+});

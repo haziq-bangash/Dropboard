@@ -19,6 +19,7 @@ import { DropZone } from "@/components/app/DropZone";
 import { InsightsPanel } from "@/components/app/InsightsPanel";
 import { StoryPanel } from "@/components/app/StoryPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AddChartMenu } from "@/components/app/AddChartMenu";
 import { PlacesMenu } from "@/components/app/PlacesMenu";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -219,11 +220,18 @@ export default function ProjectPage() {
               spec={project.spec}
               onSpec={(spec) => actions.saveSpec.mutate({ id, spec })}
             />
-            <PlacesMenu
-              profile={data.profile}
-              spec={project.spec}
-              onSpec={(spec) => actions.saveSpec.mutate({ id, spec })}
-            />
+            <div className="flex flex-wrap items-center gap-3">
+              <AddChartMenu
+                profile={data.profile}
+                spec={project.spec}
+                onSpec={(spec) => actions.saveSpec.mutate({ id, spec })}
+              />
+              <PlacesMenu
+                profile={data.profile}
+                spec={project.spec}
+                onSpec={(spec) => actions.saveSpec.mutate({ id, spec })}
+              />
+            </div>
             <Dashboard
               spec={project.spec}
               source={liveSource}

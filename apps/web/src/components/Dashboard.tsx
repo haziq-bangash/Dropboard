@@ -32,6 +32,8 @@ const COLORS = [
   "#F4D47C",
 ];
 const MUTED = "#6F7F86";
+// text on a coloured tile: dark on the light sand colour, white on the others
+const inkOn = (i: number) => (COLORS[i % COLORS.length] === "#F4D47C" ? "#233038" : "#FFFFFF");
 
 const fmt = (v: unknown) =>
   typeof v === "number"
@@ -287,6 +289,101 @@ function toOption(spec: ChartSpec, rows: Rows, geo?: Geo): echarts.EChartsCoreOp
           },
         ],
       };
+    case "treemap": {
+      const two = rows.some((r) => r.child !== undefined && r.child !== null);
+      const groups = new Map<string, { name: string; value: number; children: { name: string; value: number }[] }>();
+      if (two) {
+        for (const r of rows) {
+          const key = fmt(r[x]);
+          const g = groups.get(key) ?? { name: key, value: 0, children: [] };
+          const v = Number(r[y]);
+          if (Number.isFinite(v) && v > 0) {
+            g.value += v;
+            g.children.push({ name: fmt(r.child), value: v });
+          }
+          groups.set(key, g);
+        }
+      }
+      const tile = (name: string, value: number, i: number, children?: { name: string; value: number }[]) => ({
+        name,
+        value,
+        // every part of a group takes the group's colour, so a group reads as one block with white lines between its parts
+        ...(children ? { children: children.map((c) => ({ ...c, itemStyle: { color: COLORS[i % COLORS.length] }, label: { color: inkOn(i) } })) } : {}),
+        itemStyle: { color: COLORS[i % COLORS.length] },
+        label: { color: inkOn(i) },
+        // the group's name sits above its tiles, on the white card
+        upperLabel: { color: "#233038" },
+      });
+      const data = two
+        ? [...groups.values()].filter((g) => g.value > 0).map((g, i) => tile(g.name, g.value, i, g.children))
+        : rows.filter((r) => Number(r[y]) > 0).map((r, i) => tile(fmt(r[x]), Number(r[y]), i));
+      return {
+        color: COLORS,
+        tooltip: { formatter: (p: { name: string; value: number; treePathInfo: { name: string }[] }) => `${p.treePathInfo.slice(1).map((n) => n.name).join(" / ")}: ${fmt(p.value)}` },
+        series: [
+          {
+            type: "treemap",
+            roam: false,
+            nodeClick: false,
+            breadcrumb: { show: false },
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            label: { show: true, formatter: "{b}", overflow: "truncate" },
+            upperLabel: two ? { show: true, height: 22, fontWeight: 600 } : undefined,
+            itemStyle: { borderColor: "#FFFFFF", borderWidth: 2, gapWidth: 2 },
+            levels: two ? [{ itemStyle: { borderWidth: 0, gapWidth: 3 } }, { itemStyle: { gapWidth: 1, borderColor: "#FFFFFF", borderWidth: 1 } }] : undefined,
+            data,
+          },
+        ],
+      };
+    }
+    case "funnel":
+      return {
+        color: COLORS,
+        tooltip: { trigger: "item", formatter: (p: { name: string; value: number }) => `${p.name}: ${fmt(p.value)}` },
+        series: [
+          {
+            type: "funnel",
+            sort: "descending",
+            left: "8%",
+            right: "8%",
+            top: 8,
+            bottom: 8,
+            gap: 3,
+            minSize: "8%",
+            label: { show: true, position: "inside", formatter: (p: { name: string; value: number }) => `${p.name}  ${fmt(p.value)}`, color: "#FFFFFF" },
+            itemStyle: { borderColor: "#FFFFFF", borderWidth: 1 },
+            data: rows.filter((r) => Number(r[y]) > 0).map((r, i) => ({ name: fmt(r[x]), value: Number(r[y]), label: { color: inkOn(i) } })),
+          },
+        ],
+      };
+    case "sankey": {
+      // the same word can appear on both sides, which would make a loop: each side gets its own nodes
+      const flows = rows.filter((r) => Number(r[y]) > 0);
+      const starts = [...new Set(flows.map((r) => fmt(r[x])))];
+      const ends = [...new Set(flows.map((r) => fmt(r.target)))];
+      return {
+        color: COLORS,
+        tooltip: { trigger: "item", formatter: (p: { data: { source?: string; target?: string; value?: number }; name: string }) => (p.data.source ? `${p.data.source.slice(2)} to ${p.data.target?.slice(2)}: ${fmt(p.data.value)}` : p.name.slice(2)) },
+        series: [
+          {
+            type: "sankey",
+            left: 8,
+            right: 120,
+            top: 8,
+            bottom: 8,
+            nodeGap: 10,
+            emphasis: { focus: "adjacency" },
+            lineStyle: { color: "source", opacity: 0.4, curveness: 0.5 },
+            label: { color: "#233038", formatter: (p: { name: string }) => p.name.slice(2) },
+            data: [...starts.map((n) => ({ name: `s:${n}` })), ...ends.map((n) => ({ name: `t:${n}` }))],
+            links: flows.map((r) => ({ source: `s:${fmt(r[x])}`, target: `t:${fmt(r.target)}`, value: Number(r[y]) })),
+          },
+        ],
+      };
+    }
     default:
       return base;
   }

@@ -77,3 +77,7 @@ One live check on 8 Nov 2026 with `gpt-6-luna`, five tries on seven findings mad
 ## Default model for OpenAI: gpt-6-luna (8 Nov 2026)
 
 Same 51 questions, 2 tries each, run side by side on 8 Nov 2026. `gpt-6-luna`: 100 of 102 exactly right and the other 2 usable (the right answer first in a longer list), no wrong answers, no errors; dashboards 10 of 10 fully working, median 3.5 s. `gpt-5.4-mini`: 101 of 102 exactly right and 1 usable, dashboards 10 of 10, median 5.6 s. The one-answer difference is within noise at this size, and `gpt-6-luna` is faster and writes fewer tokens. It is now the default when `AI_PROVIDER=openai` and `AI_MODEL` is not set. Set `AI_MODEL` to use another.
+
+## Treemap, funnel and flow diagram (Nov 2026)
+
+Pilot can also choose these three by naming columns, built by the same code as an Add a chart menu on the dashboard. One live check on 8 Nov 2026 with `gpt-6-luna`, three tries, on the store sample with an instruction asking for a treemap of revenue by region and category, a funnel of the channels and a flow diagram from region to channel: all three tries returned those three charts plus two headline numbers, nothing was dropped, and every chart's query ran. A smoke test, not a measurement.

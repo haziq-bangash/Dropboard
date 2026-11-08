@@ -182,3 +182,42 @@ test("a column the detector missed can be mapped by hand, and a chart can be rem
   await expect(page.getByTestId("chart-card")).toHaveCount(before - 1);
   await expect(page.getByRole("img", { name: /^Region map/ })).toHaveCount(0);
 });
+
+test("a treemap, a funnel and a flow diagram can be added by choosing columns, and each is described", async ({ page }) => {
+  await signUp(page);
+  await page.goto("/app/new");
+  await page.getByTestId("starter").filter({ hasText: "Online store orders" }).click();
+  await expect(page).toHaveURL(/\/app\/p\//, { timeout: 30_000 });
+  await expect(page.getByTestId("kpi-value").first()).not.toHaveText("", { timeout: 30_000 });
+
+  const add = async (item: string) => {
+    await page.getByRole("button", { name: "Add a chart" }).click();
+    await page.getByRole("menuitem", { name: item }).click();
+  };
+  const dialog = page.getByRole("dialog");
+
+  await add("Treemap");
+  await dialog.getByLabel("Groups", { exact: true }).selectOption("region");
+  await dialog.getByLabel("Split each group by").selectOption("category");
+  await dialog.getByLabel("Sized by").selectOption("revenue");
+  await page.getByRole("button", { name: "Add chart" }).click();
+  await expect(page.getByRole("img", { name: /^Treemap: revenue by region and category\. 4 groups, largest first: .+ Split into 24 parts/ })).toBeVisible({ timeout: 30_000 });
+
+  await add("Funnel");
+  await dialog.getByLabel("Stages", { exact: true }).selectOption("channel");
+  await page.getByRole("button", { name: "Add chart" }).click();
+  await expect(page.getByRole("img", { name: /^Funnel: Rows by channel\. 4 stages, widest first\./ })).toBeVisible({ timeout: 30_000 });
+
+  await add("Flow diagram");
+  await dialog.getByLabel("Starts in").selectOption("region");
+  await dialog.getByLabel("Ends in").selectOption("channel");
+  await dialog.getByLabel("Sized by").selectOption("revenue");
+  await page.getByRole("button", { name: "Add chart" }).click();
+  await expect(page.getByRole("img", { name: /^Flow diagram: revenue from region to channel\. 16 flows from 4 starts to 4 ends\./ })).toBeVisible({ timeout: 30_000 });
+
+  // adding the same funnel again says so
+  await add("Funnel");
+  await dialog.getByLabel("Stages", { exact: true }).selectOption("channel");
+  await page.getByRole("button", { name: "Add chart" }).click();
+  await expect(page.getByRole("alert")).toContainText("already on this dashboard");
+});

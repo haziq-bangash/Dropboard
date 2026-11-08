@@ -1,7 +1,7 @@
 import type { AiTable, GenerateInput, NarrateInput } from "@dropboard/spec";
 
 /** Bump when SYSTEM changes, so cached dashboards from older prompts are not reused. */
-export const PROMPT_VERSION = 5;
+export const PROMPT_VERSION = 6;
 
 export const SYSTEM = `You design dashboards for tabular data. You will be given only the SCHEMA of a table (column names, types, null counts and approximate distinct counts). You never see any row values, so never guess or quote values.
 
@@ -16,7 +16,7 @@ Rules for queries:
   - bar, pie: columns aliased x (category) and y (number). Order by y descending and LIMIT 20.
   - line, area: columns aliased x (a date or ordered value) and y (number), ordered by x. For dates use date_trunc('month', "col") or another grain that suits the span.
   - scatter: columns aliased x and y, both numbers, with LIMIT 1000.
-- Seven more chart types are not written as SQL. For these, set query to an empty string and list column names in columns, using exact names from the schema:
+- Ten more chart types are not written as SQL. For these, set query to an empty string and list column names in columns, using exact names from the schema:
   - histogram: columns = [a number column]. Shows how its values are spread out.
   - heatmap: columns = [text column, text column] and optionally a number column third. Both text columns need few distinct values (25 at most). Shows each pair shaded by the number, or by row count.
   - boxplot: columns = [text column, number column]. The text column needs few distinct values (25 at most). Shows how the number varies within each group.
@@ -24,6 +24,9 @@ Rules for queries:
   - calendar: columns = [a date column]. Shows how many rows fall on each day over the latest year. Only when the dates cover many different days.
   - map: columns = [latitude, longitude], both number columns. Only when the schema has a latitude and a longitude.
   - regions: columns = [a text column of countries] and optionally a number column second. Only when a column clearly holds country names or codes. Shades a world map.
+  - treemap: columns = [a text column] and optionally a second text column to split each tile (both with 40 distinct values at most), and optionally a number column last. Shows how a total divides up.
+  - funnel: columns = [a text column of stages with 12 distinct values at most] and optionally a number column. Shows stages from the largest to the smallest.
+  - sankey: columns = [a text column, a text column] and optionally a number column third. Both text columns need few distinct values (25 at most). Shows how things move from the values of the first column to the values of the second.
   For every other type, set columns to an empty list.
 - Use sum, avg, count, min, max as the data suggests. Do not sum columns that look like identifiers, ratios or percentages (use avg for those).
 

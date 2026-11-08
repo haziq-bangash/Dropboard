@@ -4,7 +4,7 @@ import { z } from "zod";
 // so the model only has to get titles and SQL right.
 // histogram, heatmap, boxplot, calendar, map and regions are not written as SQL by the model: it names the columns, and the server builds
 // the query with the same tested builders the automatic dashboard uses.
-export const SPECIAL_CHARTS = ["histogram", "heatmap", "map", "regions", "boxplot", "calendar", "statemap"] as const;
+export const SPECIAL_CHARTS = ["histogram", "heatmap", "map", "regions", "boxplot", "calendar", "statemap", "treemap", "funnel", "sankey"] as const;
 
 export const AiChart = z.object({
   type: z.enum(["kpi", "bar", "line", "area", "pie", "scatter", ...SPECIAL_CHARTS]),
