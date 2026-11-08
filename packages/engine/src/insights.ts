@@ -1,7 +1,7 @@
 import { seriesAnomalies } from "./anomaly/series";
 import { clamp01, fmt, observedChange, pct, pctFine } from "./format";
 import { qualityFindings, type QualityInput } from "./quality";
-import { panelChecks, panelTrendCandidates, strongestTrends } from "./panelInsights";
+import { groupFindings, panelChecks, panelTrendCandidates, strongestTrends } from "./panelInsights";
 import { latestChange, seasonality } from "./stats/season";
 import { benjaminiHochberg, changePoint, dominance, mannKendall, mean, median, outliers, pearson, type Trend } from "./stats/tests";
 
@@ -15,7 +15,7 @@ import { benjaminiHochberg, changePoint, dominance, mannKendall, mean, median, o
  *   3. Findings come back ranked, with a plain sentence and the numbers behind it.
  */
 
-export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "concentration" | "missing" | "seasonal" | "latest" | "duplicates" | "leader" | "standout" | "entitytrend" | "jump" | "rankshift" | "unusualrows" | "contextual" | "quality";
+export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "concentration" | "missing" | "seasonal" | "latest" | "duplicates" | "leader" | "standout" | "entitytrend" | "jump" | "rankshift" | "unusualrows" | "contextual" | "quality" | "pareto";
 
 /** The rows or points behind a finding, for a person to look at. They stay in the browser: nothing here is ever sent to a model. */
 export interface FindingDetails {
@@ -91,6 +91,10 @@ export interface InsightInput {
     considered: string[];
     top: { id: number; source: "joint" | "isolated"; score: number; reasons: { measure: string; side: "high" | "low"; z: number }[]; row: Record<string, unknown> }[];
   };
+  /** The total of a measure in each value of a text column with many values (a product, a store), for one that stands apart. */
+  groups?: { column: string; measure: string; values: { label: string; value: number }[] }[];
+  /** How much of a measure the biggest few values of a text column hold (customers, products): shares as fractions of the total. */
+  pareto?: { column: string; measure: string; groups: number; top10: number; top20: number; biggest: number }[];
   /** Checks on the values themselves: spellings, placeholders, numbers as text, impossible dates, empty periods, repeated keys. */
   quality?: QualityInput;
   /** How many rows are exact copies of an earlier row. */
@@ -207,6 +211,12 @@ function describe(f: RawFinding): Pick<Finding, "headline" | "figure" | "next"> 
         headline: `${e.issues} ${Number(e.issues) === 1 ? "problem" : "problems"} in the data`,
         figure: { value: String(e.issues), label: Number(e.issues) === 1 ? "problem to fix" : "problems to fix" },
         next: "Fix these in your file first and upload it again: each one changes what a total, a chart or an average means.",
+      };
+    case "pareto":
+      return {
+        headline: `A few ${a} values drive most of ${b}`,
+        figure: { value: pct(Number(e.share20)), label: `of ${b} from the top 20%` },
+        next: `Ask whether depending on so few ${a} values is a risk, and what it would take to grow the rest.`,
       };
     case "unusualrows":
       return {
@@ -525,6 +535,7 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
   }
 
   found.push(...qualityFindings(input.quality, input.rowCount));
+  found.push(...groupFindings(input));
 
   // ---- points that break their own trend and season ----
   const contextual: RawFinding[] = [];

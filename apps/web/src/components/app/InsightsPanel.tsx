@@ -15,6 +15,7 @@ import {
   Zap,
   PieChart,
   Repeat,
+  Layers,
   ShieldAlert,
   TrendingDown,
   TrendingUp,
@@ -46,6 +47,7 @@ const KIND: Record<FindingKind, { label: string; icon: LucideIcon }> = {
   unusualrows: { label: "Unusual rows", icon: ScanSearch },
   contextual: { label: "Out of pattern", icon: Activity },
   quality: { label: "Data quality", icon: ShieldAlert },
+  pareto: { label: "Concentration", icon: Layers },
 };
 
 /** The numbers behind a finding, in plain words, so a claim can be traced. */
@@ -80,6 +82,8 @@ function evidenceLines(f: Finding): string[] {
     lines.push(`${e.spreadsAway} times the usual spread away from how entities normally move from one period to the next`);
   if (f.kind === "rankshift")
     lines.push(`Ranked #${e.from} at the start and #${e.to} at the end, out of ${e.groups}`);
+  if (f.kind === "pareto")
+    lines.push(`The top 20% hold ${(Number(e.share20) * 100).toFixed(0)}% of the total, the top 10% hold ${(Number(e.share10) * 100).toFixed(0)}%, across ${e.groups} values; an even spread would give the top 20% a fifth`);
   if (f.kind === "quality")
     lines.push("A check on the values in the file, not a statistical test, so there is no chance of it being a fluke");
   if (f.kind === "unusualrows")

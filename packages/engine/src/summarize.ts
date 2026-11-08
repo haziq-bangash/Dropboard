@@ -16,11 +16,17 @@ const MIN_POINTS = 8;
 const MIN_YEAR_POINTS = 6;
 const MAX_POINTS = 400;
 const MAX_ENTITIES = 40;
+/** A text column with more values than this is not grouped for concentration: it is closer to an identifier of single rows. */
+const MAX_PARETO_GROUPS = 200_000;
+/** Groups tested for one far from the rest: above this many values the total of each is too small a thing to compare. */
+const MAX_GROUPS = 500;
 /** A measure needs this many different values for rows to be unusual on it: a rating of one to five has no tails to speak of. */
 const MIN_UNUSUAL_DISTINCT = 20;
 const MAX_UNUSUAL_MEASURES = 8;
 const MAX_UNUSUAL_ROWS = 50_000;
 const MAX_UNUSUAL_SHOWN = 8;
+/** At most this many unusual rows are left out of the group totals: more would make the query too long to be useful. */
+const MAX_EXCLUDED_ROWS = 300;
 const MAX_PANEL_MEASURES = 3;
 const MAX_DUPLICATE_ROWS = 2_000_000;
 
@@ -169,6 +175,8 @@ export async function gatherInsightInput(profile: TableProfile, run: RunSql): Pr
     }));
   }
 
+  let unusualIds: number[] = [];
+
   // ---- rows that are unusual across several measures, found on the rows themselves (a sample, for a very big table) ----
   const spread = measures.filter((m) => m.distinct >= MIN_UNUSUAL_DISTINCT && m.nullCount <= rowCount * 0.2).slice(0, MAX_UNUSUAL_MEASURES);
   if (spread.length >= 2 && rowCount >= 100) {
@@ -178,6 +186,8 @@ export async function gatherInsightInput(profile: TableProfile, run: RunSql): Pr
     const rows = await run(`SELECT id, ${spread.map((_, i) => `c${i}`).join(", ")} FROM (SELECT CAST(rowid AS DOUBLE) AS id, ${cols} FROM data WHERE ${present})${sample}`);
     const columns = spread.map((_, i) => rows.map((r) => Number(r[`c${i}`])));
     const result = ecod(columns);
+    // the rows named unusual are left out of the totals below, so a group that stands out only because of them is not reported twice
+    unusualIds = result.unusual.slice(0, MAX_EXCLUDED_ROWS).map((u) => Number(rows[u.index].id));
     if (result.unusual.length) {
       const top = result.unusual.slice(0, MAX_UNUSUAL_SHOWN);
       const ids = top.map((u) => Number(rows[u.index].id));
@@ -200,6 +210,38 @@ export async function gatherInsightInput(profile: TableProfile, run: RunSql): Pr
         }),
       };
     }
+  }
+
+  // ---- among many values of a text column (customers, products, stores): one far from the rest, and how much a few hold ----
+  const flow = measures.find((m) => valueKind(m) === "flow");
+  const many = columns
+    .filter((c) => c.type === "string" && c.distinct >= 21 && c.distinct <= MAX_PARETO_GROUPS && rowCount / c.distinct >= 2 && (c.textLength ?? 0) <= 40 && c.name !== profile.panel?.entity)
+    .slice(0, 3);
+  if (flow && many.length) {
+    const groups: NonNullable<InsightInput["groups"]> = [];
+    const pareto: NonNullable<InsightInput["pareto"]> = [];
+    const m = q(flow.name);
+    const without = unusualIds.length ? ` AND rowid NOT IN (${unusualIds.join(", ")})` : "";
+    for (const c of many) {
+      const col = q(c.name);
+      if (c.distinct <= MAX_GROUPS) {
+        const rows = await run(`SELECT CAST(${col} AS VARCHAR) AS label, CAST(sum(${m}) AS DOUBLE) AS value FROM data WHERE ${col} IS NOT NULL AND ${m} IS NOT NULL${without} GROUP BY 1 LIMIT ${MAX_GROUPS}`);
+        groups.push({ column: c.name, measure: flow.name, values: rows.map((r) => ({ label: String(r.label), value: Number(r.value) })).filter((v) => Number.isFinite(v.value)) });
+      }
+      const [r] = await run(
+        `WITH s AS (SELECT sum(${m}) AS v FROM data WHERE ${col} IS NOT NULL AND ${m} IS NOT NULL${without} GROUP BY ${col}), ` +
+          `r AS (SELECT v, row_number() OVER (ORDER BY v DESC) AS rk, count(*) OVER () AS n, sum(v) OVER () AS total, min(v) OVER () AS lo FROM s) ` +
+          `SELECT CAST(any_value(n) AS DOUBLE) AS n, CAST(any_value(total) AS DOUBLE) AS total, CAST(any_value(lo) AS DOUBLE) AS lo, ` +
+          `CAST(sum(v) FILTER (WHERE rk <= ceil(n * 0.2)) AS DOUBLE) AS top20, CAST(sum(v) FILTER (WHERE rk <= ceil(n * 0.1)) AS DOUBLE) AS top10, CAST(max(v) AS DOUBLE) AS biggest FROM r`,
+      );
+      const total = Number(r?.total);
+      // shares of a total only mean something when no group is negative
+      if (total > 0 && Number(r?.lo) >= 0) {
+        pareto.push({ column: c.name, measure: flow.name, groups: Number(r.n), top10: Number(r.top10) / total, top20: Number(r.top20) / total, biggest: Number(r.biggest) / total });
+      }
+    }
+    if (groups.some((x) => x.values.length)) input.groups = groups;
+    if (pareto.length) input.pareto = pareto;
   }
 
   // ---- how many rows each category value has ----

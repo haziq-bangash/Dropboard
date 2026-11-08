@@ -63,6 +63,37 @@ export function panelTrendCandidates(panels: Panel[]): PanelCandidate[] {
   return out;
 }
 
+/** One group is far above or below the rest (a product, a store), and a few groups hold most of a total. */
+export function groupFindings(input: Pick<InsightInput, "groups" | "pareto">): RawFinding[] {
+  const found: RawFinding[] = [];
+  for (const g of input.groups ?? []) {
+    const s = standoutAmong(g.values.map((x) => ({ label: x.label, v: x.value })));
+    if (!s) continue;
+    found.push({
+      kind: "standout",
+      columns: [g.column, g.measure],
+      sentence: `${s.far.label} has the ${s.z > 0 ? "highest" : "lowest"} total ${g.measure} among ${g.values.length} values of ${g.column}: ${fmt(s.far.v)} against a typical ${fmt(s.med)}.`,
+      p: s.p,
+      strength: clamp01(Math.abs(s.z) / 10) * 0.7,
+      evidence: { label: s.far.label, value: Number(fmt(s.far.v)), typical: Number(fmt(s.med)), spreadsAway: Number(Math.abs(s.z).toFixed(1)) },
+    });
+  }
+  for (const c of input.pareto ?? []) {
+    // an even spread gives the top fifth a fifth of the total; more than 55% is a real concentration
+    if (c.groups < 20 || c.top20 < 0.55) continue;
+    const top = Math.ceil(c.groups * 0.2);
+    found.push({
+      kind: "pareto",
+      columns: [c.column, c.measure],
+      sentence: `The top 20% of ${c.column} (${fmt(top)} of ${fmt(c.groups)}) account for ${pct(c.top20)} of ${c.measure}.`,
+      p: null,
+      strength: clamp01((c.top20 - 0.2) / 0.8) * 0.7,
+      evidence: { share20: Number(c.top20.toFixed(3)), share10: Number(c.top10.toFixed(3)), groups: c.groups, topGroups: top, biggestShare: Number(c.biggest.toFixed(3)) },
+    });
+  }
+  return found;
+}
+
 /** Of all the entity trends that held up, keep the strongest rise and the strongest fall for each measure: the rest are the same story. */
 export function strongestTrends(found: RawFinding[]): RawFinding[] {
   const best = new Map<string, RawFinding>();
@@ -71,6 +102,26 @@ export function strongestTrends(found: RawFinding[]): RawFinding[] {
     if (!best.has(key) || f.strength > best.get(key)!.strength) best.set(key, f);
   }
   return [...found.filter((x) => x.kind !== "entitytrend"), ...best.values()];
+}
+
+/**
+ * Is one of these far from the rest? It must be well outside in robust terms, and also clearly outside when tested against the
+ * others with Student's t (as for a new observation), with the p-value multiplied by how many were looked at: with a handful of
+ * values the robust spread alone is unstable and flags too readily.
+ */
+export function standoutAmong(items: { label: string; v: number }[]): { far: { label: string; v: number }; z: number; med: number; p: number } | null {
+  if (items.length < 6) return null;
+  const med = median(items.map((e) => e.v));
+  const spread = scaledMad(items.map((e) => e.v));
+  if (!(spread > 0)) return null;
+  const far = items.reduce((a, b) => (Math.abs(b.v - med) > Math.abs(a.v - med) ? b : a));
+  const z = (far.v - med) / spread;
+  const others = items.filter((e) => e !== far).map((e) => e.v);
+  const m = others.length;
+  const mean = others.reduce((s, v) => s + v, 0) / m;
+  const sd = Math.sqrt(others.reduce((s, v) => s + (v - mean) ** 2, 0) / (m - 1));
+  const p = sd > 0 ? Math.min(1, tTwoSided((far.v - mean) / (sd * Math.sqrt(1 + 1 / m)), m - 1) * items.length) : 1;
+  return Math.abs(z) >= 3.5 && p <= 0.01 ? { far, z, med, p } : null;
 }
 
 /** Checks that pass on a clear, large effect alone, as the outlier and step checks do. */
@@ -100,28 +151,16 @@ export function panelChecks(panels: Panel[], trending: Set<string> = new Set()):
 
     // who is far from their peers in the latest period, for levels and rates, where a share of a total means nothing
     if (p.kind !== "flow" && now.length >= 6) {
-      const med = median(now.map((e) => e.v));
-      const spread = scaledMad(now.map((e) => e.v));
-      if (spread > 0) {
-        const far = now.reduce((a, b) => (Math.abs(b.v - med) > Math.abs(a.v - med) ? b : a));
-        const z = (far.v - med) / spread;
-        // With a handful of entities the robust spread is unstable, so the entity is also tested against the others with
-        // Student's t (as for a new observation), and the p-value is multiplied by how many entities were looked at.
-        const others = now.filter((e) => e !== far).map((e) => e.v);
-        const m = others.length;
-        const mean = others.reduce((s, v) => s + v, 0) / m;
-        const sd = Math.sqrt(others.reduce((s, v) => s + (v - mean) ** 2, 0) / (m - 1));
-        const pValue = sd > 0 ? Math.min(1, tTwoSided((far.v - mean) / (sd * Math.sqrt(1 + 1 / m)), m - 1) * now.length) : 1;
-        if (Math.abs(z) >= 3.5 && pValue <= 0.01) {
-          found.push({
-            kind: "standout",
-            columns: [p.entity, p.measure],
-            sentence: `${far.label} has the ${z > 0 ? "highest" : "lowest"} ${p.measure} in ${p.periods[last].label}, ${fmt(far.v)} against a typical ${fmt(med)}.`,
-            p: pValue,
-            strength: clamp01(Math.abs(z) / 10) * 0.7,
-            evidence: { label: far.label, value: Number(fmt(far.v)), typical: Number(fmt(med)), spreadsAway: Number(Math.abs(z).toFixed(1)), at: p.periods[last].label },
-          });
-        }
+      const s = standoutAmong(now);
+      if (s) {
+        found.push({
+          kind: "standout",
+          columns: [p.entity, p.measure],
+          sentence: `${s.far.label} has the ${s.z > 0 ? "highest" : "lowest"} ${p.measure} in ${p.periods[last].label}, ${fmt(s.far.v)} against a typical ${fmt(s.med)}.`,
+          p: s.p,
+          strength: clamp01(Math.abs(s.z) / 10) * 0.7,
+          evidence: { label: s.far.label, value: Number(fmt(s.far.v)), typical: Number(fmt(s.med)), spreadsAway: Number(Math.abs(s.z).toFixed(1)), at: p.periods[last].label },
+        });
       }
     }
 
