@@ -18,6 +18,8 @@ export interface Dataset {
   panel?: { entity: string; time: string };
   /** Charts that must be present, by type. */
   charts?: string[];
+  /** Anomalies planted in the data: the kind of finding that must appear, and words its sentence must contain. Tables without this must produce none. */
+  anomalies?: { kind: "unusualrows" | "contextual"; mentions: string }[];
 }
 
 const csv = (header: string[], rows: (string | number | boolean | null)[][]) =>
@@ -233,6 +235,47 @@ function sports(): Dataset {
   };
 }
 
+/** Store orders where a handful of rows were keyed in wrongly: a quantity of 900 and a revenue to match. */
+function retailWithErrors(): Dataset {
+  const base = retail();
+  const lines = base.csv.trimEnd().split("\n");
+  // quantity is column 6 and revenue column 10 (1-based): inflate six rows spread through the table
+  for (const at of [210, 640, 1120, 1500, 1890, 2250]) {
+    const cells = lines[at].split(",");
+    cells[5] = "900";
+    cells[9] = String(Number(cells[6]) * 900);
+    lines[at] = cells.join(",");
+  }
+  return {
+    ...base,
+    id: "retail-with-errors",
+    title: "Store orders with keying errors",
+    csv: lines.join("\n") + "\n",
+    anomalies: [{ kind: "unusualrows", mentions: "unusually high" }],
+  };
+}
+
+/** Monthly sales with a clear pattern, and one month that broke it. */
+function monthlySales(): Dataset {
+  const r = seeded(21);
+  const rows = range(72).map((i) => {
+    const month = i % 12;
+    const base = 5000 * (1 + i * 0.01) * (month === 11 ? 1.6 : month === 6 ? 0.8 : 1) * (1 + r.normal() * 0.03);
+    // month 40 (May of the fourth year): an outage, sales fall to a third
+    return [iso(new Date(Date.UTC(2018, i, 1))), Math.round(i === 40 ? base * 0.33 : base), 200 + r.int(0, 30)];
+  });
+  return {
+    id: "monthly-sales",
+    title: "Monthly sales with one bad month",
+    csv: csv(["month", "sales", "orders"], rows),
+    rows: rows.length,
+    roles: { month: "time", sales: "flow" },
+    time: "month",
+    charts: ["line"],
+    anomalies: [{ kind: "contextual", mentions: "below what its trend and season predict" }],
+  };
+}
+
 function tiny(): Dataset {
   return { id: "edge-tiny", title: "Five rows", csv: csv(["item", "qty", "note"], [["a", 1, "x"], ["b", 2, "y"], ["c", 3, "z"], ["d", 4, "w"], ["e", 5, "v"]]), rows: 5, roles: {} };
 }
@@ -257,4 +300,4 @@ function sparse(): Dataset {
   };
 }
 
-export const DATASETS: Dataset[] = [finance(), retail(), hr(), saas(), web(), survey(), sensors(), marketing(), realEstate(), education(), healthcare(), sports(), tiny(), oneColumn(), allText(), sparse()];
+export const DATASETS: Dataset[] = [finance(), retail(), retailWithErrors(), monthlySales(), hr(), saas(), web(), survey(), sensors(), marketing(), realEstate(), education(), healthcare(), sports(), tiny(), oneColumn(), allText(), sparse()];

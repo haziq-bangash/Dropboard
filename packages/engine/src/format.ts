@@ -25,4 +25,7 @@ export function observedChange(values: number[]): number | null {
   return start > 0 ? end / start - 1 : null;
 }
 
+/** A fraction as a percent that keeps a decimal when it is small: 0.4%, 12%. */
+export const pctFine = (x: number) => (Math.abs(x) < 0.1 ? `${(Math.abs(x) * 100).toFixed(1)}%` : pct(x));
+
 export const clamp01 = (x: number) => Math.max(0, Math.min(1, x));

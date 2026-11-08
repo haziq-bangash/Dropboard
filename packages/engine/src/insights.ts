@@ -1,4 +1,5 @@
-import { clamp01, fmt, observedChange, pct } from "./format";
+import { seriesAnomalies } from "./anomaly/series";
+import { clamp01, fmt, observedChange, pct, pctFine } from "./format";
 import { panelChecks, panelTrendCandidates, strongestTrends } from "./panelInsights";
 import { latestChange, seasonality } from "./stats/season";
 import { benjaminiHochberg, changePoint, dominance, mannKendall, mean, median, outliers, pearson, type Trend } from "./stats/tests";
@@ -13,9 +14,18 @@ import { benjaminiHochberg, changePoint, dominance, mannKendall, mean, median, o
  *   3. Findings come back ranked, with a plain sentence and the numbers behind it.
  */
 
-export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "concentration" | "missing" | "seasonal" | "latest" | "duplicates" | "leader" | "standout" | "entitytrend" | "jump" | "rankshift";
+export type FindingKind = "trend" | "change" | "outlier" | "correlation" | "dominance" | "concentration" | "missing" | "seasonal" | "latest" | "duplicates" | "leader" | "standout" | "entitytrend" | "jump" | "rankshift" | "unusualrows" | "contextual";
+
+/** The rows or points behind a finding, for a person to look at. They stay in the browser: nothing here is ever sent to a model. */
+export interface FindingDetails {
+  caption: string;
+  columns: string[];
+  rows: (string | number | null)[][];
+}
 
 export interface Finding {
+  /** Rows to show under the finding, when it is about particular rows. */
+  details?: FindingDetails;
   kind: FindingKind;
   /** The columns it is about. */
   columns: string[];
@@ -36,7 +46,7 @@ export interface Finding {
 }
 
 /** A finding before its headline, figure and suggestion are worked out from its evidence. */
-export type RawFinding = Omit<Finding, "headline" | "figure" | "next">;
+export type RawFinding = Omit<Finding, "headline" | "figure" | "next"> ;
 
 export interface SeriesInput {
   column: string;
@@ -69,6 +79,15 @@ export interface InsightInput {
     periods: { x: number; label: string }[];
     entities: { label: string; y: (number | null)[] }[];
   }[];
+  /** Rows that are unusual across several measures, found on the rows themselves (see anomaly/ecod). */
+  unusual?: {
+    scored: number;
+    flagged: number;
+    measures: string[];
+    /** Every measure the rows were looked at on, including ones left out of the joint test for moving with another. */
+    considered: string[];
+    top: { id: number; source: "joint" | "isolated"; score: number; reasons: { measure: string; side: "high" | "low"; z: number }[]; row: Record<string, unknown> }[];
+  };
   /** How many rows are exact copies of an earlier row. */
   duplicates?: { rows: number };
 }
@@ -106,6 +125,26 @@ const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "Ju
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 /** Fold how unlikely the result is by chance into the ranking, without letting it overrule how big the effect is. */
 const confidence = (p: number | null) => (p === null ? 0.7 : clamp01(0.5 + -Math.log10(Math.max(p, 1e-300)) / 20));
+
+const cell = (v: unknown): string | number | null => (v === null || v === undefined ? null : typeof v === "number" ? Number(fmt(v)) === v ? v : Number(v.toFixed(2)) : v instanceof Date ? v.toISOString().slice(0, 10) : String(v));
+
+function contextualFinding(measure: string, entity: string | null, when: string, a: { actual: number; expected: number; relative: number | null; z: number }, seasonal: boolean): RawFinding {
+  const subject = entity ? `${entity}'s ${measure}` : measure;
+  const how =
+    a.relative === null
+      ? a.actual > a.expected ? "far above" : "far below"
+      : a.relative >= 3
+        ? `about ${a.relative >= 9 ? Math.round(1 + a.relative) : fmt(1 + a.relative)} times`
+        : `${pct(a.relative)} ${a.relative > 0 ? "above" : "below"}`;
+  return {
+    kind: "contextual",
+    columns: [measure],
+    sentence: `${subject} in ${when} was ${how} what its trend${seasonal ? " and season" : ""} predict${seasonal ? "" : "s"} (${fmt(a.actual)} against about ${fmt(a.expected)}).`,
+    p: null,
+    strength: clamp01(Math.abs(a.z) / 20) * 0.65,
+    evidence: { ...(entity ? { label: entity } : {}), at: when, change: a.relative === null ? 0 : Number(a.relative.toFixed(3)), actual: Number(fmt(a.actual)), expected: Number(fmt(a.expected)), spreadsAway: Number(Math.abs(a.z).toFixed(1)) },
+  };
+}
 
 /** The headline, big number and next step for a finding, all taken from its own evidence so they cannot disagree with it. */
 function describe(f: RawFinding): Pick<Finding, "headline" | "figure" | "next"> {
@@ -156,6 +195,20 @@ function describe(f: RawFinding): Pick<Finding, "headline" | "figure" | "next"> 
         headline: `${count === 1 ? "One" : "A few"} ${a} ${count === 1 ? "value stands" : "values stand"} apart`,
         figure: { value: fmt(Number(e.worstValue)), label: "the most extreme value" },
         next: "Check whether these are mistakes (a typo, an extra zero) or real events worth a closer look.",
+      };
+    }
+    case "unusualrows":
+      return {
+        headline: `${fmt(Number(e.flagged))} rows stand out`,
+        figure: { value: fmt(Number(e.flagged)), label: `of ${fmt(Number(e.scored))} rows` },
+        next: "Look at these rows first: a typing mistake, a one-off sale, a record that does not belong. Totals and averages include them.",
+      };
+    case "contextual": {
+      const change = Number(e.change);
+      return {
+        headline: `${e.label ? `${e.label}'s ` : ""}${a} broke its pattern in ${e.at}`,
+        figure: { value: change === 0 ? "off pattern" : `${change >= 0 ? "+" : "-"}${pct(change)}`, label: "against what was expected" },
+        next: "Check whether something happened then (a launch, an outage, a change in how it was counted) or whether it is a mistake in the data.",
       };
     }
     case "entitytrend": {
@@ -432,6 +485,63 @@ export function findInsights(input: InsightInput, options: InsightOptions = {}):
       evidence: { duplicateRows: copies, share: Number(copyShare.toFixed(3)) },
     });
   }
+
+  // ---- rows that are unusual across several measures, with the rows themselves for a person to look at ----
+  const u = input.unusual;
+  if (u && u.flagged > 0 && u.top.length) {
+    const top = u.top[0];
+    const share = u.scored ? u.flagged / u.scored : 0;
+    const why = (t: (typeof u.top)[number]) => t.reasons.slice(0, 2).map((r) => `${r.side === "high" ? "unusually high" : "unusually low"} ${r.measure}`).join(" and ");
+    const shown = new Set<string>();
+    for (const t of u.top) for (const r of t.reasons.slice(0, 2)) shown.add(r.measure);
+    for (const k of Object.keys(u.top[0].row)) if (shown.size < 6) shown.add(k);
+    const columns = [...shown];
+    found.push({
+      kind: "unusualrows",
+      columns: u.measures,
+      sentence: `${fmt(u.flagged)} of ${fmt(u.scored)} rows (${pctFine(share)}) stand out from the rest across ${u.measures.length} measures. The most unusual has ${why(top)}.`,
+      p: null,
+      strength: 0.55 + clamp01(Math.abs(top.reasons[0]?.z ?? 0) / 25) * 0.3,
+      evidence: { flagged: u.flagged, scored: u.scored, share: Number(share.toFixed(4)), measures: u.measures.length, strongestZ: Number(Math.abs(top.reasons[0]?.z ?? 0).toFixed(1)) },
+      details: {
+        caption: "The most unusual rows, and what makes each stand out. They stay in your browser.",
+        columns: ["Row", "Why", ...columns],
+        rows: u.top.map((t) => [t.id + 1, why(t), ...columns.map((c) => cell(t.row[c]))]),
+      },
+    });
+    // a lone extreme value is already described here, with the row it is in
+    found = found.filter((x) => x.kind !== "outlier");
+  }
+
+  // ---- points that break their own trend and season ----
+  const contextual: RawFinding[] = [];
+  for (const s of input.series ?? []) {
+    const phases = s.unit === "month" ? s.x.map((t) => new Date(t).getUTCMonth()) : s.unit === "day" ? s.x.map((t) => new Date(t).getUTCDay()) : null;
+    const period = s.unit === "month" ? 12 : s.unit === "day" ? 7 : 0;
+    for (const a of seriesAnomalies(s.y, phases && period ? { season: { phases, period } } : {}).slice(0, 2)) {
+      contextual.push(contextualFinding(s.column, null, s.labels?.[a.index] ?? `point ${a.index + 1}`, a, !!phases));
+    }
+  }
+  for (const p of input.panel ?? []) {
+    for (const e of p.entities) {
+      const idx: number[] = [];
+      const ys: number[] = [];
+      e.y.forEach((v, i) => {
+        if (v !== null) {
+          idx.push(i);
+          ys.push(v);
+        }
+      });
+      if (p.kind === "rate") continue;
+      for (const a of seriesAnomalies(ys).slice(0, 1)) contextual.push(contextualFinding(p.measure, e.label, p.periods[idx[a.index]].label, a, false));
+    }
+  }
+  // a one-period jump among peers already tells the same story about that entity
+  // and when rows are already named as unusual, a total over time that spiked because of them is the same story
+  const covered = new Set((u?.flagged ? u.considered : []).flatMap((m) => [m, `Average ${m}`]));
+  for (let i = contextual.length - 1; i >= 0; i--) if (!contextual[i].evidence.label && covered.has(contextual[i].columns[0])) contextual.splice(i, 1);
+  const jumps = new Set(found.filter((x) => x.kind === "jump").map((x) => `${x.evidence.label}|${x.evidence.at}`));
+  found.push(...contextual.filter((x) => !jumps.has(`${x.evidence.label}|${x.evidence.at}`)));
 
   // an entity whose own series has a trend that held up: only those can have changed rank for a real reason
   const trending = new Set(found.filter((x) => x.kind === "entitytrend").map((x) => `${x.columns[1]}|${x.evidence.label}`));

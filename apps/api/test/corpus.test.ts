@@ -93,6 +93,18 @@ describe.each(DATASETS)("corpus: $title ($rows rows)", (dataset) => {
     }
   });
 
+  it("finds the anomalies planted in it, and none in a table that has none", async () => {
+    const { findings } = await result;
+    const anomalous = findings.filter((f) => f.kind === "unusualrows" || f.kind === "contextual");
+    if (!dataset.anomalies) {
+      expect(anomalous.map((f) => f.sentence), "no anomaly where none was planted").toEqual([]);
+      return;
+    }
+    for (const want of dataset.anomalies) {
+      expect(findings.some((f) => f.kind === want.kind && f.sentence.includes(want.mentions)), `a ${want.kind} finding mentioning "${want.mentions}"`).toBe(true);
+    }
+  });
+
   it("finds things to say without ever saying something broken", async () => {
     const { findings } = await result;
     for (const f of findings) {

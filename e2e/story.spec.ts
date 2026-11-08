@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { signUp } from "./helpers";
+import { ordersWithErrors, signUp } from "./helpers";
 
 async function openSample(page: Page, title: string) {
   await page.goto("/app/new");
@@ -149,4 +149,37 @@ test("when Pilot's story cannot be written, the plain story stays and the person
   await page.getByRole("button", { name: "Write this with Pilot" }).click();
   await expect(page.locator('[data-slot="alert"]')).toBeVisible();
   await expect(page.getByTestId("story-headline")).toHaveText(before);
+});
+
+test("rows that were keyed in wrongly are listed with why, and nothing from those rows goes to Pilot", async ({ page }) => {
+  await signUp(page);
+  await page.goto("/app/new");
+  await page.setInputFiles('input[type="file"]', { name: "orders.csv", mimeType: "text/csv", buffer: Buffer.from(ordersWithErrors()) });
+  await expect(page).toHaveURL(/\/app\/p\//, { timeout: 30_000 });
+  await expect(page.getByTestId("kpi-value").first()).not.toHaveText("", { timeout: 30_000 });
+
+  await page.getByRole("tab", { name: "Insights" }).click();
+  const finding = page.getByTestId("finding").filter({ hasText: /rows \(.*\) stand out from the rest/ });
+  await expect(finding).toBeVisible({ timeout: 30_000 });
+  await expect(finding).toContainText("unusually high");
+  const table = finding.getByTestId("finding-details");
+  await expect(table).toContainText("Why");
+  await expect(table.getByRole("region")).toBeVisible();
+  // the wrong rows are in the list, with their real values, on this screen
+  await expect(table).toContainText("900");
+
+  // the story is written from numbers and placeholders: no value from any row is in what goes out
+  await page.getByRole("tab", { name: "Story" }).click();
+  await expect(page.getByTestId("story-headline")).toBeVisible({ timeout: 30_000 });
+  let sent = "";
+  await page.route("**/api/ai/narrate", (route) => {
+    sent = route.request().postData() ?? "";
+    const { findings } = JSON.parse(sent) as { findings: { id: string }[] };
+    return route.fulfill({ json: { items: findings.map((f) => ({ id: f.id, headline: "A finding", sentence: "Worth a look.", next: "Check it." })), remaining: 5 } });
+  });
+  await page.getByRole("button", { name: "Write this with Pilot" }).click();
+  await expect(page.getByText(/requests? left today/)).toBeVisible();
+  expect(sent).toContain("unusualrows");
+  expect(sent).not.toContain("900");
+  expect(sent).not.toContain("details");
 });

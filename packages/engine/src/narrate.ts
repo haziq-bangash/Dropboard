@@ -38,7 +38,7 @@ export function toNarrateFindings(findings: Finding[]): NarrateFinding[] {
       if (typeof v === "number" && Number.isFinite(v)) facts[k] = v;
     }
     const tokens = HELD_BACK.filter((k) => k in f.evidence).map((k) => `{${k}}`);
-    return { id: `f${i}`, kind: f.kind, columns: f.columns, facts, tokens };
+    return { id: `f${i}`, kind: f.kind, columns: f.columns.slice(0, 2), facts, tokens };
   });
 }
 
