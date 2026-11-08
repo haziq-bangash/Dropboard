@@ -50,7 +50,7 @@ export function UsageMeter() {
   const { state } = useSidebar();
   if (!limits || state === "collapsed") return null;
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-sidebar-border bg-background/60 p-3">
+    <div className="flex flex-col gap-3 rounded-2xl bg-secondary/40 p-4" data-testid="usage-meter">
       <Bar
         label="Projects"
         used={limits.projects.used}

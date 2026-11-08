@@ -11,9 +11,9 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { Grain } from "@/components/art/Grain";
+import { bentoTile, Chip, ItalicLast, Stat, TONES } from "@/components/marketing/bento";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -45,9 +45,12 @@ const when = (iso: string) =>
 export function ProjectCard({
   project,
   onError,
+  tone = "yellow",
 }: {
   project: ProjectSummary;
   onError: (message: string) => void;
+  /** The tile's colour: the list takes them in turn, as the homepage's tiles do. */
+  tone?: keyof typeof TONES;
 }) {
   const router = useRouter();
   const { data: session } = authClient.useSession();
@@ -62,33 +65,22 @@ export function ProjectCard({
 
   return (
     <>
-      <Card
-        className="group relative transition-shadow hover:shadow-md"
-        data-testid="project-card"
-      >
-        <CardContent className="flex flex-col gap-4">
+      <div className={`${bentoTile} ${TONES[tone]} min-h-[240px] justify-between gap-6 p-6`} data-testid="project-card">
+        {tone === "teal" && <div aria-hidden="true" className="absolute inset-0 -z-10 bg-cover bg-center opacity-20" style={{ backgroundImage: "url(/art/topo-lines-light.svg)" }} />}
+        <Grain className="-z-10 opacity-40" />
+        <div className="flex flex-col gap-3">
           <div className="flex items-start justify-between gap-2">
-            <Link
-              href={`/app/p/${project.id}`}
-              className="min-w-0 flex-1 after:absolute after:inset-0"
-            >
-              <h3 className="truncate text-lg font-semibold tracking-tight">
-                {project.title}
-              </h3>
-              <p className="mt-1 flex items-center gap-1.5 truncate text-sm text-muted-foreground">
-                <FileSpreadsheet className="size-3.5 shrink-0" />
-                <span className="truncate">
-                  {project.sourceName ?? "No file recorded"}
-                </span>
-              </p>
-            </Link>
+            <p className="flex min-w-0 items-center gap-1.5 text-sm opacity-85">
+              <FileSpreadsheet className="size-3.5 shrink-0" aria-hidden="true" />
+              <span className="truncate">{project.sourceName ?? "No file recorded"}</span>
+            </p>
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    className="relative z-10"
+                    className="relative z-10 -mr-2 -mt-1 rounded-full hover:bg-black/10 hover:text-current aria-expanded:bg-black/10"
                     aria-label={`Actions for ${project.title}`}
                   />
                 }
@@ -124,23 +116,36 @@ export function ProjectCard({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <Link href={`/app/p/${project.id}`} className="after:absolute after:inset-0">
+            <h3 className="line-clamp-2 font-serif text-3xl leading-[1.05] font-normal tracking-normal text-balance">
+              <ItalicLast text={project.title} />
+            </h3>
+          </Link>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <Stat>
+            <span className="text-5xl">
+              <span>{(project.rowCount ?? project.charts).toLocaleString()}</span>
+              <span className="font-sans text-base font-normal tracking-normal"> {project.rowCount !== null ? "rows" : "charts"}</span>
+            </span>
+          </Stat>
+          <div className="flex flex-wrap items-center gap-2">
             {project.rowCount !== null && (
-              <Badge variant="secondary">
-                {project.rowCount.toLocaleString()} rows
-              </Badge>
+              <Chip tilt="-rotate-2" className="bg-white/85 text-foreground">
+                {project.charts} charts
+              </Chip>
             )}
-            <Badge variant="secondary">{project.charts} charts</Badge>
             {project.published && (
-              <Badge variant="secondary" className="gap-1">
-                <Globe className="size-3" />
+              <Chip tilt="rotate-2" className="inline-flex items-center gap-1 bg-white/85 text-foreground">
+                <Globe className="size-3" aria-hidden="true" />
                 Published
-              </Badge>
+              </Chip>
             )}
-            <span className="ml-auto">Updated {when(project.updatedAt)}</span>
+            <span className="ml-auto text-xs opacity-85">Updated {when(project.updatedAt)}</span>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <Dialog
         open={dialog === "rename"}
