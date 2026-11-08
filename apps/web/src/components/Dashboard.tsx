@@ -1,12 +1,12 @@
 "use client";
 
-import { chartSummary, countryCode, usStateCode } from "@dropboard/engine";
+import { chartSummary, countryCode, removeChart, usStateCode } from "@dropboard/engine";
 import type { ChartSpec, DashboardSpec } from "@dropboard/spec";
 import * as echarts from "echarts";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ChevronLeft, ChevronRight, Download, Hash, Presentation } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Hash, Presentation, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -354,12 +354,15 @@ function ChartCard({
   source,
   dataKey,
   tall,
+  onRemove,
 }: {
   spec: ChartSpec;
   source: RowSource;
   dataKey: string;
   /** Draw the chart large, for present mode */
   tall?: boolean;
+  /** When given (the owner's page), a button takes this chart off the dashboard */
+  onRemove?: () => void;
 }) {
   // Keyed by which rows are loaded, so the same SQL on a different file is never answered from the old rows
   const query = useQuery({
@@ -416,11 +419,18 @@ function ChartCard({
     >
       <CardHeader>
         <CardTitle>{spec.title}</CardTitle>
-        {spec.type !== "table" && rows && !error && (
-          <CardAction>
-            <Button variant="ghost" size="icon-sm" aria-label={`Save ${spec.title} as an image`} onClick={() => saveImage(cardRef.current, spec.title)}>
-              <Download />
-            </Button>
+        {(onRemove || (spec.type !== "table" && rows && !error)) && (
+          <CardAction className="flex items-center gap-1">
+            {spec.type !== "table" && rows && !error && (
+              <Button variant="ghost" size="icon-sm" aria-label={`Save ${spec.title} as an image`} onClick={() => saveImage(cardRef.current, spec.title)}>
+                <Download />
+              </Button>
+            )}
+            {onRemove && (
+              <Button variant="ghost" size="icon-sm" aria-label={`Remove ${spec.title} from the dashboard`} onClick={onRemove}>
+                <Trash2 />
+              </Button>
+            )}
           </CardAction>
         )}
       </CardHeader>
@@ -521,12 +531,15 @@ export function Dashboard({
   source,
   dataKey,
   showTitle = true,
+  onSpec,
 }: {
   spec: DashboardSpec;
   source: RowSource;
   /** Identifies the rows behind the source (a load id, or "snapshot"). Cached chart results are reused only for the same key. */
   dataKey: string;
   showTitle?: boolean;
+  /** When given (the owner's page), charts get a remove button and the change is passed here to be saved */
+  onSpec?: (spec: DashboardSpec) => void;
 }) {
   const kpis = spec.charts.filter((c) => c.type === "kpi");
   const rest = spec.charts.filter((c) => c.type !== "kpi");
@@ -545,7 +558,13 @@ export function Dashboard({
       )}
       <div className="grid gap-4 md:grid-cols-2">
         {rest.map((c) => (
-          <ChartCard key={c.id} spec={c} source={source} dataKey={dataKey} />
+          <ChartCard
+            key={c.id}
+            spec={c}
+            source={source}
+            dataKey={dataKey}
+            onRemove={onSpec && spec.charts.length > 1 ? () => onSpec(removeChart(spec, c.id)) : undefined}
+          />
         ))}
       </div>
     </section>
