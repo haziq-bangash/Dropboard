@@ -85,7 +85,7 @@ function Bar({
         <span>{label}</span>
         <span
           className={
-            full ? "font-medium text-brand-text" : "text-muted-foreground"
+            full ? "font-medium text-brand-text-strong" : "text-muted-foreground"
           }
         >
           {used} of {max}

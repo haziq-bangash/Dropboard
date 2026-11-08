@@ -345,7 +345,7 @@ export function Perks() {
           <div className="absolute right-5 top-5 flex flex-wrap justify-end gap-2">
             <Chip tilt="-rotate-3" className="bg-secondary text-secondary-foreground">Password</Chip>
             <Chip tilt="rotate-2" className="bg-background text-foreground">Read-only</Chip>
-            <Chip tilt="-rotate-2" className="bg-brand text-foreground">Revocable</Chip>
+            <Chip tilt="-rotate-2" className="bg-brand text-[#1b262c]">Revocable</Chip>
           </div>
           <Stat>
             <span className="block text-5xl sm:text-6xl">
@@ -358,7 +358,7 @@ export function Perks() {
 
         {/* Free to start */}
         <div className={`${bentoBase} border-2 border-dashed border-brand bg-card text-foreground sm:col-span-2`} data-testid="perk">
-          <p className="text-sm font-medium tracking-wide text-brand-text">Free to start</p>
+          <p className="text-sm font-medium tracking-wide text-brand-text-strong">Free to start</p>
           <Stat>
             <span className="block text-7xl sm:text-8xl">
               <em className="text-brand-text italic">Free</em>
